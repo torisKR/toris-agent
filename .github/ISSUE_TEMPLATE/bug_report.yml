@@ -1,0 +1,96 @@
+name: Bug report
+description: Something in toris behaves incorrectly
+title: '[bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report. Please fill in what you can —
+        a run receipt (`toris receipt <runId> --md`) is usually the fastest way for us to help.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the incorrect behaviour.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence of commands that shows the problem.
+      placeholder: |
+        1. toris init
+        2. toris project add .
+        3. toris run "add a health endpoint" --autonomy L2
+        4. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: input
+    id: toris-version
+    attributes:
+      label: toris version
+      placeholder: 'output of: toris --version'
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: 'output of: node --version'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows (WSL)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider CLI
+      options:
+        - claude
+        - codex
+        - both
+        - none
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Run receipt or logs
+      description: Output of `toris receipt <runId> --md` or `toris logs <runId>`. Redact anything sensitive.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: duplicates
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true

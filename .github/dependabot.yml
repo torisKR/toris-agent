@@ -1,0 +1,11 @@
+version: 2
+
+# No `npm` ecosystem entry on purpose: toris-agent has zero runtime dependencies
+# and ships no lockfile, so there is nothing for Dependabot to bump there.
+updates:
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    commit-message:
+      prefix: 'ci'

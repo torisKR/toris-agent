@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+title: '[feat]: '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is painful or impossible today? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What should toris do instead? Command shapes and example output are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you weighed, and why you set them aside.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - CLI
+        - planner
+        - orchestrator
+        - providers
+        - verifier
+        - receipts
+        - storage
+        - docs
+        - other
+    validations:
+      required: true
