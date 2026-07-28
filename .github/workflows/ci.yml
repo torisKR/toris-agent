@@ -12,16 +12,17 @@ permissions:
 
 jobs:
   test:
-    name: test (node ${{ matrix.node-version }})
-    runs-on: ubuntu-latest
+    name: test (node ${{ matrix.node-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         node-version: ['22.x', '24.x']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -38,9 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
 
@@ -49,10 +50,63 @@ jobs:
 
       - name: Install globally from the tarball
         run: |
-          npm pack
-          npm install -g ./toris-agent-0.1.0.tgz
+          TARBALL=$(npm pack --silent)
+          echo "Built $TARBALL"
+          npm install -g "./$TARBALL"
 
+      # The runner has neither `claude` nor `codex` installed, so `toris doctor`
+      # is *expected* to exit 1 on the providers check. That is real behaviour we
+      # do not want to weaken, so the smoke test asserts on it instead of hiding
+      # it, then proves the CLI still does useful work without any provider by
+      # driving a full dry run through the deterministic fallback planner.
       - name: Smoke test the installed CLI
+        env:
+          NO_COLOR: '1'
         run: |
+          set -euo pipefail
+
           toris --version
-          toris doctor
+          toris init
+          toris project add .
+
+          echo "--- doctor must report the missing providers and exit 1 ---"
+          if toris doctor; then
+            echo "::error::doctor exited 0 with no provider installed; it should exit 1"
+            exit 1
+          fi
+
+          echo "--- a provider-less dry run must still succeed ---"
+          toris run "add a health endpoint" --dry-run --autonomy L1 --json > run.json
+          RUN_ID=$(node -p "JSON.parse(require('fs').readFileSync('run.json','utf8')).run.id")
+          echo "run id: $RUN_ID"
+
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("run.json", "utf8"));
+            const fail = (m) => { console.error(`::error::${m}`); process.exit(1); };
+            if (r.ok !== true) fail("run did not report ok");
+            if (r.run.status !== "dry-run") fail(`unexpected status ${r.run.status}`);
+            if (r.run.providerAvailable !== false) fail("providerAvailable should be false on CI");
+            if (!Array.isArray(r.run.tasks) || r.run.tasks.length === 0) fail("fallback plan produced no tasks");
+            if (r.run.costUsd !== 0) fail("a dry run must not cost anything");
+            console.log(`fallback plan produced ${r.run.tasks.length} task(s) at $0.00`);
+          '
+
+          echo "--- read-only commands must all exit 0 ---"
+          toris receipt "$RUN_ID" --md
+          toris inspect "$RUN_ID"
+          toris logs "$RUN_ID"
+          toris runs
+          toris project list
+          toris agents
+          toris skills
+          toris approvals
+
+          echo "--- misuse must exit 2, not crash ---"
+          rc=0
+          toris definitely-not-a-command >/dev/null 2>&1 || rc=$?
+          if [ "$rc" -ne 2 ]; then
+            echo "::error::unknown command exited $rc, expected 2"
+            exit 1
+          fi
+
+          echo "smoke test passed"

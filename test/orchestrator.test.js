@@ -64,6 +64,22 @@ test('a missing provider binary degrades to a fallback plan rather than crashing
   assert.ok(store.events.some((e) => e.type === 'plan.fallback'));
 });
 
+test('a provider that errors during planning degrades to a fallback plan', async () => {
+  // Regression: an *absent* provider fell back, but a provider that was present
+  // and then failed (e.g. codex refusing a non-git directory) crashed the whole
+  // run. Both are the same class of problem and must degrade the same way.
+  const { orch, store } = build({
+    invoke: async () => { throw new Error('codex exited with code 1: Not inside a trusted directory'); },
+  });
+  const run = await orch.run({ goal: 'do the thing', dryRun: true });
+  assert.equal(run.status, 'dry-run');
+  assert.ok(run.tasks.length > 0, 'a plan is still produced');
+  assert.equal(run.costUsd, 0);
+  const failed = store.events.find((e) => e.type === 'plan.failed');
+  assert.ok(failed, 'the failure is recorded as an event');
+  assert.match(failed.reason, /trusted directory/);
+});
+
 test('an unparsable plan reply falls back and records why', async () => {
   const { orch, store } = build({ invoke: async () => ({ text: 'I refuse to emit JSON.' }) });
   const run = await orch.run({ goal: 'goal', dryRun: true });

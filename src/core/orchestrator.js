@@ -66,10 +66,20 @@ export class Orchestrator {
       return fallbackPlan(run.goal, { now: this.now });
     }
     const prompt = buildPlanPrompt(run.goal, project);
-    const result = await this.invoke(adapter, prompt, {
-      cwd: project?.path,
-      timeoutMs: this.config.providerTimeoutMs,
-    });
+    let result;
+    try {
+      result = await this.invoke(adapter, prompt, {
+        cwd: project?.path,
+        timeoutMs: this.config.providerTimeoutMs,
+      });
+    } catch (err) {
+      // A provider that is installed but refuses to run (untrusted directory,
+      // expired auth, network failure, timeout) is no more fatal than one that
+      // is missing entirely: degrade to the deterministic plan so the user still
+      // gets something actionable instead of a stack trace.
+      await this.#emit(run, 'plan.failed', { reason: err?.message ?? String(err) });
+      return fallbackPlan(run.goal, { now: this.now });
+    }
     const tasks = normalizeTasks(extractJsonArray(result.text), { now: this.now });
     if (tasks.length === 0) {
       await this.#emit(run, 'plan.unparsable', { replyPreview: String(result.text).slice(0, 300) });
