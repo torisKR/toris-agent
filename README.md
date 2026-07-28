@@ -6,6 +6,7 @@
 Turn a goal into planned, executed and verified work — with an evidence receipt for every run.
 
 [![CI](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/toris-agent.svg)](https://www.npmjs.com/package/toris-agent)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.6-brightgreen.svg)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-success.svg)](./package.json)
@@ -54,17 +55,16 @@ Agent tools are easy to start and hard to trust. toris is built around four opin
 
 ## Install
 
-> **Not on npm yet.** `toris-agent` has not been published to the public registry,
-> so `npm install -g toris-agent` will 404. Install straight from this repository —
-> there are **no dependencies**, so it is a single fast download.
-
 ```bash
 # Global CLI (recommended)
-npm install -g git+https://github.com/torisKR/toris-agent.git
+npm install -g toris-agent
 toris --help
 
 # One-off, no install
-npx github:torisKR/toris-agent doctor
+npx toris-agent doctor
+
+# Latest unreleased code, straight from git
+npm install -g git+https://github.com/torisKR/toris-agent.git
 
 # From source, for development
 git clone https://github.com/torisKR/toris-agent.git
