@@ -1,29 +1,48 @@
 {
-  "name": "toris-agent-monorepo",
+  "name": "toris-agent",
   "version": "0.1.0",
-  "private": true,
-  "description": "Toris Agent — a local-first multi-agent development harness for solo founders",
+  "description": "A local-first, multi-agent development harness that turns a goal into planned, executed and verified work — with an evidence receipt for every run.",
+  "keywords": [
+    "agent",
+    "ai",
+    "cli",
+    "orchestration",
+    "claude",
+    "codex",
+    "automation",
+    "local-first"
+  ],
   "license": "Apache-2.0",
   "type": "module",
+  "bin": {
+    "toris": "bin/toris.js"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.6.0"
   },
-  "packageManager": "pnpm@9.14.2",
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/**\" run build && pnpm --filter toris-agent run build",
-    "clean": "pnpm -r exec rm -rf dist .tsbuildinfo",
-    "typecheck": "pnpm -r run typecheck",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "coverage": "vitest run --coverage",
-    "lint": "prettier --check .",
-    "format": "prettier --write ."
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "lint": "for f in $(find bin src test -name \"*.js\"); do node --check \"$f\" || exit 1; done; echo \"syntax ok\"",
+    "toris": "node bin/toris.js"
   },
-  "devDependencies": {
-    "@types/node": "^22.10.2",
-    "prettier": "^3.4.2",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
-  }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/toriskr/toris-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/toriskr/toris-agent/issues"
+  },
+  "homepage": "https://github.com/toriskr/toris-agent#readme",
+  "dependencies": {}
 }

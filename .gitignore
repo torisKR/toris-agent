@@ -1,13 +1,7 @@
 node_modules/
 dist/
-build/
-coverage/
-*.tsbuildinfo
-.DS_Store
-.env
-.env.*
-!.env.example
 *.log
-.toris/
-tmp/
-.vitest/
+.DS_Store
+.toris-test/
+coverage/
+*.tgz

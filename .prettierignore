@@ -1,4 +1,5 @@
-dist
-coverage
-pnpm-lock.yaml
-LICENSE
+node_modules/
+dist/
+coverage/
+.toris-test/
+docs/toris-agent-development-plan.html
