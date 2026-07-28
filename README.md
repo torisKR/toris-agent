@@ -157,12 +157,80 @@ toris receipt run_kymt5ph09d7548 --md > receipt.md
 - **Receipt** records goal, plan, per-task status, check exit codes, duration and cost.
   Exit code `3` means verification failed — CI can gate on it.
 
+## Chat
+
+`toris run` delegates to agent CLIs. `toris chat` is the other half: toris talks to
+the model itself, with tools, so you can work without a second CLI installed.
+
+Point a profile at a model and route `chat` to it. toris ships **no model IDs** —
+you own that mapping, so swapping models is a config edit, never an upgrade:
+
+```jsonc
+// ~/.toris/config.json
+"models": {
+  "profiles": { "main": { "provider": "anthropic", "model": "<model-id>" } },
+  "routing":  { "chat": "main" }
+}
+```
+
+```bash
+export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY
+toris chat                        # REPL
+toris chat "why does the build fail?"   # one-shot
+```
+
+The model gets `read_file`, `list_files`, `write_file` and `run_command`. Writes and
+commands are gated by your autonomy level — below **L3** every mutation asks first,
+and a denial is reported back to the model instead of silently failing.
+
+```console
+$ toris chat
+  /skills   list loaded skill packages
+  /model    show the active profile
+  /clear    reset the transcript
+  /exit
+```
+
+If chat is not usable yet, `toris doctor` names the exact key or variable to set.
+
+## Skills
+
+A skill is a directory with a `SKILL.md` — a short, durable instruction the model
+follows during chat. Discovery is **builtin → `~/.toris/skills` → `<project>/.toris/skills`**,
+later definitions overriding earlier ones by name, so a project can sharpen a rule
+without forking it.
+
+```console
+$ toris skills
+Skills (3)
+
+  NAME             SOURCE   DESCRIPTION
+  release-check    builtin  Verify a package is actually installable and runnable before publishing or tagging.
+  reproduce-first  builtin  Reproduce a bug with a command before proposing any fix.
+  ship-small       builtin  Land the smallest change that fully solves the problem, with proof it works.
+```
+
+The three built-ins encode solo-developer habits that are easy to skip when you are
+the only reviewer: reproduce before fixing, ship the smallest change, and prove the
+package installs before tagging a release.
+
+```markdown
+---
+name: reproduce-first
+description: Reproduce a bug with a command before proposing any fix.
+---
+
+Do not propose a fix until you have run a command that shows the failure.
+```
+
+Drop that in `.toris/skills/<name>/SKILL.md` and it applies to the next chat.
+
 ## Autonomy levels
 
 Every run has a ceiling. Anything above it becomes an approval request instead of an action.
 
 ```console
-$ toris skills
+$ toris autonomy
 Autonomy levels
 
   LEVEL  WRITE  COMMIT  PUSH  MEANING
@@ -241,6 +309,7 @@ toris logs <runId>             # raw JSONL event stream
 ```
 init                      Create ~/.toris and a default config
 doctor                    Check runtime, providers, git and store
+chat ["<message>"]        Talk to a model with tools (REPL if no message)
 project add [path]        Register a project (defaults to cwd)
 project list              List registered projects
 project inspect <id>      Show one project
@@ -254,7 +323,8 @@ cancel <runId>            Mark a run cancelled
 approvals                 List approval requests
 approve <id> | reject <id>
 agents [--category <c>]   Built-in agent profiles
-skills                    Autonomy levels and what each permits
+skills                    Skill packages the model follows in chat
+autonomy                  Autonomy levels and what each permits
 daemon status             Background daemon (not in 0.1.0)
 version                   Print version
 ```
