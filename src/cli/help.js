@@ -8,6 +8,7 @@ USAGE
 COMMANDS
   init                      Create ~/.toris and a default config
   doctor                    Check runtime, providers, git and store
+  chat ["<message>"]        Talk to a model with tools (REPL if no message)
   project add [path]        Register a project (defaults to cwd)
   project list              List registered projects
   project inspect <id>      Show one project
@@ -21,7 +22,8 @@ COMMANDS
   approvals                 List approval requests
   approve <id> | reject <id>
   agents [--category <c>]   Built-in agent profiles
-  skills                    Autonomy levels and what each permits
+  skills                    Skill packages the model follows in chat
+  autonomy                  Autonomy levels and what each permits
   daemon status             Background daemon (not in 0.1.0)
   version                   Print version
 

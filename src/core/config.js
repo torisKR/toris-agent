@@ -16,6 +16,14 @@ export const DEFAULT_CONFIG = Object.freeze({
     claude: Object.freeze({ bin: 'claude', enabled: true }),
     codex: Object.freeze({ bin: 'codex', enabled: true }),
   }),
+  // Model profiles start empty on purpose. The development plan forbids pinning
+  // example model IDs in product code, so the user owns this mapping: roles ->
+  // profiles -> models. `toris init` writes a starter block and every error
+  // names the exact config key to set.
+  models: Object.freeze({
+    profiles: Object.freeze({}),
+    routing: Object.freeze({}),
+  }),
 });
 
 /** Resolve the toris home dir. Order: explicit arg > TORIS_HOME > ~/.toris */

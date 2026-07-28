@@ -22,7 +22,9 @@ export function buildTaskPrompt(task, run, project) {
     '',
     'Make the change directly in the repository. Keep it minimal and focused.',
     'When finished, reply with a one-paragraph summary of exactly what you changed.',
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
@@ -33,7 +35,15 @@ export class Orchestrator {
   /**
    * @param {{store:any, config:any, invoke?:Function, detect?:Function, verifyFn?:Function, now?:Function, onEvent?:Function}} deps
    */
-  constructor({ store, config, invoke = invokeProvider, detect = detectBinary, verifyFn = verify, now = Date.now, onEvent } = {}) {
+  constructor({
+    store,
+    config,
+    invoke = invokeProvider,
+    detect = detectBinary,
+    verifyFn = verify,
+    now = Date.now,
+    onEvent,
+  } = {}) {
     this.store = store;
     this.config = config;
     this.invoke = invoke;
@@ -115,7 +125,11 @@ export class Orchestrator {
       finishedAt: null,
     };
     await this.store?.saveRun(run);
-    await this.#emit(run, 'run.started', { goal: run.goal, autonomy: run.autonomy, provider: run.provider });
+    await this.#emit(run, 'run.started', {
+      goal: run.goal,
+      autonomy: run.autonomy,
+      provider: run.provider,
+    });
 
     const tasks = await this.plan(run, opts.project, adapter, available);
     const planned = { ...run, tasks, status: 'planned' };
@@ -160,14 +174,22 @@ export class Orchestrator {
         await this.#emit(current, 'task.skipped', { taskId: task.id, reason: 'budget exhausted' });
         continue;
       }
-      await this.#emit(current, 'task.started', { taskId: task.id, title: task.title, agent: task.agent });
+      await this.#emit(current, 'task.started', {
+        taskId: task.id,
+        title: task.title,
+        agent: task.agent,
+      });
       try {
         const result = await this.invoke(adapter, buildTaskPrompt(task, current, opts.project), {
           cwd: current.projectPath ?? undefined,
           timeoutMs: this.config.providerTimeoutMs,
         });
         current = { ...current, costUsd: current.costUsd + (result.costUsd || 0) };
-        executed.push({ ...task, status: 'succeeded', summary: String(result.text).slice(0, 2000) });
+        executed.push({
+          ...task,
+          status: 'succeeded',
+          summary: String(result.text).slice(0, 2000),
+        });
         await this.#emit(current, 'task.succeeded', { taskId: task.id });
       } catch (err) {
         executed.push({ ...task, status: 'failed', error: err.message });

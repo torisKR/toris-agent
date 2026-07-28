@@ -7,13 +7,15 @@ import { printHelp } from './help.js';
 import { cmdInit, cmdDoctor, cmdVersion } from './commands/setup.js';
 import { cmdProject } from './commands/project.js';
 import { cmdRun, cmdRuns, cmdInspect, cmdReceipt, cmdLogs, cmdCancel } from './commands/run.js';
-import { cmdAgents, cmdSkills } from './commands/catalog.js';
+import { cmdAgents, cmdSkills, cmdAutonomy } from './commands/catalog.js';
 import { cmdApprovals, cmdApprove, cmdReject } from './commands/approvals.js';
 import { cmdDaemon } from './commands/daemon.js';
+import { cmdChat } from './commands/chat.js';
 
 const COMMANDS = {
   init: cmdInit,
   doctor: cmdDoctor,
+  chat: cmdChat,
   project: cmdProject,
   run: cmdRun,
   runs: cmdRuns,
@@ -26,6 +28,7 @@ const COMMANDS = {
   reject: cmdReject,
   agents: cmdAgents,
   skills: cmdSkills,
+  autonomy: cmdAutonomy,
   daemon: cmdDaemon,
   version: cmdVersion,
 };
@@ -68,7 +71,7 @@ export async function main(argv = process.argv.slice(2)) {
     const store = new Store(home);
     if (!CONFIG_OPTIONAL.has(name)) await store.init();
 
-    const ctx = { home, config, configExists, store, json, verbose: Boolean(flags.verbose) };
+    const ctx = { home, cwd: process.cwd(), config, configExists, store, json, verbose: Boolean(flags.verbose) };
     return await command(ctx, positionals.slice(1), flags);
   } catch (err) {
     const exitCode = err instanceof TorisError ? err.exitCode : EXIT.FAILURE;

@@ -9,11 +9,20 @@ const memoryStore = () => {
   const runs = new Map();
   const events = [];
   return {
-    runs, events,
-    async saveRun(run) { runs.set(run.id, run); },
-    async getRun(id) { return runs.get(id) ?? null; },
-    async appendEvent(runId, event) { events.push({ runId, ...event }); },
-    async readEvents() { return events; },
+    runs,
+    events,
+    async saveRun(run) {
+      runs.set(run.id, run);
+    },
+    async getRun(id) {
+      return runs.get(id) ?? null;
+    },
+    async appendEvent(runId, event) {
+      events.push({ runId, ...event });
+    },
+    async readEvents() {
+      return events;
+    },
   };
 };
 
@@ -39,7 +48,10 @@ const build = (over = {}) => {
 test('a dry run plans and stops before any execution', async () => {
   let invocations = 0;
   const { orch, store } = build({
-    invoke: async () => { invocations += 1; return { text: planReply, costUsd: 0 }; },
+    invoke: async () => {
+      invocations += 1;
+      return { text: planReply, costUsd: 0 };
+    },
   });
   const run = await orch.run({ goal: 'ship a feature', dryRun: true });
   assert.equal(run.status, 'dry-run');
@@ -69,7 +81,9 @@ test('a provider that errors during planning degrades to a fallback plan', async
   // and then failed (e.g. codex refusing a non-git directory) crashed the whole
   // run. Both are the same class of problem and must degrade the same way.
   const { orch, store } = build({
-    invoke: async () => { throw new Error('codex exited with code 1: Not inside a trusted directory'); },
+    invoke: async () => {
+      throw new Error('codex exited with code 1: Not inside a trusted directory');
+    },
   });
   const run = await orch.run({ goal: 'do the thing', dryRun: true });
   assert.equal(run.status, 'dry-run');
@@ -103,9 +117,12 @@ test('a failing task marks the run failed but still finishes cleanly', async () 
 });
 
 test('failed verification prevents a successful status', async () => {
-  const { orch } = build({ verifyFn: async () => ({ passed: false, checks: [{ command: 'npm test', passed: false }] }) });
+  const { orch } = build({
+    verifyFn: async () => ({ passed: false, checks: [{ command: 'npm test', passed: false }] }),
+  });
   const run = await orch.run({
-    goal: 'g', autonomy: 'L2',
+    goal: 'g',
+    autonomy: 'L2',
     project: { id: 'p1', path: tmpdir() },
     checks: ['npm test'],
   });
@@ -122,7 +139,10 @@ test('the run cost accumulates from every provider call', async () => {
 test('the budget ceiling skips remaining work instead of overspending', async () => {
   const { orch, store } = build({ invoke: async () => ({ text: planReply, costUsd: 5 }) });
   const run = await orch.run({ goal: 'g', autonomy: 'L2', budgetUsd: 0.01 });
-  assert.ok(store.events.some((e) => e.type === 'task.skipped'), 'work must stop when the budget is gone');
+  assert.ok(
+    store.events.some((e) => e.type === 'task.skipped'),
+    'work must stop when the budget is gone',
+  );
   assert.ok(run.finishedAt);
 });
 
@@ -138,9 +158,13 @@ test('run state is never mutated in place across transitions', async () => {
   const seen = [];
   const store = memoryStore();
   const original = store.saveRun.bind(store);
-  store.saveRun = async (run) => { seen.push(run); return original(run); };
+  store.saveRun = async (run) => {
+    seen.push(run);
+    return original(run);
+  };
   const orch = new Orchestrator({
-    store, config: DEFAULT_CONFIG,
+    store,
+    config: DEFAULT_CONFIG,
     invoke: async () => ({ text: planReply, costUsd: 0 }),
     detect: async () => true,
     verifyFn: async () => ({ passed: true, checks: [] }),
@@ -158,9 +182,19 @@ test('a provider whose binary is absent is reported as unavailable', async () =>
 
 test('verification runs only when checks are supplied', async () => {
   let called = 0;
-  const { orch } = build({ verifyFn: async () => { called += 1; return { passed: true, checks: [] }; } });
+  const { orch } = build({
+    verifyFn: async () => {
+      called += 1;
+      return { passed: true, checks: [] };
+    },
+  });
   await orch.run({ goal: 'g', autonomy: 'L2' });
   assert.equal(called, 0, 'no checks means nothing to verify');
-  await orch.run({ goal: 'g', autonomy: 'L2', project: { id: 'p', path: tmpdir() }, checks: ['npm test'] });
+  await orch.run({
+    goal: 'g',
+    autonomy: 'L2',
+    project: { id: 'p', path: tmpdir() },
+    checks: ['npm test'],
+  });
   assert.equal(called, 1);
 });
