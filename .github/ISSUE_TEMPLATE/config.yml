@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question or idea
-    url: https://github.com/toriskr/toris-agent/discussions
+    url: https://github.com/torisKR/toris-agent/discussions
     about: Ask how something works, or float an idea before it becomes a proposal.

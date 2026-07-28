@@ -7,15 +7,15 @@ By participating you agree to the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## Ways to contribute
 
-- **Report a bug** — use the [bug report form](https://github.com/toriskr/toris-agent/issues/new?template=bug_report.yml). A run receipt (`toris receipt <runId> --md`) is worth a thousand words.
-- **Propose a feature** — use the [feature request form](https://github.com/toriskr/toris-agent/issues/new?template=feature_request.yml). Describe the problem before the solution.
+- **Report a bug** — use the [bug report form](https://github.com/torisKR/toris-agent/issues/new?template=bug_report.yml). A run receipt (`toris receipt <runId> --md`) is worth a thousand words.
+- **Propose a feature** — use the [feature request form](https://github.com/torisKR/toris-agent/issues/new?template=feature_request.yml). Describe the problem before the solution.
 - **Improve the docs** — if something in the README was wrong or confusing, that is a bug.
 - **Send a pull request** — see the workflow below.
 
 ## Getting started
 
 ```bash
-git clone https://github.com/toriskr/toris-agent.git
+git clone https://github.com/torisKR/toris-agent.git
 cd toris-agent
 
 node --version   # must be >= 22.6.0
@@ -160,7 +160,7 @@ its binary, how to build an invocation, and how to interpret the result. Require
 
 ## Reporting bugs
 
-Use the [issue templates](https://github.com/toriskr/toris-agent/issues/new/choose). For security
+Use the [issue templates](https://github.com/torisKR/toris-agent/issues/new/choose). For security
 problems, **do not open a public issue** — follow [SECURITY.md](./SECURITY.md).
 
 ## License

@@ -12,7 +12,7 @@
 **Please do not open a public issue for a security problem.**
 
 Report it privately through
-[GitHub Security Advisories](https://github.com/toriskr/toris-agent/security/advisories/new).
+[GitHub Security Advisories](https://github.com/torisKR/toris-agent/security/advisories/new).
 If you cannot use that, email **ironjustlikethat@gmail.com**.
 
 Please include:

@@ -5,8 +5,7 @@
 **A local-first, multi-agent development harness.**
 Turn a goal into planned, executed and verified work — with an evidence receipt for every run.
 
-[![CI](https://github.com/toriskr/toris-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/toriskr/toris-agent/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/toris-agent.svg)](https://www.npmjs.com/package/toris-agent)
+[![CI](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.6-brightgreen.svg)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-success.svg)](./package.json)
@@ -55,20 +54,26 @@ Agent tools are easy to start and hard to trust. toris is built around four opin
 
 ## Install
 
-```bash
-# One-off, no install
-npx toris-agent doctor
+> **Not on npm yet.** `toris-agent` has not been published to the public registry,
+> so `npm install -g toris-agent` will 404. Install straight from this repository —
+> there are **no dependencies**, so it is a single fast download.
 
+```bash
 # Global CLI (recommended)
-npm install -g toris-agent
+npm install -g git+https://github.com/torisKR/toris-agent.git
 toris --help
 
-# From source
-git clone https://github.com/toriskr/toris-agent.git
+# One-off, no install
+npx github:torisKR/toris-agent doctor
+
+# From source, for development
+git clone https://github.com/torisKR/toris-agent.git
 cd toris-agent
 npm link          # no `npm install` needed — there are no dependencies
 toris doctor
 ```
+
+Uninstall with `npm uninstall -g toris-agent`.
 
 ## Quickstart
 
@@ -363,7 +368,7 @@ docs/
 No install step — there are no dependencies.
 
 ```bash
-git clone https://github.com/toriskr/toris-agent.git
+git clone https://github.com/torisKR/toris-agent.git
 cd toris-agent
 npm test                          # node --test test/
 npm run lint                      # syntax check
@@ -384,7 +389,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and the rules aro
 - [ ] More provider adapters
 - [ ] Custom agent profiles from a project-local file
 
-Ideas and complaints both welcome in [issues](https://github.com/toriskr/toris-agent/issues).
+Ideas and complaints both welcome in [issues](https://github.com/torisKR/toris-agent/issues).
 
 ## Contributing
 

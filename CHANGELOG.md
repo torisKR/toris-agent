@@ -34,5 +34,5 @@ Initial public release — the CLI foundation.
   `4` approval denied, `5` daemon unavailable — plus `--json` output on every command.
 - **Zero runtime dependencies**; requires Node.js >= 22.6.0.
 
-[Unreleased]: https://github.com/toriskr/toris-agent/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/toriskr/toris-agent/releases/tag/v0.1.0
+[Unreleased]: https://github.com/torisKR/toris-agent/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.1.0
