@@ -1,0 +1,149 @@
+name: release
+
+# Publishing is a two-stage handshake. The platform packages must exist on the
+# registry *before* the root package that lists them as optionalDependencies,
+# otherwise a fresh `npm install toris-agent` resolves the optional deps to
+# nothing and every user silently drops to the JS fallback.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and pack, but do not publish
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  # Stage 1: one native build per platform, on a real runner of that platform.
+  # No cross-compilation — every triple in scripts/targets.js maps to a runner
+  # that is natively that triple, so the toolchain stays boring.
+  native:
+    name: build ${{ matrix.triple }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - triple: darwin-arm64
+            runner: macos-14
+            rust_target: aarch64-apple-darwin
+          - triple: darwin-x64
+            runner: macos-13
+            rust_target: x86_64-apple-darwin
+          - triple: linux-x64-gnu
+            runner: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+          - triple: linux-arm64-gnu
+            runner: ubuntu-22.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+          - triple: win32-x64-msvc
+            runner: windows-2022
+            rust_target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.rust_target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/toris-native
+
+      - name: Build cdylib
+        run: >
+          cargo build --release
+          --manifest-path crates/toris-native/Cargo.toml
+          --target ${{ matrix.rust_target }}
+
+      - name: Pack platform package
+        run: node scripts/pack-native.js --triple ${{ matrix.triple }}
+
+      # Proving the freshly built binary actually dlopens here is the whole
+      # point of the matrix. A .node that packs but fails to load would
+      # otherwise only surface on a user's machine as a silent fallback.
+      - name: Verify the binary loads
+        run: node scripts/verify-native.js --triple ${{ matrix.triple }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.triple }}
+          path: npm/native-${{ matrix.triple }}
+          if-no-files-found: error
+          retention-days: 7
+
+  # Stage 2: publish platform packages first, then the root that depends on them.
+  publish:
+    name: publish to npm
+    needs: native
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: npm
+
+      - name: Show what will be published
+        run: |
+          find npm -name package.json -exec node -e '
+            const p = require(process.argv[1]);
+            console.log(p.name + "@" + p.version + "  os=" + p.os + "  cpu=" + p.cpu);
+          ' {} \;
+
+      # A partial matrix is worse than no release: users on the missing
+      # platform get a root package whose optional dep never resolves.
+      - name: Refuse to publish an incomplete matrix
+        run: |
+          # The comparison happens in Node, not in the shell. Passing the count
+          # through a shell variable means passing it through Node's stdout
+          # formatting, which colourises bare numbers when FORCE_COLOR is set.
+          # `[ "$count" -ne "$expected" ]` then dies with "integer expression
+          # expected" and the `if` falls through to the *success* path — the
+          # gate would wave an incomplete matrix straight past. Fail-open, in
+          # the one check whose whole job is to fail closed.
+          node -e "
+            import('./scripts/targets.js').then(async (m) => {
+              const { readdir } = await import('node:fs/promises');
+              const dirs = (await readdir('npm', { withFileTypes: true }))
+                .filter((e) => e.isDirectory());
+              if (dirs.length !== m.TARGETS.length) {
+                console.error(
+                  'expected ' + m.TARGETS.length + ' platform packages, found ' + dirs.length
+                );
+                process.exit(1);
+              }
+              console.error('matrix complete: ' + dirs.length + ' platform packages');
+            });
+          "
+
+      - name: Publish platform packages
+        if: inputs.dry_run != true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -e
+          for dir in npm/*/; do
+            npm publish "$dir" --access public --provenance
+          done
+
+      # Only now is it safe: every optionalDependency the root declares is live.
+      - name: Publish root package
+        if: inputs.dry_run != true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
