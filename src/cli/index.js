@@ -11,6 +11,7 @@ import { cmdAgents, cmdSkills, cmdAutonomy } from './commands/catalog.js';
 import { cmdApprovals, cmdApprove, cmdReject } from './commands/approvals.js';
 import { cmdDaemon } from './commands/daemon.js';
 import { cmdChat } from './commands/chat.js';
+import { cmdUpdate } from './commands/update.js';
 
 const COMMANDS = {
   init: cmdInit,
@@ -30,11 +31,12 @@ const COMMANDS = {
   skills: cmdSkills,
   autonomy: cmdAutonomy,
   daemon: cmdDaemon,
+  update: cmdUpdate,
   version: cmdVersion,
 };
 
 /** Commands that must not fail merely because config does not exist yet. */
-const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'version']);
+const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'version', 'update']);
 
 export async function main(argv = process.argv.slice(2)) {
   let json = false;
@@ -48,7 +50,10 @@ export async function main(argv = process.argv.slice(2)) {
     }
     const name = positionals[0];
     if (!name || flags.help) {
-      if (json) { printJson({ usage: 'toris <command>', commands: Object.keys(COMMANDS) }); return EXIT.OK; }
+      if (json) {
+        printJson({ usage: 'toris <command>', commands: Object.keys(COMMANDS) });
+        return EXIT.OK;
+      }
       printHelp();
       return name ? EXIT.OK : EXIT.USAGE;
     }
@@ -65,13 +70,24 @@ export async function main(argv = process.argv.slice(2)) {
       ({ config, exists: configExists } = await loadConfig(home));
     } catch (err) {
       if (!CONFIG_OPTIONAL.has(name)) throw new TorisError(err.message, 'E_CONFIG');
-      ({ config, exists: configExists } = { config: (await import('../core/config.js')).DEFAULT_CONFIG, exists: false });
+      ({ config, exists: configExists } = {
+        config: (await import('../core/config.js')).DEFAULT_CONFIG,
+        exists: false,
+      });
     }
 
     const store = new Store(home);
     if (!CONFIG_OPTIONAL.has(name)) await store.init();
 
-    const ctx = { home, cwd: process.cwd(), config, configExists, store, json, verbose: Boolean(flags.verbose) };
+    const ctx = {
+      home,
+      cwd: process.cwd(),
+      config,
+      configExists,
+      store,
+      json,
+      verbose: Boolean(flags.verbose),
+    };
     return await command(ctx, positionals.slice(1), flags);
   } catch (err) {
     const exitCode = err instanceof TorisError ? err.exitCode : EXIT.FAILURE;

@@ -36,8 +36,12 @@ export function resolveProfile(name, config) {
   const entry = config?.models?.profiles?.[name];
   if (!entry) {
     const available = listProfiles(config);
-    const hint = available.length > 0 ? available.join(', ') : '(none configured — run: toris init)';
-    throw new TorisError(`Unknown model profile "${name}". Available: ${hint}`, 'E_UNKNOWN_PROFILE');
+    const hint =
+      available.length > 0 ? available.join(', ') : '(none configured — run: toris init)';
+    throw new TorisError(
+      `Unknown model profile "${name}". Available: ${hint}`,
+      'E_UNKNOWN_PROFILE',
+    );
   }
   if (!entry.provider) {
     throw new TorisError(`Model profile "${name}" is missing "provider".`, 'E_UNKNOWN_PROFILE');

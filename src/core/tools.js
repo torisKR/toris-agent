@@ -61,7 +61,9 @@ export function createDefaultTools({ cwd = process.cwd() } = {}) {
         'are editing what is actually on disk.',
       inputSchema: {
         type: 'object',
-        properties: { path: { type: 'string', description: 'Path relative to the workspace root' } },
+        properties: {
+          path: { type: 'string', description: 'Path relative to the workspace root' },
+        },
         required: ['path'],
       },
       run: async ({ path }) => {

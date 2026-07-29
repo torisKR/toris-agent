@@ -11,22 +11,38 @@ export async function cmdAgents(ctx, _positionals, flags) {
     throw new UsageError(`Unknown category "${category}". One of: ${AGENT_CATEGORIES.join(', ')}`);
   }
   const agents = listAgents(category);
-  if (ctx.json) { printJson({ agents }); return EXIT.OK; }
+  if (ctx.json) {
+    printJson({ agents });
+    return EXIT.OK;
+  }
   line(c.bold(`Agent profiles (${agents.length})`));
   line();
-  table(['ID', 'CATEGORY', 'WRITES', 'SUMMARY'],
-    agents.map((a) => [a.id, a.category, a.writes ? 'yes' : 'no', a.summary]));
+  table(
+    ['ID', 'CATEGORY', 'WRITES', 'SUMMARY'],
+    agents.map((a) => [a.id, a.category, a.writes ? 'yes' : 'no', a.summary]),
+  );
   return EXIT.OK;
 }
 
 /** What the agent is allowed to do, by level. */
 export async function cmdAutonomy(ctx) {
   const levels = Object.values(AUTONOMY_LEVELS);
-  if (ctx.json) { printJson({ autonomy: levels }); return EXIT.OK; }
+  if (ctx.json) {
+    printJson({ autonomy: levels });
+    return EXIT.OK;
+  }
   line(c.bold('Autonomy levels'));
   line();
-  table(['LEVEL', 'WRITE', 'COMMIT', 'PUSH', 'MEANING'],
-    levels.map((l) => [l.level, l.writes ? 'yes' : 'no', l.commits ? 'yes' : 'no', l.pushes ? 'yes' : 'no', l.label]));
+  table(
+    ['LEVEL', 'WRITE', 'COMMIT', 'PUSH', 'MEANING'],
+    levels.map((l) => [
+      l.level,
+      l.writes ? 'yes' : 'no',
+      l.commits ? 'yes' : 'no',
+      l.pushes ? 'yes' : 'no',
+      l.label,
+    ]),
+  );
   return EXIT.OK;
 }
 
@@ -44,7 +60,11 @@ function skillSource(dir, ctx) {
 
 /** Skill packages: the working habits the model is told to follow in chat. */
 export async function cmdSkills(ctx) {
-  const dirs = skillSearchPaths({ builtinDir: BUILTIN_SKILL_DIR, home: ctx.home, projectPath: ctx.cwd });
+  const dirs = skillSearchPaths({
+    builtinDir: BUILTIN_SKILL_DIR,
+    home: ctx.home,
+    projectPath: ctx.cwd,
+  });
   const { skills, problems } = await discoverSkills(dirs);
   if (ctx.json) {
     printJson({ skills: skills.map(({ body: _body, ...meta }) => meta), problems });
@@ -57,8 +77,10 @@ export async function cmdSkills(ctx) {
   }
   line(c.bold(`Skills (${skills.length})`));
   line();
-  table(['NAME', 'SOURCE', 'DESCRIPTION'],
-    skills.map((s) => [s.name, skillSource(s.dir, ctx), s.description]));
+  table(
+    ['NAME', 'SOURCE', 'DESCRIPTION'],
+    skills.map((s) => [s.name, skillSource(s.dir, ctx), s.description]),
+  );
   for (const p of problems) line(c.dim(`  skipped ${p.dir}: ${p.message}`));
   return EXIT.OK;
 }

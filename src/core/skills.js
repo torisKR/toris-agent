@@ -5,7 +5,12 @@ import { join, resolve, basename, dirname } from 'node:path';
 import { TorisError } from './errors.js';
 
 /** Skills that ship with toris itself, the lowest-precedence source. */
-export const BUILTIN_SKILL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'skills');
+export const BUILTIN_SKILL_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'skills',
+);
 
 /**
  * A skill package is a directory containing SKILL.md:

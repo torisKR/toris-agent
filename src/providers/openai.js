@@ -109,7 +109,10 @@ export function toWire(messages) {
  */
 export function createOpenAIProvider({ apiKey, fetchImpl = fetch, baseUrl = DEFAULT_BASE_URL }) {
   if (!apiKey) {
-    throw new TorisError('No OpenAI API key. Export OPENAI_API_KEY, then retry.', 'E_PROVIDER_AUTH');
+    throw new TorisError(
+      'No OpenAI API key. Export OPENAI_API_KEY, then retry.',
+      'E_PROVIDER_AUTH',
+    );
   }
 
   const request = (body, signal) =>

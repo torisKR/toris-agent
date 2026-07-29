@@ -140,7 +140,11 @@ export async function cmdChat(ctx, args, flags) {
   const { skills, problems } = flags['no-skills']
     ? { skills: [], problems: [] }
     : await discoverSkills(
-        skillSearchPaths({ builtinDir: BUILTIN_SKILL_DIR, home: ctx.home, projectPath: process.cwd() }),
+        skillSearchPaths({
+          builtinDir: BUILTIN_SKILL_DIR,
+          home: ctx.home,
+          projectPath: process.cwd(),
+        }),
       );
   const briefing = renderSkillBriefing(skills);
   const system = briefing ? `${SYSTEM_PROMPT}\n\n${briefing}` : SYSTEM_PROMPT;
@@ -253,9 +257,7 @@ export async function cmdChat(ctx, args, flags) {
         );
       } else if (cmd === 'skills') {
         log(
-          skills
-            .map((s) => `  ${s.name}${c.dim(` — ${s.description}`)}`)
-            .join('\n') || '  (none)',
+          skills.map((s) => `  ${s.name}${c.dim(` — ${s.description}`)}`).join('\n') || '  (none)',
         );
       } else {
         log(c.dim(`unknown command "${line}". /help for the list.`));

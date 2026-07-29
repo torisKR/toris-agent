@@ -42,7 +42,10 @@ async function runDoctor({ models } = {}) {
       store: new Store(home),
     };
     const write = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (chunk) => { captured.push(chunk); return true; };
+    process.stdout.write = (chunk) => {
+      captured.push(chunk);
+      return true;
+    };
     try {
       await cmdDoctor(ctx);
     } finally {

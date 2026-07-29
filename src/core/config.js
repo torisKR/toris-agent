@@ -45,8 +45,12 @@ export function mergeConfig(base, override) {
   for (const [key, value] of Object.entries(override)) {
     const current = out[key];
     const bothPlainObjects =
-      value && typeof value === 'object' && !Array.isArray(value) &&
-      current && typeof current === 'object' && !Array.isArray(current);
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      current &&
+      typeof current === 'object' &&
+      !Array.isArray(current);
     out[key] = bothPlainObjects ? mergeConfig(current, value) : value;
   }
   return out;
@@ -65,7 +69,9 @@ export function validateConfig(config) {
     problems.push(`maxParallelAgents must be an integer 1..16, got ${JSON.stringify(n)}`);
   }
   if (typeof config.maxDailyCostUsd !== 'number' || config.maxDailyCostUsd < 0) {
-    problems.push(`maxDailyCostUsd must be a non-negative number, got ${JSON.stringify(config.maxDailyCostUsd)}`);
+    problems.push(
+      `maxDailyCostUsd must be a non-negative number, got ${JSON.stringify(config.maxDailyCostUsd)}`,
+    );
   }
   return problems;
 }

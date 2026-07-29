@@ -11,11 +11,7 @@ import {
   resolveRole,
   isInvokable,
 } from '../../core/models.js';
-import {
-  discoverSkills,
-  skillSearchPaths,
-  BUILTIN_SKILL_DIR,
-} from '../../core/skills.js';
+import { discoverSkills, skillSearchPaths, BUILTIN_SKILL_DIR } from '../../core/skills.js';
 import { EXIT } from '../../core/errors.js';
 import { isRepo } from '../../core/git.js';
 import { printJson, line, keyValues, c, statusColor } from '../output.js';
@@ -24,7 +20,10 @@ const require = createRequire(import.meta.url);
 
 export async function cmdVersion(ctx) {
   const pkg = require('../../../package.json');
-  if (ctx.json) { printJson({ name: pkg.name, version: pkg.version, node: process.version }); return EXIT.OK; }
+  if (ctx.json) {
+    printJson({ name: pkg.name, version: pkg.version, node: process.version });
+    return EXIT.OK;
+  }
   line(`${c.bold(pkg.name)} ${pkg.version}  ${c.dim(`(node ${process.version})`)}`);
   return EXIT.OK;
 }
@@ -38,14 +37,21 @@ export async function cmdInit(ctx) {
     printJson({ ok: true, home: ctx.home, config: configPath(ctx.home), created: !existed });
     return EXIT.OK;
   }
-  line(existed
-    ? `${c.yellow('~')} Config already present, left untouched.`
-    : `${c.green('+')} Created config.`);
-  keyValues([['home', ctx.home], ['config', configPath(ctx.home)]]);
+  line(
+    existed
+      ? `${c.yellow('~')} Config already present, left untouched.`
+      : `${c.green('+')} Created config.`,
+  );
+  keyValues([
+    ['home', ctx.home],
+    ['config', configPath(ctx.home)],
+  ]);
   line();
   line(`Next: ${c.cyan('toris doctor')} then ${c.cyan('toris project add .')}`);
   if (Object.keys(config.models?.profiles ?? {}).length === 0) {
-    line(c.dim('For chat, add a model profile to config.json — `toris chat` prints the exact block.'));
+    line(
+      c.dim('For chat, add a model profile to config.json — `toris chat` prints the exact block.'),
+    );
   }
   return EXIT.OK;
 }
@@ -73,7 +79,9 @@ export async function cmdDoctor(ctx) {
   checks.push({
     name: 'providers',
     status: anyProvider ? 'PASS' : 'FAIL',
-    detail: anyProvider ? 'at least one agent CLI available' : 'install claude or codex to execute runs',
+    detail: anyProvider
+      ? 'at least one agent CLI available'
+      : 'install claude or codex to execute runs',
   });
 
   checks.push({
@@ -112,12 +120,16 @@ export async function cmdDoctor(ctx) {
   line(c.bold('toris doctor'));
   line();
   for (const check of checks) {
-    line(`  ${statusColor(check.status).padEnd(4)}  ${check.name.padEnd(18)} ${c.dim(check.detail)}`);
+    line(
+      `  ${statusColor(check.status).padEnd(4)}  ${check.name.padEnd(18)} ${c.dim(check.detail)}`,
+    );
   }
   line();
-  line(failed.length === 0
-    ? c.green('All required checks passed.')
-    : c.red(`${failed.length} required check(s) failed.`));
+  line(
+    failed.length === 0
+      ? c.green('All required checks passed.')
+      : c.red(`${failed.length} required check(s) failed.`),
+  );
   return failed.length === 0 ? EXIT.OK : EXIT.FAILURE;
 }
 
@@ -134,18 +146,20 @@ function chatChecks(ctx) {
   checks.push({
     name: 'api-keys',
     status: keyed.length > 0 ? 'PASS' : 'WARN',
-    detail: keyed.length > 0
-      ? keyed.map((provider) => apiKeyEnvVar(provider)).join(', ')
-      : `none set; export ${API_PROVIDERS.map((p) => apiKeyEnvVar(p)).join(' or ')} to chat`,
+    detail:
+      keyed.length > 0
+        ? keyed.map((provider) => apiKeyEnvVar(provider)).join(', ')
+        : `none set; export ${API_PROVIDERS.map((p) => apiKeyEnvVar(p)).join(' or ')} to chat`,
   });
 
   const profiles = listProfiles(ctx.config);
   checks.push({
     name: 'model-profiles',
     status: profiles.length > 0 ? 'PASS' : 'WARN',
-    detail: profiles.length > 0
-      ? profiles.join(', ')
-      : 'none defined under models.profiles; run: toris chat (it prints the block to paste)',
+    detail:
+      profiles.length > 0
+        ? profiles.join(', ')
+        : 'none defined under models.profiles; run: toris chat (it prints the block to paste)',
   });
 
   let status = 'WARN';
@@ -169,7 +183,11 @@ function chatChecks(ctx) {
 async function skillCheck(ctx) {
   try {
     const { skills, problems } = await discoverSkills(
-      skillSearchPaths({ builtinDir: BUILTIN_SKILL_DIR, home: ctx.home, projectPath: process.cwd() }),
+      skillSearchPaths({
+        builtinDir: BUILTIN_SKILL_DIR,
+        home: ctx.home,
+        projectPath: process.cwd(),
+      }),
     );
     if (problems.length > 0) {
       return {
@@ -181,7 +199,10 @@ async function skillCheck(ctx) {
     return {
       name: 'skills',
       status: skills.length > 0 ? 'PASS' : 'WARN',
-      detail: skills.length > 0 ? skills.map((skill) => skill.name).join(', ') : 'no skill packages found',
+      detail:
+        skills.length > 0
+          ? skills.map((skill) => skill.name).join(', ')
+          : 'no skill packages found',
     };
   } catch (err) {
     return { name: 'skills', status: 'WARN', detail: err.message };

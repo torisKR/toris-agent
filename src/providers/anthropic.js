@@ -45,7 +45,10 @@ async function toHttpError(res) {
   if (res.status === 429) {
     return new TorisError(`Anthropic rate limit hit (HTTP 429). ${body}`, 'E_PROVIDER_RATE_LIMIT');
   }
-  return new TorisError(`Anthropic request failed (HTTP ${res.status}). ${body}`, 'E_PROVIDER_HTTP');
+  return new TorisError(
+    `Anthropic request failed (HTTP ${res.status}). ${body}`,
+    'E_PROVIDER_HTTP',
+  );
 }
 
 /** Split a completed response body into plain text and tool calls. */
@@ -97,7 +100,9 @@ export function toWire(messages) {
       };
       const prev = wire[wire.length - 1];
       const isOpenToolTurn =
-        prev?.role === 'user' && Array.isArray(prev.content) && prev.content[0]?.type === 'tool_result';
+        prev?.role === 'user' &&
+        Array.isArray(prev.content) &&
+        prev.content[0]?.type === 'tool_result';
       if (isOpenToolTurn) {
         wire[wire.length - 1] = { role: 'user', content: [...prev.content, block] };
       } else {

@@ -326,8 +326,23 @@ agents [--category <c>]   Built-in agent profiles
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
 daemon status             Background daemon (not in 0.1.0)
+update [--check]          Update toris to the latest published version
 version                   Print version
 ```
+
+**Updating**
+
+```bash
+toris update            # fetch the latest version and install it in place
+toris update --check    # only report whether a newer version exists
+toris update --json     # machine-readable result
+```
+
+`update` works out how this copy was installed before it changes anything. A global
+npm install is upgraded with `npm install -g toris-agent@latest`; pnpm, yarn and bun
+installs get their own manager's command. A git checkout or a local project
+dependency is never overwritten — toris prints the command it would have run and
+leaves the decision to you.
 
 **Run options**
 
