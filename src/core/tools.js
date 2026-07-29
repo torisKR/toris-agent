@@ -1,8 +1,7 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { resolve, dirname, relative, join } from 'node:path';
-import { exec } from 'node:child_process';
-
 import { TorisError } from './errors.js';
+import { spawnCaptured } from '../native/index.js';
 
 /**
  * The default tool set given to a chat session.
@@ -29,21 +28,30 @@ function safeResolve(root, p) {
   return full;
 }
 
+// Keep the TAIL: a failing build puts its error on the last line, and the
+// first 30k of a webpack log tells you nothing about why it broke.
 const truncate = (s) =>
-  s.length > MAX_OUTPUT_CHARS ? `${s.slice(0, MAX_OUTPUT_CHARS)}\n…[truncated]` : s;
+  s.length > MAX_OUTPUT_CHARS ? `…[truncated]\n${s.slice(-MAX_OUTPUT_CHARS)}` : s;
 
-/** Promisified exec that returns output even when the command fails. */
-function runCommand(command, { cwd, timeout }) {
-  return new Promise((resolvePromise) => {
-    exec(command, { cwd, timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolvePromise({
-        exitCode: err?.code ?? 0,
-        killed: Boolean(err?.killed),
-        stdout: truncate(stdout ?? ''),
-        stderr: truncate(stderr ?? ''),
-      });
-    });
+/**
+ * Run a shell command and always resolve — a failure is data, not an exception.
+ *
+ * Delegates to the native process-control layer so that a timeout kills the
+ * whole process group. `exec` only kills the shell it spawned, which leaves
+ * `npm run dev` style grandchildren holding the port after the agent moves on.
+ */
+async function runCommand(command, { cwd, timeout }) {
+  const result = await spawnCaptured(command, {
+    cwd,
+    timeoutMs: timeout,
+    maxOutputBytes: 10 * 1024 * 1024,
   });
+  return {
+    exitCode: result.exitCode ?? 0,
+    killed: result.timedOut,
+    stdout: truncate(result.stdout),
+    stderr: truncate(result.stderr),
+  };
 }
 
 /**
