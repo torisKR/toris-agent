@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Orchestrator } from '../src/core/orchestrator.js';
+import { Orchestrator, buildTaskPrompt } from '../src/core/orchestrator.js';
 import { DEFAULT_CONFIG } from '../src/core/config.js';
+import { RECOMMENDED_AUTONOMY } from '../src/core/autonomy.js';
 import { tmpdir } from 'node:os';
 
 /** Minimal in-memory store so tests never touch the filesystem. */
@@ -41,6 +42,7 @@ const build = (over = {}) => {
     invoke,
     detect: over.detect ?? (async () => true),
     verifyFn: over.verifyFn ?? (async () => ({ passed: true, checks: [] })),
+    detectChecksFn: over.detectChecksFn ?? (async () => []),
   });
   return { orch, store };
 };
@@ -197,4 +199,193 @@ test('verification runs only when checks are supplied', async () => {
     checks: ['npm test'],
   });
   assert.equal(called, 1);
+});
+
+test('a project with no recorded checks is sniffed on disk instead of skipping verification', async () => {
+  // Arrange: the project was registered before its test script existed, so its
+  // stored checks are empty — the run must still prove something.
+  let verified = null;
+  const { orch, store } = build({
+    detectChecksFn: async () => ['npm run test'],
+    verifyFn: async (commands) => {
+      verified = commands;
+      return { passed: true, checks: [{ command: commands[0], passed: true, exitCode: 0 }] };
+    },
+  });
+
+  // Act
+  const run = await orch.run({
+    goal: 'g',
+    autonomy: 'L2',
+    project: { id: 'p', path: tmpdir() },
+    checks: [],
+  });
+
+  // Assert
+  assert.deepEqual(verified, ['npm run test']);
+  assert.equal(run.verification.passed, true);
+  const started = store.events.find((e) => e.type === 'verify.started');
+  assert.equal(started.inferred, true, 'the receipt must show these checks were guessed');
+});
+
+test('explicitly configured checks are never overridden by detection', async () => {
+  // Arrange
+  let detectCalls = 0;
+  let verified = null;
+  const { orch, store } = build({
+    detectChecksFn: async () => {
+      detectCalls += 1;
+      return ['cargo test'];
+    },
+    verifyFn: async (commands) => {
+      verified = commands;
+      return { passed: true, checks: [] };
+    },
+  });
+
+  // Act
+  await orch.run({
+    goal: 'g',
+    autonomy: 'L2',
+    project: { id: 'p', path: tmpdir() },
+    checks: ['npm run lint'],
+  });
+
+  // Assert
+  assert.deepEqual(verified, ['npm run lint']);
+  assert.equal(detectCalls, 0, 'detection must not run when the user already said what to run');
+  assert.equal(store.events.find((e) => e.type === 'verify.started').inferred, false);
+});
+
+test('a run that proves nothing records why, rather than passing silently', async () => {
+  // Arrange
+  const { orch, store } = build({ detectChecksFn: async () => [] });
+
+  // Act
+  const run = await orch.run({
+    goal: 'g',
+    autonomy: 'L2',
+    project: { id: 'p', path: tmpdir() },
+  });
+
+  // Assert: "succeeded" with no evidence is the failure mode this guards against.
+  const skipped = store.events.find((e) => e.type === 'verify.skipped');
+  assert.ok(skipped, 'the absence of verification must be an event, not silence');
+  assert.match(skipped.reason, /none could be detected/);
+  assert.equal(run.verification.passed, null);
+});
+
+test('a run with no project explains that there is nothing to verify against', async () => {
+  // Arrange
+  const { orch, store } = build();
+
+  // Act
+  await orch.run({ goal: 'g', autonomy: 'L2' });
+
+  // Assert
+  const skipped = store.events.find((e) => e.type === 'verify.skipped');
+  assert.match(skipped.reason, /no project path/);
+});
+
+test('a failed verification names the commands that broke', async () => {
+  // Arrange
+  const { orch, store } = build({
+    verifyFn: async () => ({
+      passed: false,
+      checks: [
+        { command: 'npm run lint', passed: true, exitCode: 0 },
+        { command: 'npm test', passed: false, exitCode: 1 },
+      ],
+    }),
+  });
+
+  // Act
+  await orch.run({
+    goal: 'g',
+    autonomy: 'L2',
+    project: { id: 'p', path: tmpdir() },
+    checks: ['npm run lint', 'npm test'],
+  });
+
+  // Assert
+  const finished = store.events.find((e) => e.type === 'verify.finished');
+  assert.deepEqual(finished.failed, ['npm test'], 'the log must say which check failed');
+});
+
+test('task events carry a readable title, not just an opaque id', async () => {
+  // Arrange
+  const { orch, store } = build();
+
+  // Act
+  await orch.run({ goal: 'g', autonomy: 'L2' });
+
+  // Assert: `toris run --verbose` prints event.title, so an id-only event is noise.
+  const started = store.events.filter((e) => e.type === 'task.started');
+  const succeeded = store.events.filter((e) => e.type === 'task.succeeded');
+  assert.ok(started.length > 0);
+  assert.ok(succeeded.every((e) => typeof e.title === 'string' && e.title.length > 0));
+  assert.ok(succeeded.every((e) => typeof e.costUsd === 'number'));
+});
+
+test('a failed task event reports both its title and its error', async () => {
+  // Arrange
+  let call = 0;
+  const { orch, store } = build({
+    invoke: async () => {
+      call += 1;
+      if (call === 1) return { text: planReply, costUsd: 0 };
+      throw new Error('provider exploded');
+    },
+  });
+
+  // Act
+  await orch.run({ goal: 'g', autonomy: 'L2' });
+
+  // Assert
+  const failed = store.events.find((e) => e.type === 'task.failed');
+  assert.match(failed.title, /\w/);
+  assert.match(failed.error, /provider exploded/);
+});
+
+test('a skipped task explains the budget ceiling that stopped it', async () => {
+  // Arrange
+  const { orch, store } = build({ invoke: async () => ({ text: planReply, costUsd: 5 }) });
+
+  // Act
+  await orch.run({ goal: 'g', autonomy: 'L2', budgetUsd: 0.01 });
+
+  // Assert
+  const skipped = store.events.find((e) => e.type === 'task.skipped');
+  assert.match(skipped.reason, /budget exhausted/);
+  assert.match(skipped.reason, /0\.01/, 'a solo dev needs to know which cap they hit');
+  assert.ok(skipped.title, 'the skipped task must be identifiable');
+});
+
+test('an orchestrator with no config falls back to the recommended solo autonomy', async () => {
+  // Arrange: programmatic use via src/index.js need not construct a full config.
+  const orch = new Orchestrator({
+    invoke: async () => ({ text: planReply, costUsd: 0 }),
+    detect: async () => true,
+    verifyFn: async () => ({ passed: true, checks: [] }),
+  });
+
+  // Act
+  const run = await orch.run({ goal: 'g', dryRun: true });
+
+  // Assert
+  assert.equal(run.autonomy, RECOMMENDED_AUTONOMY);
+  assert.equal(run.status, 'dry-run');
+});
+
+test('the task prompt tells the agent nobody is there to answer questions', async () => {
+  // Arrange
+  const run = { goal: 'ship it', autonomy: 'L3' };
+  const task = { agent: 'implementer', title: 'Do the thing', detail: '', verify: '' };
+
+  // Act
+  const prompt = buildTaskPrompt(task, run, { path: '/srv/app' });
+
+  // Assert: a mid-run question just stalls the task until the provider times out.
+  assert.match(prompt, /Do not ask for confirmation/);
+  assert.match(prompt, /autonomy L3/);
 });

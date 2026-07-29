@@ -1,8 +1,8 @@
 import { newRunId, newEventId } from './ids.js';
 import { ADAPTERS, oppositeProvider, invokeProvider, detectBinary } from './providers.js';
 import { buildPlanPrompt, extractJsonArray, normalizeTasks, fallbackPlan } from './planner.js';
-import { resolveAutonomy, gate, withinBudget } from './autonomy.js';
-import { verify, inferChecks } from './verifier.js';
+import { resolveAutonomy, gate, withinBudget, RECOMMENDED_AUTONOMY } from './autonomy.js';
+import { verify, inferChecks, detectChecks } from './verifier.js';
 import { changedFiles, isRepo } from './git.js';
 import { buildReceipt } from './receipt.js';
 import { TorisError } from './errors.js';
@@ -21,6 +21,10 @@ export function buildTaskPrompt(task, run, project) {
     task.verify ? `Definition of done: ${task.verify}` : '',
     '',
     'Make the change directly in the repository. Keep it minimal and focused.',
+    // Nobody is watching the terminal mid-run. A question here just stalls the
+    // task until it times out, so tell the agent the decision is already made.
+    `The operator has pre-approved edits at autonomy ${run.autonomy} and is not present to answer questions.`,
+    'Do not ask for confirmation. If a detail is ambiguous, choose the smallest reasonable option and say so in your summary.',
     'When finished, reply with a one-paragraph summary of exactly what you changed.',
   ]
     .filter(Boolean)
@@ -41,6 +45,7 @@ export class Orchestrator {
     invoke = invokeProvider,
     detect = detectBinary,
     verifyFn = verify,
+    detectChecksFn = detectChecks,
     now = Date.now,
     onEvent,
   } = {}) {
@@ -49,6 +54,7 @@ export class Orchestrator {
     this.invoke = invoke;
     this.detect = detect;
     this.verifyFn = verifyFn;
+    this.detectChecksFn = detectChecksFn;
     this.now = now;
     this.onEvent = onEvent;
   }
@@ -80,7 +86,7 @@ export class Orchestrator {
     try {
       result = await this.invoke(adapter, prompt, {
         cwd: project?.path,
-        timeoutMs: this.config.providerTimeoutMs,
+        timeoutMs: this.config?.providerTimeoutMs,
       });
     } catch (err) {
       // A provider that is installed but refuses to run (untrusted directory,
@@ -99,11 +105,52 @@ export class Orchestrator {
   }
 
   /**
+   * Which commands prove this run. Explicit checks win; otherwise the project is
+   * sniffed on disk, because a project registered before its test script existed
+   * would otherwise verify nothing and still report "succeeded".
+   */
+  async #resolveChecks(run, opts) {
+    if (Array.isArray(opts.checks) && opts.checks.length > 0) {
+      return { checks: opts.checks, inferred: false };
+    }
+    if (!run.projectPath) return { checks: [], inferred: false };
+    const checks = await this.detectChecksFn(run.projectPath);
+    return { checks, inferred: checks.length > 0 };
+  }
+
+  /** Run the checks and fold the evidence into the run. Never throws. */
+  async #verifyRun(run, opts) {
+    const { checks, inferred } = await this.#resolveChecks(run, opts);
+    if (checks.length === 0) {
+      // Saying so out loud matters: "no checks" and "checks passed" are very
+      // different receipts, and only one of them is evidence.
+      await this.#emit(run, 'verify.skipped', {
+        reason: run.projectPath
+          ? 'no checks configured and none could be detected for this project'
+          : 'run has no project path, so there is nothing to verify against',
+      });
+      return run;
+    }
+    await this.#emit(run, 'verify.started', { checks, inferred });
+    const verification = await this.verifyFn(checks, { cwd: run.projectPath });
+    const verified = { ...run, verification };
+    await this.#emit(verified, 'verify.finished', {
+      passed: verification.passed,
+      failed: verification.checks.filter((c) => !c.passed).map((c) => c.command),
+    });
+    return verified;
+  }
+
+  /**
    * @param {{goal:string, project?:any, autonomy?:string, budgetUsd?:number, dryRun?:boolean, provider?:string}} opts
    */
   async run(opts) {
-    const autonomy = resolveAutonomy(opts.autonomy ?? this.config.defaultAutonomy);
-    const preferred = opts.provider ?? this.config.defaultProvider;
+    // A programmatic caller with no config should get the recommended solo
+    // default rather than a "Unknown autonomy level undefined" error.
+    const autonomy = resolveAutonomy(
+      opts.autonomy ?? this.config?.defaultAutonomy ?? RECOMMENDED_AUTONOMY,
+    );
+    const preferred = opts.provider ?? this.config?.defaultProvider;
     const { adapter, available } = await this.resolveProvider(preferred);
 
     const run = {
@@ -116,7 +163,7 @@ export class Orchestrator {
       providerAvailable: available,
       status: 'planning',
       dryRun: Boolean(opts.dryRun),
-      budgetUsd: opts.budgetUsd ?? this.config.maxDailyCostUsd,
+      budgetUsd: opts.budgetUsd ?? this.config?.maxDailyCostUsd,
       costUsd: 0,
       tasks: [],
       artifacts: [],
@@ -171,7 +218,11 @@ export class Orchestrator {
       const budget = withinBudget(current.costUsd, 0.05, current.budgetUsd);
       if (!budget.ok) {
         executed.push({ ...task, status: 'skipped', note: 'budget exhausted' });
-        await this.#emit(current, 'task.skipped', { taskId: task.id, reason: 'budget exhausted' });
+        await this.#emit(current, 'task.skipped', {
+          taskId: task.id,
+          title: task.title,
+          reason: `budget exhausted ($${Number(current.budgetUsd).toFixed(2)} cap reached)`,
+        });
         continue;
       }
       await this.#emit(current, 'task.started', {
@@ -182,7 +233,7 @@ export class Orchestrator {
       try {
         const result = await this.invoke(adapter, buildTaskPrompt(task, current, opts.project), {
           cwd: current.projectPath ?? undefined,
-          timeoutMs: this.config.providerTimeoutMs,
+          timeoutMs: this.config?.providerTimeoutMs,
         });
         current = { ...current, costUsd: current.costUsd + (result.costUsd || 0) };
         executed.push({
@@ -190,23 +241,24 @@ export class Orchestrator {
           status: 'succeeded',
           summary: String(result.text).slice(0, 2000),
         });
-        await this.#emit(current, 'task.succeeded', { taskId: task.id });
+        await this.#emit(current, 'task.succeeded', {
+          taskId: task.id,
+          title: task.title,
+          costUsd: result.costUsd || 0,
+        });
       } catch (err) {
         executed.push({ ...task, status: 'failed', error: err.message });
-        await this.#emit(current, 'task.failed', { taskId: task.id, error: err.message });
+        await this.#emit(current, 'task.failed', {
+          taskId: task.id,
+          title: task.title,
+          error: err.message,
+        });
         break;
       }
     }
     current = { ...current, tasks: executed };
 
-    // Verification + evidence
-    const checks = opts.checks ?? [];
-    if (checks.length > 0 && current.projectPath) {
-      await this.#emit(current, 'verify.started', { checks });
-      const verification = await this.verifyFn(checks, { cwd: current.projectPath });
-      current = { ...current, verification };
-      await this.#emit(current, 'verify.finished', { passed: verification.passed });
-    }
+    current = await this.#verifyRun(current, opts);
     if (current.projectPath && (await isRepo(current.projectPath))) {
       current = { ...current, artifacts: await changedFiles(current.projectPath) };
     }
