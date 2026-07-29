@@ -14,6 +14,7 @@ import {
 import { createProvider } from '../../providers/index.js';
 import { createChatSession } from '../../core/chat.js';
 import { createDefaultTools } from '../../core/tools.js';
+import { createStreamWriter, createSpinner, renderStatusBar } from '../tui/render.js';
 import {
   discoverSkills,
   skillSearchPaths,
@@ -178,38 +179,74 @@ export async function cmdChat(ctx, args, flags) {
   const rl = createInterface({ input: stdin, output: stdout });
   const log = (line) => stdout.write(`${line}\n`);
 
-  let streaming = false;
+  const DEFAULT_WIDTH = 80;
+  const UNWRAPPED_WIDTH = 1_000_000;
+  const isTty = Boolean(stdout.isTTY);
+
+  // Piped output must stay verbatim so `toris chat "..." | grep` keeps working.
+  // Only an interactive terminal gets wrapping, indentation and a spinner.
+  const streamWidth = () => (isTty ? (stdout.columns ?? DEFAULT_WIDTH) : UNWRAPPED_WIDTH);
+  const streamGutter = isTty ? '  ' : '';
+
+  const write = (chunk) => stdout.write(chunk);
+  const spinner = createSpinner({ write, isTTY: isTty });
+  const approver = buildApprover({ rl, autoApprove, log });
+
+  /** @type {{push: (chunk: string) => void, end: () => void, isEmpty: () => boolean} | null} */
+  let writer = null;
+
+  // Width is sampled when a turn starts, so resizing between turns takes effect.
+  const openWriter = () => {
+    spinner.stop();
+    writer ??= createStreamWriter({ write, width: streamWidth(), gutter: streamGutter });
+    return writer;
+  };
+  const closeWriter = () => {
+    writer?.end();
+    writer = null;
+  };
+
   const session = createChatSession({
     provider,
     model: resolved.model,
     system,
     tools,
     maxTokens: resolved.maxTokens ?? undefined,
-    approve: buildApprover({ rl, autoApprove, log }),
+    // The approval prompt is drawn by readline and arrives BEFORE the
+    // `tool-start` event, so the spinner and any open prose block have to be
+    // torn down here — otherwise the spinner's line-erase eats the question.
+    approve: (call) => {
+      closeWriter();
+      spinner.stop();
+      return approver(call);
+    },
     onEvent: (evt) => {
       if (evt.type === 'text') {
-        streaming = true;
-        stdout.write(evt.delta);
-      } else if (evt.type === 'tool-start') {
-        if (streaming) stdout.write('\n');
-        streaming = false;
-        log(c.dim(`  → ${describeCall(evt)}`));
-      } else if (evt.type === 'tool-error') {
-        log(c.red(`  ✗ ${evt.name}: ${evt.error}`));
-      } else if (evt.type === 'tool-denied') {
-        log(c.yellow(`  ✗ ${evt.name} denied`));
+        openWriter().push(evt.delta);
+        return;
       }
+      // Any non-text event interrupts the prose, so close the block first and
+      // silence the spinner before writing a line of our own.
+      closeWriter();
+      spinner.stop();
+      if (evt.type === 'tool-start') log(c.dim(`  → ${describeCall(evt)}`));
+      else if (evt.type === 'tool-error') log(c.red(`  ✗ ${evt.name}: ${evt.error}`));
+      else if (evt.type === 'tool-denied') log(c.yellow(`  ✗ ${evt.name} denied`));
     },
   });
 
   const askModel = async (text) => {
+    spinner.start('thinking');
     try {
       await session.send(text);
     } catch (err) {
+      // Stop the spinner before printing, or its line-erase would wipe the error.
+      spinner.stop();
+      closeWriter();
       log(c.red(`error  ${err.message}`));
     } finally {
-      if (streaming) stdout.write('\n');
-      streaming = false;
+      spinner.stop();
+      closeWriter();
     }
   };
 
@@ -219,14 +256,22 @@ export async function cmdChat(ctx, args, flags) {
     return EXIT.OK;
   }
 
+  log(c.bold('toris chat'));
+  // A status strip clips cleanly on a narrow terminal instead of wrapping into
+  // an unreadable block the way a plain concatenated line would.
   log(
-    `${c.bold('toris chat')} ${c.dim(`· ${resolved.profile} · ${resolved.provider}/${resolved.model}`)}`,
-  );
-  log(
-    c.dim(
-      `${tools.length} tools · ${skills.length} skills · approvals ${autoApprove ? 'auto' : 'ask'} · /help for commands`,
+    renderStatusBar(
+      [
+        ['profile', resolved.profile],
+        ['model', `${resolved.provider}/${resolved.model}`],
+        ['tools', String(tools.length)],
+        ['skills', String(skills.length)],
+        ['approvals', autoApprove ? 'auto' : 'ask'],
+      ],
+      stdout.columns ?? DEFAULT_WIDTH,
     ),
   );
+  log(c.dim('/help for commands'));
   for (const problem of problems) log(c.yellow(`  skill  ${problem.message}`));
 
   for (;;) {

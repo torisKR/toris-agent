@@ -202,3 +202,69 @@ test('openai wire format serializes tool arguments to a JSON string', () => {
   assert.equal(wire[2].role, 'tool');
   assert.equal(wire[2].tool_call_id, 'a');
 });
+
+test('approval is requested before the tool-start event is emitted', async () => {
+  // The chat CLI relies on this order: it tears down the spinner and any open
+  // prose block inside `approve`, because by the time `tool-start` arrives the
+  // readline prompt has already been drawn. Reordering core/chat.js would
+  // silently corrupt the approval prompt, so pin the contract here.
+  const order = [];
+  const session = createChatSession({
+    provider: fakeProvider([
+      { text: '', toolCalls: [{ id: 'c1', name: 'echo', input: {} }] },
+      { text: 'done' },
+    ]),
+    model: 'test-model',
+    tools: [
+      {
+        name: 'echo',
+        description: 'echo',
+        needsApproval: true,
+        inputSchema: { type: 'object' },
+        run: async () => 'ok',
+      },
+    ],
+    approve: async () => {
+      order.push('approve');
+      return true;
+    },
+    onEvent: (evt) => {
+      if (evt.type === 'tool-start' || evt.type === 'tool-denied') order.push(evt.type);
+    },
+  });
+
+  await session.send('go');
+
+  assert.deepEqual(order, ['approve', 'tool-start']);
+});
+
+test('a denied tool never emits tool-start', async () => {
+  const order = [];
+  const session = createChatSession({
+    provider: fakeProvider([
+      { text: '', toolCalls: [{ id: 'c1', name: 'echo', input: {} }] },
+      { text: 'done' },
+    ]),
+    model: 'test-model',
+    tools: [
+      {
+        name: 'echo',
+        description: 'echo',
+        needsApproval: true,
+        inputSchema: { type: 'object' },
+        run: async () => assert.fail('a denied tool must not run'),
+      },
+    ],
+    approve: async () => {
+      order.push('approve');
+      return false;
+    },
+    onEvent: (evt) => {
+      if (evt.type === 'tool-start' || evt.type === 'tool-denied') order.push(evt.type);
+    },
+  });
+
+  await session.send('go');
+
+  assert.deepEqual(order, ['approve', 'tool-denied']);
+});
