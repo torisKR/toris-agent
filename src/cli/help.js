@@ -3,11 +3,13 @@ import { line, c } from './output.js';
 export const USAGE = `${'toris'} - local-first multi-agent development harness
 
 USAGE
+  toris                     Open the interactive chat TUI (at a terminal)
   toris <command> [options]
 
 COMMANDS
   init                      Create ~/.toris and a default config
   doctor                    Check runtime, providers, git and store
+  connect                   Connect a model backend (CLI login or API key)
   chat ["<message>"]        Talk to a model with tools (REPL if no message)
   project add [path]        Register a project (defaults to cwd)
   project list              List registered projects

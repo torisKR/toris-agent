@@ -1,9 +1,13 @@
+import { createRequire } from 'node:module';
+
 import { resolveHome, loadConfig } from '../core/config.js';
+import { listProfiles } from '../core/models.js';
 import { Store } from '../core/store.js';
 import { EXIT, UsageError, TorisError } from '../core/errors.js';
 import { parseArgs } from './args.js';
-import { setColor, errorLine, printJson, c } from './output.js';
+import { setColor, errorLine, printJson, line, c } from './output.js';
 import { printHelp } from './help.js';
+import { needsOnboarding, renderOnboarding } from './tui/onboarding.js';
 import { cmdInit, cmdDoctor, cmdVersion } from './commands/setup.js';
 import { cmdProject } from './commands/project.js';
 import { cmdRun, cmdRuns, cmdInspect, cmdReceipt, cmdLogs, cmdCancel } from './commands/run.js';
@@ -11,11 +15,13 @@ import { cmdAgents, cmdSkills, cmdAutonomy } from './commands/catalog.js';
 import { cmdApprovals, cmdApprove, cmdReject } from './commands/approvals.js';
 import { cmdDaemon } from './commands/daemon.js';
 import { cmdChat } from './commands/chat.js';
+import { cmdConnect } from './commands/connect.js';
 import { cmdUpdate } from './commands/update.js';
 
 const COMMANDS = {
   init: cmdInit,
   doctor: cmdDoctor,
+  connect: cmdConnect,
   chat: cmdChat,
   project: cmdProject,
   run: cmdRun,
@@ -38,9 +44,46 @@ const COMMANDS = {
 /** Commands that must not fail merely because config does not exist yet. */
 const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'version', 'update']);
 
-export async function main(argv = process.argv.slice(2)) {
+/** What a bare `toris` runs when a human is watching. */
+const DEFAULT_INTERACTIVE_COMMAND = 'chat';
+
+const require = createRequire(import.meta.url);
+const torisVersion = () => require('../../package.json').version;
+
+/** Both halves matter: a TUI needs somewhere to draw *and* someone to type. */
+export const isInteractiveTerminal = (streams = process) =>
+  Boolean(streams.stdin?.isTTY && streams.stdout?.isTTY);
+
+/**
+ * Decide what an invocation means before any I/O happens.
+ *
+ * A bare `toris` is ambiguous by design: at a terminal it should open the chat
+ * TUI the way `claude` and `opencode` do, but in a pipe or in CI the same
+ * command must keep its old help-and-fail contract — a prompt nobody can answer
+ * is a hung build, which is far worse than a usage error.
+ *
+ * @param {{positionals:string[], flags:Record<string,any>, isInteractive:boolean}} input
+ * @returns {{kind:'help', exitCode:number} | {kind:'command', name:string, isDefault:boolean}}
+ */
+export function resolveInvocation({ positionals, flags, isInteractive }) {
+  const name = positionals[0];
+  if (flags.help) return { kind: 'help', exitCode: name ? EXIT.OK : EXIT.USAGE };
+  if (name) return { kind: 'command', name, isDefault: false };
+  if (isInteractive && !flags.json) {
+    return { kind: 'command', name: DEFAULT_INTERACTIVE_COMMAND, isDefault: true };
+  }
+  return { kind: 'help', exitCode: EXIT.USAGE };
+}
+
+/**
+ * @param {string[]} argv
+ * @param {{commands?:Record<string,Function>, isInteractive?:boolean}} [deps] Injection seam for tests.
+ */
+export async function main(argv = process.argv.slice(2), deps = {}) {
   let json = false;
   try {
+    const commands = deps.commands ?? COMMANDS;
+    const isInteractive = deps.isInteractive ?? isInteractiveTerminal();
     const { positionals, flags } = parseArgs(argv);
     json = Boolean(flags.json);
     if (flags['no-color'] || flags.json) setColor(false);
@@ -48,17 +91,19 @@ export async function main(argv = process.argv.slice(2)) {
     if (flags.version && positionals.length === 0) {
       return await cmdVersion({ json });
     }
-    const name = positionals[0];
-    if (!name || flags.help) {
+
+    const invocation = resolveInvocation({ positionals, flags, isInteractive });
+    if (invocation.kind === 'help') {
       if (json) {
-        printJson({ usage: 'toris <command>', commands: Object.keys(COMMANDS) });
+        printJson({ usage: 'toris <command>', commands: Object.keys(commands) });
         return EXIT.OK;
       }
       printHelp();
-      return name ? EXIT.OK : EXIT.USAGE;
+      return invocation.exitCode;
     }
 
-    const command = COMMANDS[name];
+    const { name, isDefault } = invocation;
+    const command = commands[name];
     if (!command) {
       throw new UsageError(`Unknown command "${name}". Run \`toris --help\`.`);
     }
@@ -74,6 +119,26 @@ export async function main(argv = process.argv.slice(2)) {
         config: (await import('../core/config.js')).DEFAULT_CONFIG,
         exists: false,
       });
+    }
+
+    // Typing the tool's name is how people discover it, so a first run teaches
+    // instead of failing. Explicit `toris chat` still errors, because a script
+    // that asked for chat by name wants a non-zero exit when it cannot run.
+    // A command that onboards interactively by itself is left to do so.
+    const firstRun =
+      isDefault &&
+      command.handlesFirstRun !== true &&
+      needsOnboarding({ configExists, profileCount: listProfiles(config).length });
+    if (firstRun) {
+      for (const text of renderOnboarding({
+        version: torisVersion(),
+        configExists,
+        profileCount: listProfiles(config).length,
+        home,
+      })) {
+        line(text);
+      }
+      return EXIT.OK;
     }
 
     const store = new Store(home);
