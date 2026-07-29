@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeConfig, validateConfig, DEFAULT_CONFIG, resolveHome } from '../src/core/config.js';
+import {
+  mergeConfig,
+  validateConfig,
+  migrateLegacyProviders,
+  DEFAULT_CONFIG,
+  resolveHome,
+} from '../src/core/config.js';
 
 test('mergeConfig deep-merges without mutating either input', () => {
   const base = { a: 1, nested: { x: 1, y: 2 } };
@@ -31,4 +37,50 @@ test('validateConfig reports each bad field', () => {
 
 test('resolveHome prefers an explicit path over the environment', () => {
   assert.match(resolveHome('/tmp/explicit'), /explicit$/);
+});
+
+test('migrateLegacyProviders derives CLI profiles from an old providers block', () => {
+  const legacy = {
+    providers: {
+      claude: { bin: 'claude', enabled: true },
+      codex: { bin: 'codex', enabled: true },
+    },
+    models: { profiles: {}, routing: {} },
+  };
+  const before = JSON.stringify(legacy);
+  const migrated = migrateLegacyProviders(legacy);
+  assert.deepEqual(migrated.models.profiles['claude-cli'], {
+    provider: 'claude-cli',
+    model: 'auto',
+  });
+  assert.deepEqual(migrated.models.profiles['codex-cli'], {
+    provider: 'codex-cli',
+    model: 'auto',
+  });
+  assert.equal(migrated.models.routing.chat, 'claude-cli', 'chat routes to the first profile');
+  assert.equal(JSON.stringify(legacy), before, 'input must not be mutated');
+});
+
+test('migrateLegacyProviders leaves an explicit profile setup alone', () => {
+  const configured = {
+    providers: { claude: { bin: 'claude', enabled: true } },
+    models: {
+      profiles: { mine: { provider: 'anthropic', model: 'auto' } },
+      routing: { chat: 'mine' },
+    },
+  };
+  assert.equal(migrateLegacyProviders(configured), configured, 'no copy when nothing to do');
+});
+
+test('migrateLegacyProviders ignores disabled or unknown legacy entries', () => {
+  const legacy = {
+    providers: {
+      claude: { bin: 'claude', enabled: false },
+      mystery: { bin: 'mystery', enabled: true },
+    },
+    models: { profiles: {}, routing: {} },
+  };
+  const migrated = migrateLegacyProviders(legacy);
+  assert.deepEqual(Object.keys(migrated.models.profiles), []);
+  assert.equal(migrated.models.routing.chat, undefined);
 });

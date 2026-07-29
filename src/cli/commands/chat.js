@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { stdin, stdout } from 'node:process';
 
 import { TorisError, EXIT } from '../../core/errors.js';
-import { AUTONOMY_LEVELS } from '../../core/autonomy.js';
+import { AUTONOMY_LEVELS, autoApprovesTools } from '../../core/autonomy.js';
 import {
   resolveProfile,
   resolveRole,
@@ -25,15 +25,12 @@ import {
   renderSkillBriefing,
   BUILTIN_SKILL_DIR,
 } from '../../core/skills.js';
-import { renderBanner, renderTurnStatus } from '../tui/banner.js';
+import { renderBanner, renderTurnStatus, resolveWidth, countOf } from '../tui/banner.js';
 import { parseSlashCommand, isQuitWord, renderSlashHelp } from '../tui/slash.js';
 import { createInterruptPolicy } from '../tui/interrupt.js';
 import { c, printJson } from '../output.js';
 
 const require = createRequire(import.meta.url);
-
-/** Autonomy levels at or above this run mutating tools without asking. */
-const AUTO_APPROVE_FROM = 3;
 
 /** An aborted request is a deliberate interrupt, not a failure to report. */
 const isAbort = (err) => err?.name === 'AbortError' || err?.code === 'ABORT_ERR';
@@ -128,8 +125,6 @@ function assertUsable(resolved, config) {
   }
 }
 
-const autonomyRank = (level) => Number(String(level ?? 'L2').replace(/^L/, '')) || 2;
-
 /** Render a tool call compactly enough to judge it at a glance. */
 function describeCall(call) {
   const preview = JSON.stringify(call.input ?? {});
@@ -208,7 +203,7 @@ export async function cmdChat(ctx, args, flags) {
       : SYSTEM_PROMPT;
   const autoApprove =
     Boolean(flags.yes) ||
-    autonomyRank(flags.autonomy ?? config.defaultAutonomy) >= AUTO_APPROVE_FROM;
+    autoApprovesTools(flags.autonomy ?? config.defaultAutonomy);
 
   const oneShot = args.length > 0;
   if (oneShot && json) {
@@ -236,13 +231,12 @@ export async function cmdChat(ctx, args, flags) {
   const rl = createInterface({ input: stdin, output: stdout });
   const log = (line) => stdout.write(`${line}\n`);
 
-  const DEFAULT_WIDTH = 80;
   const UNWRAPPED_WIDTH = 1_000_000;
   const isTty = Boolean(stdout.isTTY);
 
   // Piped output must stay verbatim so `toris chat "..." | grep` keeps working.
   // Only an interactive terminal gets wrapping, indentation and a spinner.
-  const streamWidth = () => (isTty ? (stdout.columns ?? DEFAULT_WIDTH) : UNWRAPPED_WIDTH);
+  const streamWidth = () => (isTty ? resolveWidth(stdout.columns) : UNWRAPPED_WIDTH);
   const streamGutter = isTty ? '  ' : '';
 
   const write = (chunk) => stdout.write(chunk);
@@ -342,7 +336,7 @@ export async function cmdChat(ctx, args, flags) {
     return EXIT.OK;
   }
 
-  const terminalWidth = () => stdout.columns ?? DEFAULT_WIDTH;
+  const terminalWidth = () => resolveWidth(stdout.columns);
   const delegated = (value) => (isCliBacked ? 'delegated' : value);
 
   const showModel = () => log(c.dim(`${active.profile} → ${active.provider}/${active.model}`));
@@ -363,7 +357,7 @@ export async function cmdChat(ctx, args, flags) {
       return;
     }
     autonomyLevel = level.level;
-    isAutoApproved = Boolean(flags.yes) || autonomyRank(level.level) >= AUTO_APPROVE_FROM;
+    isAutoApproved = Boolean(flags.yes) || autoApprovesTools(level.level);
     showAutonomy();
   };
 
@@ -407,7 +401,7 @@ export async function cmdChat(ctx, args, flags) {
     skills: () => log(listLines(skills.map((s) => `  ${s.name}${c.dim(` — ${s.description}`)}`))),
     usage: () => {
       const u = totalUsage();
-      log(c.dim(`in ${u.inputTokens} · out ${u.outputTokens} · ${u.turns} model turns`));
+      log(c.dim(`in ${u.inputTokens} · out ${u.outputTokens} · ${countOf(u.turns, 'model turn')}`));
     },
     clear: () => {
       session.reset();
@@ -500,7 +494,7 @@ export async function cmdChat(ctx, args, flags) {
 
   rl.close();
   const u = totalUsage();
-  log(c.dim(`\n${u.inputTokens} in · ${u.outputTokens} out · ${u.turns} turns`));
+  log(c.dim(`\n${u.inputTokens} in · ${u.outputTokens} out · ${countOf(u.turns, 'turn')}`));
   return EXIT.OK;
 }
 

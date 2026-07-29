@@ -2,11 +2,15 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 
+import { RECOMMENDED_AUTONOMY } from './autonomy.js';
+
 export const CONFIG_VERSION = 1;
 
 export const DEFAULT_CONFIG = Object.freeze({
   version: CONFIG_VERSION,
-  defaultAutonomy: 'L2',
+  // Solo-dev default: git is the undo button for one person, so pause at push,
+  // not at every local write/commit. See RECOMMENDED_AUTONOMY in autonomy.js.
+  defaultAutonomy: RECOMMENDED_AUTONOMY,
   maxParallelAgents: 3,
   maxDailyCostUsd: 20,
   maxRetriesPerTask: 2,
@@ -76,6 +80,40 @@ export function validateConfig(config) {
   return problems;
 }
 
+/** Legacy `providers` keys and the CLI-backed provider each one maps to. */
+const LEGACY_CLI_PROVIDERS = Object.freeze({ claude: 'claude-cli', codex: 'codex-cli' });
+
+/**
+ * Configs written before `models.profiles` existed carry only a `providers`
+ * block, which made a bare `toris` send an already-connected user back through
+ * the connect wizard. Derive equivalent CLI profiles in memory instead — the
+ * file on disk is never rewritten, and an explicit profile setup wins.
+ * Returns the input unchanged when there is nothing to migrate.
+ */
+export function migrateLegacyProviders(config) {
+  const hasProfiles = Object.keys(config?.models?.profiles ?? {}).length > 0;
+  if (hasProfiles) return config;
+
+  const derived = {};
+  for (const [key, provider] of Object.entries(LEGACY_CLI_PROVIDERS)) {
+    if (config?.providers?.[key]?.enabled === true) {
+      derived[provider] = { provider, model: 'auto' };
+    }
+  }
+  const names = Object.keys(derived);
+  if (names.length === 0) return config;
+
+  const models = config?.models ?? {};
+  return {
+    ...config,
+    models: {
+      ...models,
+      profiles: { ...(models.profiles ?? {}), ...derived },
+      routing: { chat: names[0], ...(models.routing ?? {}) },
+    },
+  };
+}
+
 export async function loadConfig(home) {
   let raw = null;
   try {
@@ -85,7 +123,7 @@ export async function loadConfig(home) {
       throw new Error(`Config at ${configPath(home)} is unreadable: ${err.message}`);
     }
   }
-  const config = mergeConfig(DEFAULT_CONFIG, raw);
+  const config = migrateLegacyProviders(mergeConfig(DEFAULT_CONFIG, raw));
   const problems = validateConfig(config);
   if (problems.length > 0) {
     throw new Error(`Invalid config at ${configPath(home)}:\n  - ${problems.join('\n  - ')}`);
