@@ -11,21 +11,31 @@
 //! group. That also unblocks output capture: grandchildren inherit the stdout
 //! pipe, so a reader waiting on EOF hangs until every one of them is gone.
 
+mod capture;
+mod process;
+
 use napi::bindgen_prelude::{AsyncTask, Error, Result, Status};
 use napi::{Env, Task};
 use napi_derive::napi;
-use std::io::Read;
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc;
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-/// Poll interval while waiting for the child. Small enough that a timeout is
-/// honoured promptly, large enough not to spin a core.
-const POLL_INTERVAL_MS: u64 = 10;
+use capture::Capture;
+use process::{configure_group, kill_group, shell};
 
-/// How long to wait for reader threads after the group has been signalled.
+/// How long to wait for reader threads after the child has exited.
 const DRAIN_GRACE_MS: u64 = 250;
+
+/// How long to wait for a killed group to be reaped before giving up on
+/// recovering a real exit code.
+const REAP_GRACE_MS: u64 = 500;
+
+/// Reported when the process was terminated by a signal and so has no exit code
+/// of its own. Matches the JS fallback, which sees `null` and normalises it the
+/// same way.
+const SIGNAL_EXIT_CODE: i32 = -1;
 
 const DEFAULT_TIMEOUT_MS: u32 = 120_000;
 const DEFAULT_MAX_OUTPUT_BYTES: u32 = 10 * 1024 * 1024;
@@ -49,92 +59,17 @@ pub struct SpawnResult {
     pub truncated: bool,
 }
 
-/// Read a pipe into a byte buffer, keeping at most `cap` bytes.
+/// Decode captured bytes without a needless copy.
 ///
-/// Reading continues past the cap (draining, discarding) so the child is never
-/// blocked writing into a full pipe — a blocked child would never observe our
-/// signal and would sit in an uninterruptible write forever.
-fn drain_capped<R: Read + Send + 'static>(
-    mut src: R,
-    cap: usize,
-) -> mpsc::Receiver<(Vec<u8>, bool)> {
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let mut kept: Vec<u8> = Vec::new();
-        let mut buf = [0u8; 16 * 1024];
-        let mut truncated = false;
-        loop {
-            match src.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    // Keep the tail: the end of a build log carries the error.
-                    kept.extend_from_slice(&buf[..n]);
-                    if kept.len() > cap {
-                        let excess = kept.len() - cap;
-                        kept.drain(..excess);
-                        truncated = true;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-        let _ = tx.send((kept, truncated));
-    });
-    rx
-}
-
-#[cfg(unix)]
-fn configure_group(cmd: &mut Command) {
-    use std::os::unix::process::CommandExt;
-    // SAFETY: setsid is async-signal-safe and is the documented way to move the
-    // child into a fresh session + process group between fork and exec.
-    unsafe {
-        cmd.pre_exec(|| {
-            libc::setsid();
-            Ok(())
-        });
+/// `String::from_utf8_lossy` borrows when the input is valid and then
+/// `into_owned` copies it wholesale — a full extra pass over megabytes of build
+/// log in the overwhelmingly common case. `String::from_utf8` reuses the
+/// existing allocation instead, so only genuinely invalid output pays.
+fn into_string(bytes: Vec<u8>) -> String {
+    match String::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(err) => String::from_utf8_lossy(err.as_bytes()).into_owned(),
     }
-}
-
-#[cfg(windows)]
-fn configure_group(cmd: &mut Command) {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
-}
-
-/// Signal every process in the child's group.
-#[cfg(unix)]
-fn kill_group(child: &mut Child) {
-    let pid = child.id() as i32;
-    // A negative pid targets the whole process group. `setsid` made the child
-    // the group leader, so its pid is the pgid.
-    unsafe {
-        libc::kill(-pid, libc::SIGKILL);
-    }
-    // Fall back to the direct child in case setsid did not take effect.
-    let _ = child.kill();
-}
-
-#[cfg(windows)]
-fn kill_group(child: &mut Child) {
-    let pid = child.id();
-    let _ = Command::new("taskkill")
-        .args(["/T", "/F", "/PID", &pid.to_string()])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    let _ = child.kill();
-}
-
-#[cfg(unix)]
-fn shell() -> (&'static str, &'static str) {
-    ("/bin/sh", "-c")
-}
-
-#[cfg(windows)]
-fn shell() -> (&'static str, &'static str) {
-    ("cmd.exe", "/C")
 }
 
 pub struct SpawnTask {
@@ -144,11 +79,8 @@ pub struct SpawnTask {
     max_output: usize,
 }
 
-impl Task for SpawnTask {
-    type Output = SpawnResult;
-    type JsValue = SpawnResult;
-
-    fn compute(&mut self) -> Result<Self::Output> {
+impl SpawnTask {
+    fn build_command(&self) -> Command {
         let (bin, flag) = shell();
         let mut cmd = Command::new(bin);
         cmd.arg(flag)
@@ -160,56 +92,88 @@ impl Task for SpawnTask {
             cmd.current_dir(dir);
         }
         configure_group(&mut cmd);
+        cmd
+    }
 
-        let mut child = cmd
+    /// Block until the child exits, killing its whole group if the deadline
+    /// passes first.
+    ///
+    /// The wait runs on a helper thread so this one can block on a channel with
+    /// a timeout. The obvious alternative — a `try_wait()` poll loop — charges
+    /// every call up to a full poll interval of latency, which for the short
+    /// commands an agent loop issues by the thousand cost more than the commands
+    /// themselves.
+    ///
+    /// Returns `(exit_code, timed_out)`.
+    fn await_exit(&self, child: Child, pid: u32) -> Result<(i32, bool)> {
+        let (tx, rx) = mpsc::channel();
+        // Detached deliberately: after a timeout the waiter may still be inside
+        // `wait()`, and joining it would reintroduce the hang we just removed.
+        // It owns the `Child` and returns on its own once the kill lands.
+        thread::spawn(move || {
+            let mut child = child;
+            let _ = tx.send(child.wait().map(|s| s.code().unwrap_or(SIGNAL_EXIT_CODE)));
+        });
+
+        match rx.recv_timeout(Duration::from_millis(self.timeout_ms)) {
+            Ok(Ok(code)) => Ok((code, false)),
+            Ok(Err(e)) => Err(Error::new(
+                Status::GenericFailure,
+                format!("wait failed: {e}"),
+            )),
+            Err(RecvTimeoutError::Timeout) => {
+                // Kill the group *before* collecting output: grandchildren hold
+                // the write end of the pipe and the readers will not see EOF
+                // until every one of them is gone.
+                kill_group(pid);
+                let code = match rx.recv_timeout(Duration::from_millis(REAP_GRACE_MS)) {
+                    Ok(Ok(code)) => code,
+                    _ => SIGNAL_EXIT_CODE,
+                };
+                Ok((code, true))
+            }
+            // The waiter cannot drop the sender without sending, but a panic
+            // there must not take the whole call down with it.
+            Err(RecvTimeoutError::Disconnected) => Ok((SIGNAL_EXIT_CODE, false)),
+        }
+    }
+}
+
+impl Task for SpawnTask {
+    type Output = SpawnResult;
+    type JsValue = SpawnResult;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        let mut child = self
+            .build_command()
             .spawn()
             .map_err(|e| Error::new(Status::GenericFailure, format!("spawn failed: {e}")))?;
+        let pid = child.id();
 
-        let out_rx = drain_capped(child.stdout.take().expect("piped"), self.max_output);
-        let err_rx = drain_capped(child.stderr.take().expect("piped"), self.max_output);
+        let missing = |name: &str| {
+            Error::new(
+                Status::GenericFailure,
+                format!("{name} pipe missing after spawn"),
+            )
+        };
+        let stdout = child.stdout.take().ok_or_else(|| missing("stdout"))?;
+        let stderr = child.stderr.take().ok_or_else(|| missing("stderr"))?;
 
-        let deadline = Duration::from_millis(self.timeout_ms);
-        let started = Instant::now();
-        let mut timed_out = false;
-        let mut exit_code = -1i32;
+        let out = Capture::spawn(stdout, self.max_output);
+        let err = Capture::spawn(stderr, self.max_output);
 
-        loop {
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    exit_code = status.code().unwrap_or(-1);
-                    break;
-                }
-                Ok(None) => {
-                    if started.elapsed() >= deadline {
-                        timed_out = true;
-                        // Kill the group *before* collecting output: grandchildren
-                        // hold the write end of the pipe and the readers will not
-                        // see EOF until every one of them is gone.
-                        kill_group(&mut child);
-                        let _ = child.wait();
-                        break;
-                    }
-                    thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
-                }
-                Err(e) => {
-                    return Err(Error::new(
-                        Status::GenericFailure,
-                        format!("wait failed: {e}"),
-                    ))
-                }
-            }
-        }
+        let (exit_code, timed_out) = self.await_exit(child, pid)?;
 
         let grace = Duration::from_millis(DRAIN_GRACE_MS);
-        let (stdout, trunc_out) = out_rx.recv_timeout(grace).unwrap_or_default();
-        let (stderr, trunc_err) = err_rx.recv_timeout(grace).unwrap_or_default();
+        let out = out.collect(grace);
+        let err = err.collect(grace);
 
         Ok(SpawnResult {
             exit_code,
-            stdout: String::from_utf8_lossy(&stdout).into_owned(),
-            stderr: String::from_utf8_lossy(&stderr).into_owned(),
             timed_out,
-            truncated: trunc_out || trunc_err,
+            truncated: out.truncated || err.truncated,
+            stdout: into_string(out.bytes),
+            stderr: into_string(err.bytes),
         })
     }
 
@@ -244,4 +208,59 @@ pub fn native_info() -> String {
         env!("CARGO_PKG_VERSION"),
         std::env::consts::OS
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_utf8_decodes_intact() {
+        assert_eq!(into_string("hello ☃".as_bytes().to_vec()), "hello ☃");
+    }
+
+    #[test]
+    fn invalid_utf8_is_replaced_not_dropped() {
+        let decoded = into_string(vec![b'a', 0xff, b'b']);
+        assert!(decoded.starts_with('a'));
+        assert!(decoded.ends_with('b'));
+        assert!(decoded.contains('\u{fffd}'));
+    }
+
+    #[test]
+    fn empty_input_decodes_to_empty() {
+        assert_eq!(into_string(Vec::new()), "");
+    }
+}
+
+#[cfg(test)]
+mod timing {
+    use super::*;
+    use std::time::Instant;
+
+    /// Times `compute()` directly, bypassing N-API and the libuv threadpool.
+    ///
+    /// Not a correctness test — it exists to attribute the gap between this
+    /// crate and the JS fallback. If Rust-side spawn is already as fast as
+    /// Node's, the remaining cost is the binding hop and no amount of tuning
+    /// here will recover it.
+    ///
+    ///   cargo test --release -- --ignored --nocapture bare_spawn_cost
+    #[test]
+    #[ignore]
+    fn bare_spawn_cost() {
+        let mut best = f64::MAX;
+        for _ in 0..60 {
+            let mut task = SpawnTask {
+                command: "exit 0".to_owned(),
+                cwd: None,
+                timeout_ms: 10_000,
+                max_output: 1 << 20,
+            };
+            let started = Instant::now();
+            task.compute().expect("spawn");
+            best = best.min(started.elapsed().as_secs_f64() * 1000.0);
+        }
+        println!("bare compute() min: {best:.2} ms");
+    }
 }

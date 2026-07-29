@@ -6,7 +6,10 @@ license = "Apache-2.0"
 publish = false
 
 [lib]
-crate-type = ["cdylib"]
+# cdylib is what Node dlopens; rlib additionally lets `cargo test` link a test
+# harness against the crate, so the capture and decode logic can be unit-tested
+# without going through N-API.
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 napi = { version = "2", default-features = false, features = ["napi4"] }
@@ -21,4 +24,7 @@ napi-build = "2"
 [profile.release]
 lto = true
 strip = "symbols"
-opt-level = "z"
+# This crate exists to be faster than the JS it replaces, so it is optimised for
+# speed rather than size. The artifact ships as a per-platform prebuild that is
+# downloaded once, which makes a few hundred KB the cheap side of the trade.
+opt-level = 3

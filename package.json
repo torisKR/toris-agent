@@ -18,8 +18,12 @@
     "toris": "bin/toris.js"
   },
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
-    ".": "./src/index.js"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
   },
   "files": [
     "bin",
@@ -37,7 +41,8 @@
     "lint": "for f in $(find bin src test -name \"*.js\"); do node --check \"$f\" || exit 1; done; echo \"syntax ok\"",
     "toris": "node bin/toris.js",
     "build:native": "cargo build --release --manifest-path crates/toris-native/Cargo.toml",
-    "pack:native": "node scripts/pack-native.js"
+    "pack:native": "node scripts/pack-native.js",
+    "bench": "node scripts/bench.js"
   },
   "repository": {
     "type": "git",
