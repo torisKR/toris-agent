@@ -26,11 +26,17 @@ async function withWorkspace() {
 test('mutating tools stay behind the approval gate', async () => {
   const { tools, cleanup } = await withWorkspace();
   try {
-    const gated = tools.filter((t) => t.needsApproval).map((t) => t.name).sort();
+    const gated = tools
+      .filter((t) => t.needsApproval)
+      .map((t) => t.name)
+      .sort();
     // If this drifts, the autonomy level silently stops gating side effects.
     assert.deepEqual(gated, ['run_command', 'write_file']);
 
-    const readOnly = tools.filter((t) => !t.needsApproval).map((t) => t.name).sort();
+    const readOnly = tools
+      .filter((t) => !t.needsApproval)
+      .map((t) => t.name)
+      .sort();
     assert.deepEqual(readOnly, ['list_files', 'read_file']);
   } finally {
     await cleanup();
@@ -215,9 +221,9 @@ test('oversized output keeps the tail, where the error is', async () => {
   try {
     const out = await byName.run_command.run({
       command:
-        'node -e "console.log(\'FIRST_SENTINEL\');' +
-        'for(let i=0;i<9000;i++)console.log(\'x\'.repeat(20));' +
-        'console.log(\'LAST_SENTINEL\')"',
+        "node -e \"console.log('FIRST_SENTINEL');" +
+        "for(let i=0;i<9000;i++)console.log('x'.repeat(20));" +
+        "console.log('LAST_SENTINEL')\"",
       timeoutMs: 20_000,
     });
 
