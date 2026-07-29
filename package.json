@@ -35,7 +35,9 @@
     "test": "node --test",
     "test:watch": "node --test --watch",
     "lint": "for f in $(find bin src test -name \"*.js\"); do node --check \"$f\" || exit 1; done; echo \"syntax ok\"",
-    "toris": "node bin/toris.js"
+    "toris": "node bin/toris.js",
+    "build:native": "cargo build --release --manifest-path crates/toris-native/Cargo.toml",
+    "pack:native": "node scripts/pack-native.js"
   },
   "repository": {
     "type": "git",
@@ -45,5 +47,12 @@
     "url": "https://github.com/torisKR/toris-agent/issues"
   },
   "homepage": "https://github.com/torisKR/toris-agent#readme",
-  "dependencies": {}
+  "dependencies": {},
+  "optionalDependencies": {
+    "@toris-agent/native-darwin-arm64": "0.1.0",
+    "@toris-agent/native-darwin-x64": "0.1.0",
+    "@toris-agent/native-linux-x64-gnu": "0.1.0",
+    "@toris-agent/native-linux-arm64-gnu": "0.1.0",
+    "@toris-agent/native-win32-x64-msvc": "0.1.0"
+  }
 }

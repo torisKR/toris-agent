@@ -5,3 +5,9 @@ dist/
 .toris-test/
 coverage/
 *.tgz
+
+# Derived native artifacts — regenerate with `npm run build:native` and
+# `node scripts/pack-native.js --triple <triple>`.
+build/
+npm/
+crates/*/target/
