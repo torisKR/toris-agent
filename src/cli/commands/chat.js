@@ -18,7 +18,13 @@ import { detectBinary } from '../../core/providers.js';
 import { createProvider } from '../../providers/index.js';
 import { createChatSession } from '../../core/chat.js';
 import { createDefaultTools } from '../../core/tools.js';
-import { createStreamWriter, createSpinner } from '../tui/render.js';
+import {
+  createStreamWriter,
+  createSpinner,
+  renderRule,
+  renderPrompt,
+  renderUserEcho,
+} from '../tui/render.js';
 import {
   discoverSkills,
   skillSearchPaths,
@@ -28,6 +34,7 @@ import {
 import { renderBanner, renderTurnStatus, resolveWidth, countOf } from '../tui/banner.js';
 import { parseSlashCommand, isQuitWord, renderSlashHelp } from '../tui/slash.js';
 import { createInterruptPolicy } from '../tui/interrupt.js';
+import { SYM } from '../tui/theme.js';
 import { c, printJson } from '../output.js';
 
 const require = createRequire(import.meta.url);
@@ -202,8 +209,7 @@ export async function cmdChat(ctx, args, flags) {
       ? `${SYSTEM_PROMPT}\n\n${briefing}`
       : SYSTEM_PROMPT;
   const autoApprove =
-    Boolean(flags.yes) ||
-    autoApprovesTools(flags.autonomy ?? config.defaultAutonomy);
+    Boolean(flags.yes) || autoApprovesTools(flags.autonomy ?? config.defaultAutonomy);
 
   const oneShot = args.length > 0;
   if (oneShot && json) {
@@ -238,6 +244,9 @@ export async function cmdChat(ctx, args, flags) {
   // Only an interactive terminal gets wrapping, indentation and a spinner.
   const streamWidth = () => (isTty ? resolveWidth(stdout.columns) : UNWRAPPED_WIDTH);
   const streamGutter = isTty ? '  ' : '';
+  // The answer is marked once, then merely indented: one glyph per response,
+  // the way claude-code separates model prose from everything else.
+  const streamFirstGutter = isTty ? `${c.accent(SYM.dot)} ` : '';
 
   const write = (chunk) => stdout.write(chunk);
   const spinner = createSpinner({ write, isTTY: isTty });
@@ -258,7 +267,12 @@ export async function cmdChat(ctx, args, flags) {
   // Width is sampled when a turn starts, so resizing between turns takes effect.
   const openWriter = () => {
     spinner.stop();
-    writer ??= createStreamWriter({ write, width: streamWidth(), gutter: streamGutter });
+    writer ??= createStreamWriter({
+      write,
+      width: streamWidth(),
+      gutter: streamGutter,
+      firstGutter: streamFirstGutter,
+    });
     return writer;
   };
   const closeWriter = () => {
@@ -275,9 +289,9 @@ export async function cmdChat(ctx, args, flags) {
     // silence the spinner before writing a line of our own.
     closeWriter();
     spinner.stop();
-    if (evt.type === 'tool-start') log(c.dim(`  → ${describeCall(evt)}`));
-    else if (evt.type === 'tool-error') log(c.red(`  ✗ ${evt.name}: ${evt.error}`));
-    else if (evt.type === 'tool-denied') log(c.yellow(`  ✗ ${evt.name} denied`));
+    if (evt.type === 'tool-start') log(c.dim(`  ${SYM.arrow} ${describeCall(evt)}`));
+    else if (evt.type === 'tool-error') log(c.red(`  ${SYM.cross} ${evt.name}: ${evt.error}`));
+    else if (evt.type === 'tool-denied') log(c.yellow(`  ${SYM.cross} ${evt.name} denied`));
   };
 
   /** Sessions are rebuilt rather than mutated, so /model can hand over cleanly. */
@@ -443,13 +457,25 @@ export async function cmdChat(ctx, args, flags) {
     promptAbort?.abort();
   });
 
+  /**
+   * Draw the input area: a dim rule to close the previous turn, then an accent
+   * caret. Non-TTY output stays a bare prompt so piped transcripts are clean.
+   */
   const readLine = async () => {
     promptAbort = new AbortController();
+    if (isTty) stdout.write(`\n${renderRule(terminalWidth())}\n`);
     try {
-      return await rl.question(`\n${c.cyan('you ›')} `, { signal: promptAbort.signal });
+      return await rl.question(isTty ? renderPrompt() : '> ', { signal: promptAbort.signal });
     } finally {
       promptAbort = null;
     }
+  };
+
+  /** Push what was just typed into the background, so the answer leads. */
+  const echoSubmitted = (text) => {
+    if (!isTty) return;
+    const chunk = renderUserEcho(text, terminalWidth());
+    if (chunk) stdout.write(chunk);
   };
 
   for (const text of renderBanner({
@@ -488,8 +514,19 @@ export async function cmdChat(ctx, args, flags) {
       continue;
     }
 
+    echoSubmitted(line);
+    const startedAt = Date.now();
     await askModel(line);
-    if (isTty) log(renderTurnStatus({ ...active, usage: totalUsage(), width: terminalWidth() }));
+    if (isTty) {
+      log(
+        renderTurnStatus({
+          ...active,
+          usage: totalUsage(),
+          width: terminalWidth(),
+          elapsedMs: Date.now() - startedAt,
+        }),
+      );
+    }
   }
 
   rl.close();

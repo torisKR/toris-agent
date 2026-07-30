@@ -37,7 +37,9 @@ test('the banner answers what, where and how freely, in a few lines', () => {
   assert.match(text, /main/);
   assert.match(text, /L2/);
   assert.match(text, /~\/projects\/toris-agent/);
-  assert.ok(renderBanner(info).length <= 5, 'stays compact');
+  // The box costs two border rows and a spacer; past that it is one line per
+  // fact, and there are only six facts.
+  assert.ok(renderBanner(info).length <= 12, 'stays compact');
 });
 
 test('the banner names the keys that get an operator unstuck', () => {
@@ -55,18 +57,37 @@ test('the banner never overflows the terminal it is drawn in', () => {
   }
 });
 
-test('a status bar that will not fit drops whole fields, never half of one', () => {
-  const bar = stripAnsi(renderBanner({ ...info, width: 46 })[2]);
+test('a cramped banner keeps its fields whole rather than cutting a value', () => {
+  const lines = renderBanner({ ...info, width: 46 }).map(stripAnsi);
+  const modelRow = lines.find((l) => l.includes('model'));
 
-  assert.ok(!bar.includes('…'), `no field was cut mid-value: ${bar}`);
-  assert.match(bar, /model/, 'the most important field survives');
-  assert.ok(stringWidth(bar) <= 46);
+  assert.ok(modelRow, 'the most important field survives');
+  assert.ok(!modelRow.includes('…'), `no field was cut mid-value: ${modelRow}`);
+  assert.match(modelRow, /anthropic\/some-model/);
+  for (const l of lines) assert.ok(stringWidth(l) <= 46, l);
+});
+
+test('a terminal too narrow to frame falls back to plain stacked lines', () => {
+  const lines = renderBanner({ ...info, width: 24 }).map(stripAnsi);
+  const text = lines.join('\n');
+
+  assert.ok(!text.includes('╭'), 'no box is drawn where it cannot fit');
+  assert.match(text, /toris/);
+  for (const l of lines) assert.ok(stringWidth(l) <= 24, l);
+});
+
+test('a roomy terminal gets a closed, aligned box', () => {
+  const lines = renderBanner({ ...info, width: 100 }).map(stripAnsi);
+
+  assert.match(lines[0], /^╭─+╮$/);
+  assert.match(lines.at(-2), /^╰─+╯$/);
+  const widths = new Set(lines.slice(0, -1).map(stringWidth));
+  assert.equal(widths.size, 1, 'every box row is the same width');
+  assert.ok([...widths][0] <= 64, 'the box is capped, not stretched');
 });
 
 test('one turn is not "1 turns"', () => {
-  const one = stripAnsi(
-    renderTurnStatus({ provider: 'p', model: 'm', usage: { turns: 1 } }),
-  );
+  const one = stripAnsi(renderTurnStatus({ provider: 'p', model: 'm', usage: { turns: 1 } }));
   assert.match(one, /1 turn\b/);
   assert.doesNotMatch(one, /1 turns/);
 });

@@ -1,3 +1,5 @@
+import { ACCENT_CODE } from './tui/theme.js';
+
 const CSI = `${String.fromCharCode(27)}[`;
 const RESET = `${CSI}0m`;
 
@@ -16,6 +18,10 @@ export const c = {
   yellow: wrap('33'),
   blue: wrap('34'),
   cyan: wrap('36'),
+  // The product's own colour, used sparingly: the banner badge, the caret and
+  // the marker in front of an answer. 256-colour so it survives older
+  // terminals, and plain text wherever colour is disabled.
+  accent: wrap(ACCENT_CODE),
 };
 
 export const SYMBOL = Object.freeze({ ok: 'OK', fail: 'FAIL', warn: 'WARN', arrow: '->' });

@@ -30,7 +30,11 @@ test('validateConfig accepts defaults', () => {
 });
 
 test('validateConfig reports each bad field', () => {
-  const problems = validateConfig({ defaultAutonomy: 'L9', maxParallelAgents: 0, maxDailyCostUsd: -1 });
+  const problems = validateConfig({
+    defaultAutonomy: 'L9',
+    maxParallelAgents: 0,
+    maxDailyCostUsd: -1,
+  });
   assert.equal(problems.length, 3);
   assert.match(problems.join(' '), /L9/);
 });

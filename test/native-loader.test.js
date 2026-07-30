@@ -43,7 +43,11 @@ test('loader falls back cleanly when the native binary is unavailable', async ()
   const probe = await probeLoader({ TORIS_DISABLE_NATIVE: '1' });
 
   assert.equal(probe.active, false, 'native must not be active when disabled');
-  assert.match(probe.info, /fallback/i, `backendInfo should name the fallback, got "${probe.info}"`);
+  assert.match(
+    probe.info,
+    /fallback/i,
+    `backendInfo should name the fallback, got "${probe.info}"`,
+  );
 
   // The point of the fallback is that behaviour is unchanged, not merely that
   // it loads: a user with no prebuild must still get correct results.
@@ -138,7 +142,8 @@ test('truncation behaves identically across backends', async (t) => {
  */
 function declaredValueExports(source) {
   const names = new Set();
-  const pattern = /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|class)\s+([A-Za-z_$][\w$]*)/gm;
+  const pattern =
+    /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|class)\s+([A-Za-z_$][\w$]*)/gm;
   for (const match of source.matchAll(pattern)) names.add(match[1]);
   return names;
 }
