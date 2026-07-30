@@ -188,6 +188,9 @@ export async function cmdChat(ctx, args, flags) {
       'codex-cli': cliBinFor('codex-cli', config),
     },
     timeoutMs: config.providerTimeoutMs,
+    // An interactive session asks the same CLI many questions, so it keeps one
+    // process warm; a one-shot answer has nothing to amortise the boot over.
+    warm: !json && args.length === 0,
   };
   const provider = createProvider(resolved, providerOptions);
   const tools = flags['no-tools'] || isCliBacked ? [] : createDefaultTools({ cwd: process.cwd() });
@@ -295,9 +298,9 @@ export async function cmdChat(ctx, args, flags) {
   };
 
   /** Sessions are rebuilt rather than mutated, so /model can hand over cleanly. */
-  const makeSession = (target, transport) =>
+  const makeSession = (target, wire) =>
     createChatSession({
-      provider: transport,
+      provider: wire,
       model: target.model,
       system,
       tools,
@@ -314,6 +317,9 @@ export async function cmdChat(ctx, args, flags) {
     });
 
   let session = makeSession(resolved, provider);
+  /** The transport `session` is currently speaking through, so it can be torn
+   *  down: a warm CLI-backed provider owns a child process. */
+  let transport = provider;
 
   const totalUsage = () => {
     const live = session.usage;
@@ -347,6 +353,7 @@ export async function cmdChat(ctx, args, flags) {
   if (oneShot) {
     await askModel(args.join(' '));
     rl.close();
+    transport.dispose?.();
     return EXIT.OK;
   }
 
@@ -397,7 +404,12 @@ export async function cmdChat(ctx, args, flags) {
 
     const history = session.history;
     carriedUsage = totalUsage();
-    session = makeSession(next, createProvider(next, providerOptions));
+    // The outgoing transport may hold a warm child; swapping without ending it
+    // would leak a `claude` process for the rest of the session.
+    transport.dispose?.();
+    transport = createProvider(next, providerOptions);
+    transport.prewarm?.();
+    session = makeSession(next, transport);
     session.reset(history);
     active = next;
     showModel();
@@ -478,6 +490,11 @@ export async function cmdChat(ctx, args, flags) {
     if (chunk) stdout.write(chunk);
   };
 
+  // Start the backend booting now: the banner, the skill warnings and the
+  // operator's first message all happen while it comes up, so the first answer
+  // does not begin with a cold start.
+  transport.prewarm?.();
+
   for (const text of renderBanner({
     version: require('../../../package.json').version,
     profile: active.profile,
@@ -530,6 +547,7 @@ export async function cmdChat(ctx, args, flags) {
   }
 
   rl.close();
+  transport.dispose?.();
   const u = totalUsage();
   log(c.dim(`\n${u.inputTokens} in · ${u.outputTokens} out · ${countOf(u.turns, 'turn')}`));
   return EXIT.OK;

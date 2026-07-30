@@ -1,7 +1,20 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 
 import { TorisError } from '../core/errors.js';
-import { AUTO_MODEL } from '../core/models.js';
+import {
+  DEFAULT_BIN,
+  DEFAULT_TIMEOUT_MS,
+  STDERR_KEEP,
+  STDERR_TAIL,
+  assistantText,
+  buildArgs,
+  createNdjsonParser,
+  describeFailure,
+  lastUserPrompt,
+  resultUsage,
+  sessionIdOf,
+} from './claude-cli-protocol.js';
+import { createWarmSession, WARM_UNAVAILABLE } from './claude-cli-warm.js';
 
 /**
  * Chat provider backed by the installed `claude` CLI.
@@ -12,133 +25,33 @@ import { AUTO_MODEL } from '../core/models.js';
  * empty — the CLI already ran whatever tools it wanted, and handing those calls
  * back to src/core/chat.js would execute every tool a second time.
  *
+ * Turns take the warm path (one long-lived process, see claude-cli-warm.js)
+ * whenever the installed CLI supports it, and the cold path — a fresh process
+ * per turn — whenever it does not.
+ *
  * @typedef {{role:'user'|'assistant'|'tool', content:any}} Message
  * @typedef {{inputTokens:number, outputTokens:number}} Usage
  * @typedef {{text:string, toolCalls:[], stopReason:string|null, usage:Usage}} Completion
  */
 
-/**
- * `stream-json` is only legal in print mode, and print mode rejects it without
- * `--verbose`. These three always travel together.
- */
-const OUTPUT_FLAGS = Object.freeze(['--output-format', 'stream-json', '--verbose']);
-
-/** Enough stderr to diagnose a crash without pasting a whole log into the REPL. */
-const STDERR_TAIL = 500;
-/** Cap on retained stderr so a chatty failure cannot grow unbounded in memory. */
-const STDERR_KEEP = 4000;
-
-const DEFAULT_BIN = 'claude';
-const DEFAULT_TIMEOUT_MS = 900_000;
+// Re-exported because these are the provider's public surface and its tests'
+// entry point; the definitions moved out only to keep this file readable.
+export { buildArgs, createNdjsonParser, lastUserPrompt };
 
 /**
- * Build the argv for one turn.
- *
- * Two details are load-bearing and were verified against `claude --help`:
- * - `-p/--print` is a BOOLEAN flag; the prompt is a positional argument, so
- *   `-p <prompt>` is two argv entries, not a flag with a value.
- * - `--resume` takes the session id as its value, so it must come before the
- *   positional prompt or the prompt would be swallowed as the resume target.
- *
- * @param {{model?:string|null, system?:string|null, sessionId?:string|null, prompt:string}} opts
- * @returns {string[]}
- */
-export function buildArgs({ model, system, sessionId, prompt }) {
-  const args = [];
-
-  if (sessionId) args.push('--resume', sessionId);
-
-  // The CLI keeps the system prompt for the life of the session, so appending
-  // it again on every resumed turn would stack duplicates.
-  if (!sessionId && typeof system === 'string' && system.trim() !== '') {
-    args.push('--append-system-prompt', system);
-  }
-
-  // 'auto' means "let the CLI pick", which is simply the absence of --model.
-  if (model && model !== AUTO_MODEL) args.push('--model', model);
-
-  args.push('-p', prompt, ...OUTPUT_FLAGS);
-  return args;
-}
-
-/** @param {string} line @returns {object|null} */
-function parseLine(line) {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-  try {
-    const value = JSON.parse(trimmed);
-    return value && typeof value === 'object' ? value : null;
-  } catch {
-    return null; // a line we cannot read is a line we ignore
-  }
-}
-
-/**
- * Incremental NDJSON reader. A stdout chunk boundary can land in the middle of
- * a JSON object, so the trailing fragment is held back until the newline that
- * completes it arrives.
- */
-export function createNdjsonParser() {
-  let buffered = '';
-
-  return {
-    /** @param {string} chunk @returns {object[]} */
-    push(chunk) {
-      buffered += chunk;
-      const lines = buffered.split('\n');
-      buffered = lines.pop() ?? ''; // last element is the incomplete remainder
-      return lines.map(parseLine).filter((evt) => evt !== null);
-    },
-
-    /** Drain whatever is left once stdout ends without a trailing newline. */
-    flush() {
-      const rest = buffered;
-      buffered = '';
-      const evt = parseLine(rest);
-      return evt === null ? [] : [evt];
-    },
-  };
-}
-
-/**
- * The CLI takes a single prompt, not a transcript: continuity comes from
- * `--resume`, so only the newest user turn is sent.
- *
- * @param {ReadonlyArray<Message>} [messages]
- * @returns {string}
- */
-export function lastUserPrompt(messages) {
-  const list = Array.isArray(messages) ? messages : [];
-  for (let i = list.length - 1; i >= 0; i -= 1) {
-    const msg = list[i];
-    if (msg?.role !== 'user') continue;
-    if (typeof msg.content === 'string') return msg.content;
-    if (Array.isArray(msg.content)) {
-      return msg.content
-        .filter((b) => b?.type === 'text' && typeof b.text === 'string')
-        .map((b) => b.text)
-        .join('');
-    }
-    return '';
-  }
-  throw new TorisError('The claude-cli provider needs a user message to send.', 'E_INVALID_ARG');
-}
-
-/** Best-effort human explanation for a `result` event that reports failure. */
-function describeFailure(evt) {
-  if (typeof evt.result === 'string' && evt.result.trim() !== '') return evt.result;
-  if (Array.isArray(evt.errors) && evt.errors.length) return evt.errors.join('; ');
-  return evt.subtype ?? 'unknown error';
-}
-
-/**
- * @param {{bin?:string, timeoutMs?:number, env?:object, spawnImpl?:Function}} [opts]
+ * @param {{bin?:string, timeoutMs?:number, env?:object, spawnImpl?:Function,
+ *          warm?:boolean}} [opts]
+ * @param {boolean} [opts.warm] Hold one CLI process open across turns. Off by
+ *   default: it only pays for itself in a multi-turn session, and a per-turn
+ *   process is the stricter isolation for one-shot and batch callers. The chat
+ *   REPL turns it on.
  */
 export function createClaudeCliProvider({
   bin = DEFAULT_BIN,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   env = process.env,
   spawnImpl = nodeSpawn,
+  warm: warmEnabled = false,
 } = {}) {
   /**
    * Per-provider conversation state. The first turn learns the id from the
@@ -148,10 +61,28 @@ export function createClaudeCliProvider({
   let sessionId = null;
 
   /**
-   * One turn: spawn the CLI, translate its NDJSON into provider events.
+   * The fast path. Created eagerly so `prewarm()` can start the CLI booting
+   * while the operator is still typing, but never spawned until asked.
+   */
+  const warm = warmEnabled
+    ? createWarmSession({
+        bin,
+        env,
+        spawnImpl,
+        timeoutMs,
+        // A cold fallback after a warm turn must resume the same conversation,
+        // not start a second one.
+        onSessionId: (id) => {
+          sessionId = id;
+        },
+      })
+    : null;
+
+  /**
+   * Cold path: one turn, one process. Correct everywhere, slow to start.
    * @returns {AsyncGenerator<{type:string, [k:string]:any}>}
    */
-  async function* stream(opts) {
+  async function* coldStream(opts) {
     const prompt = lastUserPrompt(opts?.messages);
     const signal = opts?.signal;
     if (signal?.aborted) throw new TorisError('The turn was cancelled.', 'E_CANCELLED');
@@ -212,21 +143,14 @@ export function createClaudeCliProvider({
 
     const handle = (evt) => {
       if (evt.type === 'system') {
-        if (evt.subtype === 'init' && typeof evt.session_id === 'string' && evt.session_id) {
-          sessionId = evt.session_id;
-        }
+        if (evt.subtype === 'init') sessionId = sessionIdOf(evt) ?? sessionId;
         return;
       }
 
       if (evt.type === 'assistant') {
-        const blocks = Array.isArray(evt.message?.content) ? evt.message.content : [];
-        for (const block of blocks) {
-          // 'thinking' and 'tool_use' blocks ride the same channel; only text
-          // is ours to surface to the REPL.
-          if (block?.type === 'text' && typeof block.text === 'string' && block.text !== '') {
-            fullText += block.text;
-            emit({ type: 'text', delta: block.text });
-          }
+        for (const text of assistantText(evt)) {
+          fullText += text;
+          emit({ type: 'text', delta: text });
         }
         return;
       }
@@ -234,10 +158,7 @@ export function createClaudeCliProvider({
       if (evt.type === 'result') {
         result = {
           text: typeof evt.result === 'string' ? evt.result : '',
-          usage: {
-            inputTokens: evt.usage?.input_tokens ?? 0,
-            outputTokens: evt.usage?.output_tokens ?? 0,
-          },
+          usage: resultUsage(evt),
         };
         if (evt.is_error) {
           fail(
@@ -364,10 +285,50 @@ export function createClaudeCliProvider({
     }
   }
 
+  /**
+   * One turn, warm if we can, cold if we must.
+   *
+   * The warm session only reports `E_WARM_UNAVAILABLE` before it has yielded
+   * anything, so falling through here can never duplicate visible output.
+   *
+   * @returns {AsyncGenerator<{type:string, [k:string]:any}>}
+   */
+  async function* stream(opts) {
+    // Validate before either path so a malformed call fails identically.
+    const prompt = lastUserPrompt(opts?.messages);
+
+    if (warm && !warm.isDisabled()) {
+      try {
+        yield* warm.turn({ prompt, signal: opts?.signal, timeoutMs });
+        return;
+      } catch (err) {
+        if (err?.code !== WARM_UNAVAILABLE) throw err;
+        // An installed CLI too old for stdin streaming, or a child that died
+        // before answering: stop paying for the attempt and serve it cold.
+        warm.disable();
+      }
+    }
+
+    yield* coldStream(opts);
+  }
+
   return Object.freeze({
     name: 'claude-cli',
 
     stream,
+
+    /**
+     * Start the CLI before there is anything to ask it, so its boot overlaps
+     * with the user composing their first message. Safe to call more than once.
+     */
+    prewarm() {
+      return Boolean(warm?.prewarm());
+    },
+
+    /** End of session: leave no `claude` process behind. */
+    dispose() {
+      warm?.dispose();
+    },
 
     /**
      * One turn, collapsed to its final event. The CLI has no cheaper

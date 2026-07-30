@@ -26,17 +26,21 @@ const CLI_FACTORIES = Object.freeze({
 /**
  * @param {{provider:string, model:string, profile?:string}} resolved
  * @param {{env?:object, fetchImpl?:Function, baseUrl?:string,
- *          bins?:{[provider:string]:string}, timeoutMs?:number}} [opts]
+ *          bins?:{[provider:string]:string}, timeoutMs?:number,
+ *          warm?:boolean}} [opts]
+ * @param {boolean} [opts.warm] Ask CLI-backed providers to hold one process
+ *   open across turns. Only worth it for a live multi-turn session.
  */
 export function createProvider(
   resolved,
-  { env = process.env, fetchImpl, baseUrl, bins = {}, timeoutMs } = {},
+  { env = process.env, fetchImpl, baseUrl, bins = {}, timeoutMs, warm = false } = {},
 ) {
   const cliFactory = CLI_FACTORIES[resolved?.provider];
   if (cliFactory) {
     return cliFactory({
       ...(bins[resolved.provider] ? { bin: bins[resolved.provider] } : {}),
       ...(timeoutMs ? { timeoutMs } : {}),
+      ...(warm ? { warm: true } : {}),
       env,
     });
   }
