@@ -1,6 +1,6 @@
 {
   "name": "toris-agent",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A local-first, multi-agent development harness that turns a goal into planned, executed and verified work — with an evidence receipt for every run.",
   "keywords": [
     "agent",
@@ -54,10 +54,10 @@
   "homepage": "https://github.com/torisKR/toris-agent#readme",
   "dependencies": {},
   "optionalDependencies": {
-    "@toris-agent/native-darwin-arm64": "0.2.0",
-    "@toris-agent/native-darwin-x64": "0.2.0",
-    "@toris-agent/native-linux-x64-gnu": "0.2.0",
-    "@toris-agent/native-linux-arm64-gnu": "0.2.0",
-    "@toris-agent/native-win32-x64-msvc": "0.2.0"
+    "@toris-agent/native-darwin-arm64": "0.2.1",
+    "@toris-agent/native-darwin-x64": "0.2.1",
+    "@toris-agent/native-linux-x64-gnu": "0.2.1",
+    "@toris-agent/native-linux-arm64-gnu": "0.2.1",
+    "@toris-agent/native-win32-x64-msvc": "0.2.1"
   }
 }
