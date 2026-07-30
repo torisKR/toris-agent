@@ -1,6 +1,6 @@
 {
   "name": "toris-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A local-first, multi-agent development harness that turns a goal into planned, executed and verified work — with an evidence receipt for every run.",
   "keywords": [
     "agent",
