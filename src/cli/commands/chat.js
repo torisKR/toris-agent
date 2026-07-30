@@ -33,6 +33,8 @@ import {
 } from '../../core/skills.js';
 import { renderBanner, renderTurnStatus, resolveWidth, countOf } from '../tui/banner.js';
 import { parseSlashCommand, isQuitWord, renderSlashHelp } from '../tui/slash.js';
+import { completeSlash, createPaletteController } from '../tui/palette.js';
+import { stripAnsi, stringWidth } from '../tui/text.js';
 import { createInterruptPolicy } from '../tui/interrupt.js';
 import { SYM } from '../tui/theme.js';
 import { c, printJson } from '../output.js';
@@ -237,7 +239,7 @@ export async function cmdChat(ctx, args, flags) {
     return EXIT.OK;
   }
 
-  const rl = createInterface({ input: stdin, output: stdout });
+  const rl = createInterface({ input: stdin, output: stdout, completer: completeSlash });
   const log = (line) => stdout.write(`${line}\n`);
 
   const UNWRAPPED_WIDTH = 1_000_000;
@@ -456,9 +458,12 @@ export async function cmdChat(ctx, args, flags) {
       return;
     }
     if (action === 'clear') {
-      // ctrl-u then ctrl-k wipes the line on both sides of the cursor.
+      // ctrl-u then ctrl-k wipes the line on both sides of the cursor. These
+      // programmatic writes bypass stdin's keypress event, so the palette
+      // must be told the line is empty by hand.
       rl.write(null, { ctrl: true, name: 'u' });
       rl.write(null, { ctrl: true, name: 'k' });
+      clearPalette();
       return;
     }
     if (action === 'confirm') {
@@ -468,6 +473,32 @@ export async function cmdChat(ctx, args, flags) {
     leaving = true;
     promptAbort?.abort();
   });
+
+  // --- live slash palette ----------------------------------------------------
+  // As `/…` is typed, matching commands paint just below the prompt. Each
+  // keystroke lands here *after* readline applied it (readline registered its
+  // keypress listener first), so `rl.line`/`rl.cursor` are already current.
+  const palette = createPaletteController({ output: stdout });
+  const promptColumns = stringWidth(stripAnsi(renderPrompt()));
+  const clearPalette = () =>
+    palette.update({ line: '', cursor: 0, promptLength: promptColumns, width: terminalWidth() });
+  if (isTty) {
+    stdin.on('keypress', (_char, key) => {
+      if (promptAbort === null) return; // no question pending — nothing to decorate
+      if (key?.name === 'return' || key?.name === 'enter') {
+        // The echoed newline just moved the cursor onto the first palette row;
+        // one erase-below removes the whole panel before the answer streams.
+        palette.onSubmit();
+        return;
+      }
+      palette.update({
+        line: rl.line,
+        cursor: rl.cursor,
+        promptLength: promptColumns,
+        width: terminalWidth(),
+      });
+    });
+  }
 
   /**
    * Draw the input area: a dim rule to close the previous turn, then an accent

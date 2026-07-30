@@ -292,7 +292,7 @@ test('a submitted line is repainted dim under its own caret', () => {
 
   assert.ok(echo, 'a short line is rewritten');
   assert.equal(stripAnsi(echo), `\r${SYM.caret} deploy the thing\n`);
-  assert.ok(echo.includes('[1A'), 'it rewinds over readline\'s own echo');
+  assert.ok(echo.includes('[1A'), "it rewinds over readline's own echo");
   assert.ok(echo.includes('[2K'), 'and clears what was there');
 });
 

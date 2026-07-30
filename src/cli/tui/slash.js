@@ -25,7 +25,7 @@ export const SLASH_COMMANDS = Object.freeze([
 ]);
 
 /** Spellings that mean the same thing, so muscle memory from other tools works. */
-const ALIASES = Object.freeze({
+export const SLASH_ALIASES = Object.freeze({
   '?': 'help',
   h: 'help',
   commands: 'help',
@@ -65,7 +65,7 @@ export function parseSlashCommand(input) {
     .split(/\s+/)
     .filter((part) => part !== '');
   const head = (parts[0] ?? '').toLowerCase();
-  const name = ALIASES[head] ?? head;
+  const name = SLASH_ALIASES[head] ?? head;
   return { name, args: parts.slice(1), known: KNOWN.has(name), raw };
 }
 
