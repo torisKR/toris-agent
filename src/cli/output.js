@@ -6,7 +6,9 @@ const RESET = `${CSI}0m`;
 let colorEnabled =
   Boolean(process.stdout.isTTY) && !process.env.NO_COLOR && process.env.TERM !== 'dumb';
 
-export function setColor(enabled) { colorEnabled = Boolean(enabled); }
+export function setColor(enabled) {
+  colorEnabled = Boolean(enabled);
+}
 
 const wrap = (code) => (text) => (colorEnabled ? `${CSI}${code}m${text}${RESET}` : String(text));
 
@@ -48,7 +50,10 @@ export function keyValues(pairs) {
 
 /** Simple column table that tolerates missing values. */
 export function table(headers, rows) {
-  if (rows.length === 0) { line(c.dim('  (none)')); return; }
+  if (rows.length === 0) {
+    line(c.dim('  (none)'));
+    return;
+  }
   const norm = rows.map((r) => r.map((cell) => String(cell ?? '')));
   const widths = headers.map((h, i) => Math.max(h.length, ...norm.map((r) => (r[i] ?? '').length)));
   line(`  ${c.dim(headers.map((h, i) => h.padEnd(widths[i])).join('  '))}`);

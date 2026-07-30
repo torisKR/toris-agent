@@ -30,13 +30,13 @@ const HINT = '/help for commands · ctrl-c interrupt · ctrl-d exit';
  * eye has to travel the whole width to confirm five short values. Claude Code
  * and codex pin theirs at a similar measure for the same reason.
  */
-const BOX_MAX_WIDTH = 64;
+export const BOX_MAX_WIDTH = 64;
 
 /**
  * Below this the box costs more columns in borders than it earns in structure,
  * so the plain stacked layout is drawn instead.
  */
-const BOX_MIN_WIDTH = 40;
+export const BOX_MIN_WIDTH = 40;
 
 /** `│ ` + content + ` │`. */
 const BOX_CHROME = 4;
@@ -99,6 +99,9 @@ function fitPairs(pairs, width) {
   while (kept.length > 1 && !fits(kept)) kept = kept.slice(0, -1);
   return kept;
 }
+
+/** Versions read as versions with the `v`; unknown ones stay silent. */
+const versionLabel = (version) => (version ? `v${version}` : '');
 
 /**
  * @param {{
@@ -167,9 +170,8 @@ function boxedBanner(info, rows, boxWidth) {
     return `${SYM.vertical} ${padTo(clipped, inner)} ${SYM.vertical}`;
   };
 
-  const title = `${c.accent(SYM.star)} ${c.accent('toris')} ${c.dim(info.version)}`;
-  const field = ([label, value]) =>
-    row(`${ROW_INDENT}${c.dim(padTo(label, LABEL_WIDTH))}${value}`);
+  const title = `${c.accent(SYM.star)} ${c.accent('toris')} ${c.dim(versionLabel(info.version))}`;
+  const field = ([label, value]) => row(`${ROW_INDENT}${c.dim(padTo(label, LABEL_WIDTH))}${value}`);
 
   return [
     `${SYM.topLeft}${edge}${SYM.topRight}`,
@@ -194,7 +196,7 @@ function stackedBanner(info, rows, width) {
   const pairs = rows.filter(([label]) => label !== 'cwd');
 
   return [
-    clip(`${c.accent(SYM.star)} ${c.bold('toris')} ${c.dim(info.version)}`),
+    clip(`${c.accent(SYM.star)} ${c.bold('toris')} ${c.dim(versionLabel(info.version))}`),
     c.dim(clip(shortenPath(info.cwd, info.home))),
     renderStatusBar(fitPairs(pairs, width), width),
   ];

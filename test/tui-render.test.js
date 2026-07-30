@@ -1,8 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createStreamWriter, createSpinner, renderStatusBar } from '../src/cli/tui/render.js';
+import {
+  createStreamWriter,
+  createSpinner,
+  renderStatusBar,
+  renderRule,
+  renderPrompt,
+  renderUserEcho,
+} from '../src/cli/tui/render.js';
 import { stringWidth, stripAnsi } from '../src/cli/tui/text.js';
+import { SYM } from '../src/cli/tui/theme.js';
 
 /** Collects everything a renderer writes so assertions can inspect it. */
 function sink() {
@@ -178,4 +186,118 @@ test('statusBar tolerates a very narrow terminal', () => {
 
 test('statusBar renders empty input as an empty string', () => {
   assert.equal(renderStatusBar([], 40), '');
+});
+
+// --- response marker --------------------------------------------------------
+
+test('streamWriter marks the first line and merely indents the rest', () => {
+  const out = sink();
+  const w = createStreamWriter({ write: out.write, width: 20, gutter: '  ', firstGutter: '> ' });
+
+  w.push('one line that has to wrap onto a second\n');
+  w.end();
+
+  const lines = out.text().split('\n').filter(Boolean);
+  assert.ok(lines.length > 1, 'the text wrapped');
+  assert.ok(lines[0].startsWith('> '), 'the answer is marked once');
+  for (const line of lines.slice(1)) {
+    assert.ok(line.startsWith('  '), `continuation is indented, not re-marked: ${line}`);
+  }
+});
+
+test('the marker survives a leading newline instead of being spent on it', () => {
+  const out = sink();
+  const w = createStreamWriter({ write: out.write, width: 40, gutter: '  ', firstGutter: '> ' });
+
+  w.push('\nreal text\n');
+  w.end();
+
+  assert.equal(out.text(), '\n> real text\n');
+});
+
+test('a wider first-line marker cannot push the text past the terminal edge', () => {
+  const out = sink();
+  const w = createStreamWriter({
+    write: out.write,
+    width: 12,
+    gutter: '  ',
+    firstGutter: '>>>>> ',
+  });
+
+  w.push('alpha beta gamma delta\n');
+  w.end();
+
+  for (const line of out.text().split('\n').filter(Boolean)) {
+    assert.ok(stringWidth(line) <= 12, `${stringWidth(line)}: ${line}`);
+  }
+});
+
+test('streamWriter without a first gutter behaves exactly as before', () => {
+  const out = sink();
+  const w = createStreamWriter({ write: out.write, width: 40, gutter: '  ' });
+
+  w.push('a\nb\n');
+  w.end();
+
+  assert.equal(out.text(), '  a\n  b\n');
+});
+
+// --- spinner elapsed --------------------------------------------------------
+
+test('spinner reports elapsed seconds and the key that stops it', () => {
+  const out = sink();
+  let now = 1000;
+  const s = createSpinner({ write: out.write, isTTY: true, now: () => now });
+
+  s.start('thinking');
+  now += 3400;
+  s.tick();
+  const painted = stripAnsi(out.chunks.at(-1));
+  s.stop();
+
+  assert.match(painted, /thinking/);
+  assert.match(painted, /3s/, 'elapsed time answers "is this stuck?"');
+  assert.match(painted, /esc to interrupt/);
+});
+
+test('spinner elapsed starts from zero on each turn, not from process start', () => {
+  const out = sink();
+  let now = 50_000;
+  const s = createSpinner({ write: out.write, isTTY: true, now: () => now });
+
+  s.start('one');
+  now += 9000;
+  s.stop();
+  s.start('two');
+  const painted = stripAnsi(out.chunks.at(-1));
+  s.stop();
+
+  assert.match(painted, /\(esc to interrupt · 0s\)/);
+});
+
+// --- input area -------------------------------------------------------------
+
+test('the rule spans the terminal exactly, and vanishes at zero width', () => {
+  assert.equal(stringWidth(stripAnsi(renderRule(37))), 37);
+  assert.equal(stripAnsi(renderRule(4)), SYM.horizontal.repeat(4));
+  assert.equal(renderRule(0), '');
+});
+
+test('the prompt is a caret and a space, whatever the colour setting', () => {
+  assert.equal(stripAnsi(renderPrompt()), `${SYM.caret} `);
+});
+
+test('a submitted line is repainted dim under its own caret', () => {
+  const echo = renderUserEcho('deploy the thing', 80);
+
+  assert.ok(echo, 'a short line is rewritten');
+  assert.equal(stripAnsi(echo), `\r${SYM.caret} deploy the thing\n`);
+  assert.ok(echo.includes('[1A'), 'it rewinds over readline\'s own echo');
+  assert.ok(echo.includes('[2K'), 'and clears what was there');
+});
+
+test('input that wrapped is left alone, since one rewind cannot undo it', () => {
+  assert.equal(renderUserEcho('x'.repeat(90), 80), null);
+  assert.equal(renderUserEcho('x'.repeat(78), 80), null, 'the caret counts too');
+  assert.equal(renderUserEcho('hi', 0), null);
 });
