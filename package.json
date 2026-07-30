@@ -54,10 +54,10 @@
   "homepage": "https://github.com/torisKR/toris-agent#readme",
   "dependencies": {},
   "optionalDependencies": {
-    "@toris-agent/native-darwin-arm64": "0.1.0",
-    "@toris-agent/native-darwin-x64": "0.1.0",
-    "@toris-agent/native-linux-x64-gnu": "0.1.0",
-    "@toris-agent/native-linux-arm64-gnu": "0.1.0",
-    "@toris-agent/native-win32-x64-msvc": "0.1.0"
+    "@toris-agent/native-darwin-arm64": "0.2.0",
+    "@toris-agent/native-darwin-x64": "0.2.0",
+    "@toris-agent/native-linux-x64-gnu": "0.2.0",
+    "@toris-agent/native-linux-arm64-gnu": "0.2.0",
+    "@toris-agent/native-win32-x64-msvc": "0.2.0"
   }
 }
