@@ -28,6 +28,7 @@
   "files": [
     "bin",
     "src",
+    "python",
     "skills",
     "README.md",
     "LICENSE"

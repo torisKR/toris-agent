@@ -1,0 +1,21 @@
+{
+  "source": "/Users/toris/projects/auto_shorts",
+  "package": "auto-shorts",
+  "version": "0.1.0",
+  "bundledAt": "2026-08-09",
+  "scope": [
+    "src",
+    "tests",
+    "examples",
+    "README.md",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "excluded": [
+    ".venv",
+    ".env",
+    "__pycache__",
+    "output",
+    "assets"
+  ]
+}

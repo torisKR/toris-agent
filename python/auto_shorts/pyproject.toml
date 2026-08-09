@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auto-shorts"
+version = "0.1.0"
+description = "코드로 만드는 AI 숏폼 영상 제작 파이프라인"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["Pillow>=10.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+publish = ["google-api-python-client>=2.100", "google-auth-oauthlib>=1.2"]
+
+[project.scripts]
+auto-shorts = "auto_shorts.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

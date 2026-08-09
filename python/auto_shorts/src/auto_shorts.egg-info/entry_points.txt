@@ -1,0 +1,2 @@
+[console_scripts]
+auto-shorts = auto_shorts.cli:main
