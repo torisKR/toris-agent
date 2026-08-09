@@ -36,7 +36,7 @@ test('product assets use only local API paths and define all responsive shells',
   assert.match(css, /max-width:\s*767px/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /min-height:\s*var\(--queue-reserve\)/);
-  assert.doesNotMatch(`${components}\n${css}`, /#[0-9a-f]{6}/i);
+  assert.doesNotMatch(`${components}\n${css}`, /#(?:[0-9a-f]{3}|[0-9a-f]{6})\b/i);
 });
 
 test('root app and fixed product assets are served with CSP', async () => {

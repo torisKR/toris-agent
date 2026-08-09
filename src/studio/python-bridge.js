@@ -27,10 +27,21 @@ function parseResult(stdout) {
   }
 }
 
+function terminate(child, signal, kill) {
+  if (process.platform !== 'win32' && Number.isInteger(child.pid)) {
+    try {
+      kill(-child.pid, signal);
+      return;
+    } catch {}
+  }
+  child.kill(signal);
+}
+
 export function runProcess(options) {
   const spawn = options.spawn || nodeSpawn;
   const timeoutMs = options.timeoutMs || 15 * 60 * 1000;
   const maxOutputBytes = options.maxOutputBytes || 1024 * 1024;
+  const kill = options.kill || process.kill;
 
   return new Promise((resolve, reject) => {
     let stdout = Buffer.alloc(0);
@@ -40,6 +51,7 @@ export function runProcess(options) {
       cwd: options.cwd || process.cwd(),
       env: { ...process.env, ...(options.env || {}) },
       shell: false,
+      detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -51,7 +63,7 @@ export function runProcess(options) {
     };
 
     const exceed = () => {
-      child.kill('SIGKILL');
+      terminate(child, 'SIGKILL', kill);
       finish(reject, new PythonBridgeError('PYTHON_OUTPUT_LIMIT', 'Python bridge exceeded its output limit'));
     };
 
@@ -80,7 +92,7 @@ export function runProcess(options) {
     });
 
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      terminate(child, 'SIGKILL', kill);
       finish(reject, new PythonBridgeError('PYTHON_TIMEOUT', `Python bridge exceeded ${timeoutMs}ms`, { timeoutMs }));
     }, timeoutMs);
 
@@ -94,8 +106,10 @@ export function runAutoShorts(options) {
     bin: options.pythonPath,
     args: ['-m', 'auto_shorts', ...(options.args || [])],
     cwd: options.projectRoot,
-    env: { PYTHONPATH: join(options.projectRoot, 'src'), ...(options.env || {}) },
+    env: { PYTHONDONTWRITEBYTECODE: '1', PYTHONPATH: join(options.projectRoot, 'src'), ...(options.env || {}) },
     timeoutMs: options.timeoutMs,
     maxOutputBytes: options.maxOutputBytes,
+    spawn: options.spawn,
+    kill: options.kill,
   });
 }

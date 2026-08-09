@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONTENT_STATUS } from './content.js';
@@ -34,9 +34,11 @@ export class RenderService {
     const input = validateInput(job);
     const content = await this.contents.get(job.contentId);
     if (!content) throw new Error(`Unknown content: ${job.contentId}`);
-    const sourceMedia = content.render?.sourceMedia || content.media;
-    if (!sourceMedia?.path) throw new Error('content needs local source media before rendering');
-    if (!inside(this.home, sourceMedia.path)) throw new Error('source media path is outside TORIS_HOME');
+    const selectedMedia = content.render?.sourceMedia || content.media;
+    if (!selectedMedia?.path) throw new Error('content needs local source media before rendering');
+    const [canonicalHome, canonicalSource] = await Promise.all([realpath(this.home), realpath(selectedMedia.path)]);
+    if (!inside(canonicalHome, canonicalSource)) throw new Error('source media path is outside TORIS_HOME');
+    const sourceMedia = { ...selectedMedia, path: canonicalSource };
 
     const contentRoot = join(this.home, 'studio', 'content', content.id);
     const planDirectory = join(contentRoot, 'plan');

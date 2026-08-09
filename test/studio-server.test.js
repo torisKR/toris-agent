@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
@@ -64,6 +64,28 @@ test('content creation requires the current origin and token and persists awaiti
   });
 });
 
+test('content creation rejects forged media and serving revalidates its local boundary', async () => {
+  await withServer(async ({ base, home, studio }) => {
+    const forged = await fetch(`${base}/api/contents`, mutation(base, JSON.stringify({
+      kind: 'video',
+      title: 'forged',
+      media: { path: '/etc/hosts', mime: 'text/html' },
+    }), { 'content-type': 'application/json' }));
+    assert.equal(forged.status, 400);
+    assert.equal((await studio.contents.list()).length, 0);
+
+    const outside = join(home, 'outside.html');
+    await writeFile(outside, '<script>bad()</script>');
+    const content = await studio.contents.create({ kind: 'video', title: 'linked' });
+    const directory = join(home, 'studio', 'content', content.id, 'original');
+    const linked = join(directory, 'linked.mp4');
+    await mkdir(directory, { recursive: true });
+    await symlink(outside, linked);
+    await studio.contents.update(content.id, { media: { path: linked, mime: 'text/html' } });
+    assert.equal((await fetch(`${base}/api/contents/${content.id}/media`)).status, 404);
+  });
+});
+
 test('content patch cannot overwrite internal media, quality, status, or publication evidence', async () => {
   await withServer(async ({ base }) => {
     const created = await (await fetch(`${base}/api/contents`, mutation(base, JSON.stringify({ kind: 'post', title: 'safe', channels: ['threads'] }), { 'content-type': 'application/json' }))).json();
@@ -91,7 +113,7 @@ test('unknown job types are rejected before persistence', async () => {
 });
 
 test('raw MP4 upload checks magic bytes and supports byte ranges', async () => {
-  await withServer(async ({ base }) => {
+  await withServer(async ({ base, studio }) => {
     const created = await (await fetch(`${base}/api/contents`, mutation(base, JSON.stringify({ kind: 'video', title: 'short' }), { 'content-type': 'application/json' }))).json();
 
     const invalid = await fetch(`${base}/api/contents/${created.id}/upload`, mutation(base, Buffer.from('not-an-mp4'), { 'content-type': 'video/mp4', 'x-file-name': 'bad.mp4' }));
@@ -105,8 +127,15 @@ test('raw MP4 upload checks magic bytes and supports byte ranges', async () => {
     assert.equal(record.media.name, 'short.mp4');
     assert.equal(record.media.size, mp4.length);
 
+    await studio.contents.update(created.id, { render: { sourceMedia: { path: '/stale/source.mp4' } }, quality: { passed: true } });
+    const replaced = await (await fetch(`${base}/api/contents/${created.id}/upload`, mutation(base, mp4, { 'content-type': 'video/mp4', 'x-file-name': 'replacement.mp4' }))).json();
+    assert.equal(replaced.render, null);
+    assert.equal(replaced.quality, null);
+    await studio.contents.update(created.id, { media: { ...replaced.media, mime: 'text/html' } });
+
     const range = await fetch(`${base}/api/contents/${created.id}/media`, { headers: { range: 'bytes=0-7' } });
     assert.equal(range.status, 206);
+    assert.equal(range.headers.get('content-type'), 'video/mp4');
     assert.equal(range.headers.get('content-range'), `bytes 0-7/${mp4.length}`);
     assert.deepEqual(Buffer.from(await range.arrayBuffer()), mp4.subarray(0, 8));
   });

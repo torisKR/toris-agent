@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runProcess } from '../src/studio/python-bridge.js';
+import { runAutoShorts, runProcess } from '../src/studio/python-bridge.js';
 
 test('runProcess uses stdin JSON and parses the final stdout object', async () => {
   const result = await runProcess({
@@ -53,4 +53,41 @@ test('spawn options are always shell-free with an explicit cwd and environment',
   assert.equal(captured.options.cwd, '/fixed/project');
   assert.equal(captured.options.env.SAFE, '1');
   assert.deepEqual(captured.options.stdio, ['pipe', 'pipe', 'pipe']);
+  assert.equal(captured.options.detached, process.platform !== 'win32');
+});
+
+test('timeout terminates the detached process group on POSIX', async () => {
+  if (process.platform === 'win32') return;
+  let killed;
+  const spawn = () => ({
+    pid: 321,
+    stdin: { end() {} },
+    stdout: { on() {} },
+    stderr: { on() {} },
+    once() {},
+    kill() { throw new Error('single-process fallback should not run'); },
+  });
+  await assert.rejects(runProcess({
+    bin: '/fixed/python',
+    spawn,
+    kill: (pid, signal) => { killed = { pid, signal }; },
+    timeoutMs: 10,
+  }), (error) => error.code === 'PYTHON_TIMEOUT');
+  assert.deepEqual(killed, { pid: -321, signal: 'SIGKILL' });
+});
+
+test('auto_shorts runs without writing Python bytecode into the bundled source', async () => {
+  let captured;
+  const spawn = (bin, args, options) => {
+    captured = { bin, args, options };
+    return {
+      stdin: { end() {} },
+      stdout: { on() {} },
+      stderr: { on() {} },
+      once(event, handler) { if (event === 'close') queueMicrotask(() => handler(0, null)); },
+      kill() {},
+    };
+  };
+  await runAutoShorts({ pythonPath: '/fixed/python', projectRoot: '/fixed/bundle', spawn });
+  assert.equal(captured.options.env.PYTHONDONTWRITEBYTECODE, '1');
 });

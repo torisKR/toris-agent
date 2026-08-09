@@ -101,7 +101,7 @@ export class StudioServiceManager {
 
   async uninstall() {
     this.#assertSupported();
-    await this.runner('launchctl', ['bootout', this.domain, this.plistPath]);
+    await this.#required(['bootout', this.domain, this.plistPath], 'launchctl bootout');
     await unlink(this.plistPath).catch((error) => { if (error.code !== 'ENOENT') throw error; });
     return { installed: false, running: false, label: STUDIO_SERVICE_LABEL, plistPath: this.plistPath };
   }

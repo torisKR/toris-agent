@@ -34,7 +34,7 @@ body { overflow-x: hidden; }
 .workspace-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
 .workspace-header h2 { margin: 0; font-size: clamp(28px, 4vw, 48px); letter-spacing: -.05em; }
 .review-canvas { display: grid; min-height: 480px; place-items: center; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-media); background: var(--media-black); box-shadow: var(--shadow); }
-.review-canvas video { max-width: 100%; max-height: 70vh; aspect-ratio: 9 / 16; background: #000; }
+.review-canvas video { max-width: 100%; max-height: 70vh; aspect-ratio: 9 / 16; background: var(--media-black); }
 .post-preview { width: min(100%, 640px); padding: clamp(24px, 5vw, 54px); }
 .post-preview h3 { margin: 0 0 18px; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spacing: -.045em; }
 .post-preview p { color: var(--muted); font-size: 17px; line-height: 1.75; white-space: pre-wrap; }

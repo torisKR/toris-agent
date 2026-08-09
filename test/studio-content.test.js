@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ContentStore } from '../src/studio/content-store.js';
-import { CONTENT_STATUS, createContent } from '../src/studio/content.js';
+import { CONTENT_STATUS, createContent, updateContent } from '../src/studio/content.js';
 
 const withStore = async (fn) => {
   const home = await mkdtemp(join(tmpdir(), 'toris-studio-content-'));
@@ -32,6 +32,9 @@ test('createContent normalises a reviewable Korean post without inventing public
 test('createContent rejects unsupported kinds and empty titles', () => {
   assert.throws(() => createContent({ kind: 'stream', title: 'x' }), /kind/);
   assert.throws(() => createContent({ kind: 'post', title: '  ' }), /title/);
+  assert.throws(() => createContent({ kind: 'post', title: 'x', channels: 'threads' }), /channels/);
+  const content = createContent({ kind: 'post', title: 'x', channels: ['threads'] }, { id: 'cnt_channels' });
+  assert.throws(() => updateContent(content, { channels: 'x' }), /channels/);
 });
 
 test('twenty concurrent creates survive the atomic collection queue', async () => {

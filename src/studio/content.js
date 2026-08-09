@@ -25,6 +25,11 @@ function copy(value) {
   return value == null ? null : structuredClone(value);
 }
 
+function normaliseChannels(value) {
+  if (!Array.isArray(value)) throw new Error('content channels must be an array');
+  return [...new Set(value.map(String).map((channel) => channel.trim()).filter(Boolean))];
+}
+
 export function createContent(input, options = {}) {
   if (!input || typeof input !== 'object') throw new Error('content must be an object');
   const kind = String(input.kind || '').trim();
@@ -34,16 +39,14 @@ export function createContent(input, options = {}) {
 
   const now = options.now || (() => new Date());
   const createdAt = timestamp(now());
-  const channels = Array.isArray(input.channels)
-    ? input.channels
-    : Array.isArray(input.brief?.channels) ? input.brief.channels : [];
+  const channels = normaliseChannels(input.channels ?? input.brief?.channels ?? []);
 
   return {
     id: options.id || createId('cnt'),
     kind,
     title,
     status: CONTENT_STATUS.AWAITING_REVIEW,
-    channels: [...new Set(channels.map(String).filter(Boolean))],
+    channels,
     brief: copy(input.brief),
     media: copy(input.media),
     render: null,
@@ -59,12 +62,14 @@ export function updateContent(content, patch, now = () => new Date()) {
   if (!patch || typeof patch !== 'object') throw new Error('content patch must be an object');
   if (patch.status != null && !CONTENT_STATUSES.has(patch.status)) throw new Error('unsupported content status');
   if (patch.title != null && !String(patch.title).trim()) throw new Error('content title is required');
+  const nextPatch = copy(patch);
+  if (Object.hasOwn(patch, 'channels')) nextPatch.channels = normaliseChannels(patch.channels);
 
   const candidate = timestamp(now());
   const minimum = new Date(Date.parse(content.updatedAt) + 1).toISOString();
   return {
     ...content,
-    ...copy(patch),
+    ...nextPatch,
     id: content.id,
     title: patch.title == null ? content.title : String(patch.title).trim(),
     createdAt: content.createdAt,

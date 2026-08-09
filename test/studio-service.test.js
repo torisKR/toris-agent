@@ -62,3 +62,30 @@ test('service manager fails closed away from macOS', async () => {
   const manager = new StudioServiceManager({ platform: 'linux' });
   await assert.rejects(manager.install(), /macOS/);
 });
+
+test('service uninstall preserves its plist when launchctl bootout fails', async () => {
+  const userHome = await mkdtemp(join(tmpdir(), 'toris-launchd-failure-'));
+  let failBootout = false;
+  const manager = new StudioServiceManager({
+    platform: 'darwin',
+    uid: 501,
+    userHome,
+    torisHome: join(userHome, '.toris'),
+    nodePath: '/opt/node',
+    binPath: '/repo/bin/toris.js',
+    workingDirectory: '/repo',
+    bundleRoot: '/repo/python/auto_shorts',
+    uvPath: '/opt/uv',
+    runner: async (_command, args) => failBootout && args[0] === 'bootout'
+      ? { exitCode: 5, stdout: '', stderr: 'bootout denied' }
+      : { exitCode: 0, stdout: args[0] === 'print' ? 'state = running' : '', stderr: '' },
+  });
+  try {
+    await manager.install();
+    failBootout = true;
+    await assert.rejects(manager.uninstall(), /bootout denied/);
+    assert.match(await readFile(manager.plistPath, 'utf8'), /kr\.toris\.agent\.studio/);
+  } finally {
+    await rm(userHome, { recursive: true, force: true });
+  }
+});

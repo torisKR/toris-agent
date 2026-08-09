@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ContentStore } from './content-store.js';
+import { CONTENT_STATUS } from './content.js';
 import { HttpError, Router, assertStudioMutation, readJson } from './http.js';
 import { JobQueue } from './job-queue.js';
 import { mediaResponse, saveMp4Upload } from './media-store.js';
@@ -39,7 +40,17 @@ function requireJson(request) {
 }
 
 function editableContentPatch(input) {
+  if (Object.hasOwn(input, 'channels') && !Array.isArray(input.channels)) throw new HttpError(400, 'content channels must be an array');
   return Object.fromEntries(['title', 'brief', 'channels'].filter((key) => Object.hasOwn(input, key)).map((key) => [key, input[key]]));
+}
+
+function createContentInput(input) {
+  for (const key of ['media', 'render', 'quality', 'publication', 'status']) {
+    if (Object.hasOwn(input, key)) throw new HttpError(400, `${key} cannot be set during content creation`);
+  }
+  if (Object.hasOwn(input, 'channels') && !Array.isArray(input.channels)) throw new HttpError(400, 'content channels must be an array');
+  if (input.brief?.channels != null && !Array.isArray(input.brief.channels)) throw new HttpError(400, 'brief channels must be an array');
+  return Object.fromEntries(['kind', 'title', 'brief', 'channels'].filter((key) => Object.hasOwn(input, key)).map((key) => [key, input[key]]));
 }
 
 async function sendStatic(response, pathname) {
@@ -92,7 +103,7 @@ export async function createStudioServer(options) {
   });
   router.add('POST', '/api/contents', async (request, response) => {
     requireJson(request);
-    const content = await contents.create(await readJson(request));
+    const content = await contents.create(createContentInput(await readJson(request)));
     sendJson(response, 201, content);
   });
   router.add('GET', '/api/contents/:id', async (_request, response, params) => {
@@ -109,12 +120,19 @@ export async function createStudioServer(options) {
     const content = await contents.get(params.id);
     if (!content) throw new HttpError(404, 'content not found');
     const media = await saveMp4Upload(request, { home: options.home, contentId: content.id, maxBytes: options.maxUploadBytes });
-    sendJson(response, 200, await contents.update(content.id, { media, kind: content.kind === 'post' ? 'combined' : content.kind }));
+    sendJson(response, 200, await contents.update(content.id, {
+      media,
+      kind: content.kind === 'post' ? 'combined' : content.kind,
+      status: CONTENT_STATUS.AWAITING_REVIEW,
+      render: null,
+      quality: null,
+      publication: null,
+    }));
   });
   router.add('GET', '/api/contents/:id/media', async (request, response, params) => {
     const content = await contents.get(params.id);
     if (!content) throw new HttpError(404, 'content not found');
-    const media = await mediaResponse(content, request.headers.range);
+    const media = await mediaResponse(content, request.headers.range, { home: options.home });
     response.writeHead(media.status, media.headers);
     media.stream.pipe(response);
   });

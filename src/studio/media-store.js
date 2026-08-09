@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { basename, join } from 'node:path';
+import { basename, join, resolve, sep } from 'node:path';
 import { createReadStream } from 'node:fs';
-import { mkdir, open, rename, stat, unlink } from 'node:fs/promises';
+import { mkdir, open, realpath, rename, stat, unlink } from 'node:fs/promises';
 import { HttpError } from './http.js';
 
 function safeName(value) {
@@ -53,18 +53,31 @@ export async function saveMp4Upload(request, options) {
   };
 }
 
-export async function mediaResponse(record, rangeHeader) {
+function inside(root, candidate) {
+  const base = resolve(root);
+  const value = resolve(candidate);
+  return value === base || value.startsWith(`${base}${sep}`);
+}
+
+export async function mediaResponse(record, rangeHeader, options) {
   if (!record?.media?.path) throw new HttpError(404, 'content has no local media');
-  const info = await stat(record.media.path).catch((error) => {
+  const root = join(options.home, 'studio', 'content', record.id);
+  const [canonicalRoot, canonicalPath] = await Promise.all([
+    realpath(root),
+    realpath(record.media.path),
+  ]).catch((error) => {
     if (error.code === 'ENOENT') throw new HttpError(404, 'local media is missing');
     throw error;
   });
+  if (!inside(canonicalRoot, canonicalPath)) throw new HttpError(404, 'local media is outside its content directory');
+  const info = await stat(canonicalPath);
+  if (!info.isFile()) throw new HttpError(404, 'local media is not a file');
   const headers = {
     'accept-ranges': 'bytes',
-    'content-type': record.media.mime || 'application/octet-stream',
+    'content-type': 'video/mp4',
   };
   if (!rangeHeader) {
-    return { status: 200, headers: { ...headers, 'content-length': String(info.size) }, stream: createReadStream(record.media.path) };
+    return { status: 200, headers: { ...headers, 'content-length': String(info.size) }, stream: createReadStream(canonicalPath) };
   }
   const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
   if (!match) throw new HttpError(416, 'invalid byte range');
@@ -80,6 +93,6 @@ export async function mediaResponse(record, rangeHeader) {
       'content-length': String(end - start + 1),
       'content-range': `bytes ${start}-${end}/${info.size}`,
     },
-    stream: createReadStream(record.media.path, { start, end }),
+    stream: createReadStream(canonicalPath, { start, end }),
   };
 }
