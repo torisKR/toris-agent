@@ -1,0 +1,132 @@
+import { randomBytes } from 'node:crypto';
+import { createServer } from 'node:http';
+import { ContentStore } from './content-store.js';
+import { HttpError, Router, assertStudioMutation, readJson } from './http.js';
+import { JobQueue } from './job-queue.js';
+import { mediaResponse, saveMp4Upload } from './media-store.js';
+
+function sendJson(response, status, value) {
+  const body = Buffer.from(`${JSON.stringify(value)}\n`);
+  response.writeHead(status, {
+    'cache-control': 'no-store',
+    'content-length': String(body.length),
+    'content-type': 'application/json; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+  });
+  response.end(body);
+}
+
+function requireJson(request) {
+  const type = String(request.headers['content-type'] || '').split(';', 1)[0];
+  if (type !== 'application/json') throw new HttpError(415, 'request must use application/json');
+}
+
+export async function createStudioServer(options) {
+  const host = options.host || '127.0.0.1';
+  const port = options.port ?? 5824;
+  if (host !== '127.0.0.1') throw new Error('Toris Studio only binds to 127.0.0.1');
+  const token = options.token || randomBytes(32).toString('base64url');
+  const contents = await new ContentStore(options.home).init();
+  const jobs = await new JobQueue(options.home, { runners: options.jobRunners || {} }).init();
+  const router = new Router();
+  let server;
+
+  const origin = () => {
+    const address = server.address();
+    return `http://127.0.0.1:${typeof address === 'object' && address ? address.port : port}`;
+  };
+
+  router.add('GET', '/api/health', async (_request, response) => {
+    sendJson(response, 200, { ok: true, name: 'Toris Studio', localOnly: true, status: 'ready' });
+  });
+  router.add('GET', '/api/session', async (_request, response) => {
+    sendJson(response, 200, { token, origin: origin() });
+  });
+  router.add('GET', '/api/contents', async (_request, response) => {
+    sendJson(response, 200, { items: await contents.list() });
+  });
+  router.add('POST', '/api/contents', async (request, response) => {
+    requireJson(request);
+    const content = await contents.create(await readJson(request));
+    sendJson(response, 201, content);
+  });
+  router.add('GET', '/api/contents/:id', async (_request, response, params) => {
+    const content = await contents.get(params.id);
+    if (!content) throw new HttpError(404, 'content not found');
+    sendJson(response, 200, content);
+  });
+  router.add('PATCH', '/api/contents/:id', async (request, response, params) => {
+    requireJson(request);
+    if (!await contents.get(params.id)) throw new HttpError(404, 'content not found');
+    sendJson(response, 200, await contents.update(params.id, await readJson(request)));
+  });
+  router.add('POST', '/api/contents/:id/upload', async (request, response, params) => {
+    const content = await contents.get(params.id);
+    if (!content) throw new HttpError(404, 'content not found');
+    const media = await saveMp4Upload(request, { home: options.home, contentId: content.id, maxBytes: options.maxUploadBytes });
+    sendJson(response, 200, await contents.update(content.id, { media, kind: content.kind === 'post' ? 'combined' : content.kind }));
+  });
+  router.add('GET', '/api/contents/:id/media', async (request, response, params) => {
+    const content = await contents.get(params.id);
+    if (!content) throw new HttpError(404, 'content not found');
+    const media = await mediaResponse(content, request.headers.range);
+    response.writeHead(media.status, media.headers);
+    media.stream.pipe(response);
+  });
+  router.add('GET', '/api/jobs', async (_request, response) => {
+    sendJson(response, 200, { items: await jobs.list() });
+  });
+  router.add('POST', '/api/jobs', async (request, response) => {
+    requireJson(request);
+    const body = await readJson(request);
+    const job = await jobs.enqueue(body.type, { ...body, type: undefined });
+    sendJson(response, 202, job);
+  });
+  router.add('GET', '/api/jobs/:id', async (_request, response, params) => {
+    const job = await jobs.get(params.id);
+    if (!job) throw new HttpError(404, 'job not found');
+    sendJson(response, 200, job);
+  });
+
+  server = createServer({ maxHeaderSize: 16 * 1024, requireHostHeader: true }, async (request, response) => {
+    try {
+      const url = new URL(request.url || '/', origin());
+      assertStudioMutation(request, { token, origin: origin() });
+      const route = router.match(request.method || 'GET', url.pathname);
+      if (!route) throw new HttpError(404, 'route not found');
+      await route.handler(request, response, route.params);
+    } catch (error) {
+      if (response.headersSent) {
+        response.destroy(error);
+        return;
+      }
+      const status = error instanceof HttpError ? error.status : 500;
+      sendJson(response, status, { ok: false, error: { code: status, message: status === 500 ? 'internal server error' : error.message } });
+    }
+  });
+  server.headersTimeout = 5_000;
+  server.requestTimeout = 15 * 60 * 1000;
+  server.keepAliveTimeout = 5_000;
+
+  return {
+    server,
+    token,
+    contents,
+    jobs,
+    listen() {
+      return new Promise((resolve, reject) => {
+        const onError = (error) => { server.off('listening', onListening); reject(error); };
+        const onListening = () => { server.off('error', onError); resolve(this); };
+        server.once('error', onError);
+        server.once('listening', onListening);
+        server.listen({ host, port });
+      });
+    },
+    async close() {
+      await jobs.waitForIdle();
+      if (!server.listening) return;
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      server.closeAllConnections();
+    },
+  };
+}

@@ -27,6 +27,7 @@ COMMANDS
   skills                    Skill packages the model follows in chat
   autonomy                  Autonomy levels and what each permits
   daemon status             Background daemon (not in 0.1.0)
+  studio                    Local creator studio on 127.0.0.1:5824
   update [--check]          Update toris to the latest published version
   version                   Print version
 
