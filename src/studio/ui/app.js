@@ -137,9 +137,24 @@ elements['render-form'].addEventListener('submit', async (event) => {
   }
 });
 
-for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { document.querySelector('.filter.is-active')?.classList.remove('is-active'); button.classList.add('is-active'); state.filter = button.dataset.filter; renderQueue(); });
+const filterButtons = [...document.querySelectorAll('[data-filter]')];
+for (const button of filterButtons) button.addEventListener('click', () => {
+  for (const candidate of filterButtons) {
+    const active = candidate === button;
+    candidate.classList.toggle('is-active', active);
+    candidate.setAttribute('aria-pressed', String(active));
+  }
+  state.filter = button.dataset.filter;
+  renderQueue();
+});
 
 elements['open-publish'].addEventListener('click', () => { const item = itemById(state.selectedId); if (!item) return; elements['publish-confirmation'].placeholder = `PUBLISH ${item.id}`; elements['publish-dialog'].showModal(); });
+elements['publish-dialog'].addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  event.preventDefault();
+  elements['publish-dialog'].close();
+  elements['open-publish'].focus();
+});
 function updatePublishGate() { const item = itemById(state.selectedId); elements['publish-submit'].disabled = !item || !elements['publish-check'].checked || elements['publish-confirmation'].value !== `PUBLISH ${item.id}`; }
 elements['publish-check'].addEventListener('change', updatePublishGate); elements['publish-confirmation'].addEventListener('input', updatePublishGate);
 elements['publish-submit'].addEventListener('click', async () => {

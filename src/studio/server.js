@@ -18,6 +18,7 @@ const STATIC_ASSETS = new Map([
   ['/assets/components.css', ['components.css', 'text/css; charset=utf-8']],
   ['/assets/studio.css', ['studio.css', 'text/css; charset=utf-8']],
   ['/assets/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/assets/favicon.svg', ['favicon.svg', 'image/svg+xml']],
 ]);
 const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 

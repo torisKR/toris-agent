@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="로컬에서 게시물과 세로 영상을 만들고 렌더 품질을 검토하는 Toris Studio입니다.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <title>Toris Studio</title>
   <link rel="stylesheet" href="/assets/tokens.css">
   <link rel="stylesheet" href="/assets/components.css">
@@ -11,7 +13,7 @@
 <body>
   <div class="studio-frame">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="Toris Studio 홈"><span class="brand-mark">T</span><span>Toris Studio</span></a>
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">T</span><span>Toris Studio</span></a>
       <div class="local-state"><span class="pulse" aria-hidden="true"></span><span id="live-status">127.0.0.1:5824 · local</span></div>
       <a class="system-link" href="/design-system">Design system</a>
     </header>
@@ -19,10 +21,10 @@
     <div class="studio-shell">
       <aside class="queue-panel" aria-labelledby="queue-title">
         <div class="panel-heading"><div><p class="kicker">Review room</p><h1 id="queue-title">검토 큐</h1></div><span class="queue-count" id="queue-count">0</span></div>
-        <div class="queue-filters" role="tablist" aria-label="콘텐츠 필터">
-          <button class="filter is-active" data-filter="all">전체</button>
-          <button class="filter" data-filter="post">Post</button>
-          <button class="filter" data-filter="video">Video</button>
+        <div class="queue-filters" role="group" aria-label="콘텐츠 필터">
+          <button class="filter is-active" data-filter="all" aria-pressed="true" aria-controls="review-queue">전체</button>
+          <button class="filter" data-filter="post" aria-pressed="false" aria-controls="review-queue">Post</button>
+          <button class="filter" data-filter="video" aria-pressed="false" aria-controls="review-queue">Video</button>
         </div>
         <div id="review-queue" class="review-queue"><div class="queue-empty">로컬 콘텐츠를 불러오는 중입니다.</div></div>
       </aside>

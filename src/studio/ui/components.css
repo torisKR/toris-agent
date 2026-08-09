@@ -9,10 +9,10 @@ h1 { max-width: 720px; margin: 10px 0 12px; font-size: clamp(36px, 6vw, 72px); l
 .card h2 { margin: 0 0 16px; font-size: 15px; letter-spacing: -.01em; }
 .stack { display: grid; gap: 12px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.button { min-height: 44px; padding: 0 15px; border: 1px solid transparent; border-radius: var(--radius-control); color: var(--text); background: var(--accent); cursor: pointer; }
-.button.secondary { border-color: var(--border); background: var(--raised); }
+.button { min-height: 44px; padding: 0 15px; border: 1px solid transparent; border-radius: var(--radius-control); color: var(--accent-ink); background: var(--accent); cursor: pointer; }
+.button.secondary { border-color: var(--border); color: var(--text); background: var(--raised); }
 .button.quiet { color: var(--muted); background: transparent; }
-.button.danger { background: var(--failure); color: #19090b; }
+.button.danger { background: var(--failure); color: var(--failure-ink); }
 .field { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
 .field input, .field textarea, .field select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); color: var(--text); background: var(--canvas); }
 .field textarea { min-height: 92px; resize: vertical; }
@@ -29,7 +29,7 @@ h1 { max-width: 720px; margin: 10px 0 12px; font-size: clamp(36px, 6vw, 72px); l
 .progress > span { display: block; width: 62%; height: 100%; background: var(--accent); }
 .skeleton { height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--raised), var(--border), var(--raised)); background-size: 200% 100%; }
 .empty-state { display: grid; min-height: 170px; place-items: center; border: 1px dashed var(--border); color: var(--muted); text-align: center; }
-.media-frame { display: grid; aspect-ratio: 9 / 16; max-height: 340px; place-items: center; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-media); background: linear-gradient(155deg, #282027, #0c0f14 64%); color: var(--quiet); }
+.media-frame { display: grid; aspect-ratio: 9 / 16; max-height: 340px; place-items: center; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-media); background: linear-gradient(155deg, var(--media-warm), var(--media-cool) 64%); color: var(--quiet); }
 .quality-list { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-control); }
 .quality-row { display: grid; grid-template-columns: minmax(90px, 1fr) 1fr auto; gap: 12px; padding: 11px 12px; background: var(--raised); font-size: 13px; }
 .quality-row span:nth-child(2) { color: var(--muted); font-variant-numeric: tabular-nums; }

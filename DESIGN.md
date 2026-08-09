@@ -11,8 +11,10 @@ The product feels like a quiet edit bay: cinematic media focus, operational dens
 ## Tokens
 
 - Canvas: `#090b0f`; panel: `#11151b`; raised: `#171c23`; border: `#2a3039`.
-- Primary text: `#f4efe6`; secondary: `#a8b0bc`; quiet: `#727b88`.
+- Primary text: `#f4efe6`; secondary: `#a8b0bc`; quiet: `#8c95a2`.
 - Active coral: `#ff7657`; verified green: `#72d6a0`; review amber: `#f5bf68`; failure red: `#ff6f76`.
+- Accent ink: `#1b0e0a`; failure ink: `#19090b`. Filled actions always use their paired dark ink for AA contrast.
+- Media warm: `#282027`; media cool: `#0c0f14`; media black: `#050608`. Video surfaces use these tokens instead of ad hoc colors.
 - Spacing scale: 4, 8, 12, 16, 24, 32, 48 pixels.
 - Radius: 8 controls, 12 cards, 16 media frames. Avoid decorative pill containers; reserve full pills for compact status badges.
 - Typography: system sans for Korean UI; editorial headings use tighter tracking; metadata uses tabular numerals.
@@ -23,6 +25,7 @@ The product feels like a quiet edit bay: cinematic media focus, operational dens
 - Desktop 1280+: 248px review rail, fluid center canvas, 340px inspector.
 - Tablet 768–1279: 208px rail plus canvas; inspector becomes an in-flow panel.
 - Mobile 360–767: single column; queue becomes a horizontal filter strip; actions stay after evidence, never sticky over media.
+- The mobile review queue reserves 128px before async content arrives so the workspace never shifts when drafts load.
 - Every viewport must have zero horizontal overflow.
 
 ## Content surfaces
