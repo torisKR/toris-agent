@@ -10,9 +10,12 @@ import { mediaResponse, saveMp4Upload } from './media-store.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
+  ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/design-system', ['design-system.html', 'text/html; charset=utf-8']],
   ['/assets/tokens.css', ['tokens.css', 'text/css; charset=utf-8']],
   ['/assets/components.css', ['components.css', 'text/css; charset=utf-8']],
+  ['/assets/studio.css', ['studio.css', 'text/css; charset=utf-8']],
+  ['/assets/app.js', ['app.js', 'text/javascript; charset=utf-8']],
 ]);
 const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
