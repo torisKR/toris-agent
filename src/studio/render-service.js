@@ -34,8 +34,9 @@ export class RenderService {
     const input = validateInput(job);
     const content = await this.contents.get(job.contentId);
     if (!content) throw new Error(`Unknown content: ${job.contentId}`);
-    if (!content.media?.path) throw new Error('content needs local source media before rendering');
-    if (!inside(this.home, content.media.path)) throw new Error('source media path is outside TORIS_HOME');
+    const sourceMedia = content.render?.sourceMedia || content.media;
+    if (!sourceMedia?.path) throw new Error('content needs local source media before rendering');
+    if (!inside(this.home, sourceMedia.path)) throw new Error('source media path is outside TORIS_HOME');
 
     const contentRoot = join(this.home, 'studio', 'content', content.id);
     const planDirectory = join(contentRoot, 'plan');
@@ -49,12 +50,12 @@ export class RenderService {
       description: 'Rendered locally by Toris Studio',
       target_duration: input.targetDuration,
       output: outputPath,
-      segments: [{ text: input.text, source: content.media.path, start: 0 }],
+      segments: [{ text: input.text, source: sourceMedia.path, start: 0 }],
     };
     const temporary = `${planPath}.${process.pid}.tmp`;
     await writeFile(temporary, `${JSON.stringify(plan, null, 2)}\n`, 'utf8');
     await rename(temporary, planPath);
-    await this.contents.update(content.id, { status: CONTENT_STATUS.RENDERING, render: { planPath, outputPath, sourceMedia: content.media } });
+    await this.contents.update(content.id, { status: CONTENT_STATUS.RENDERING, render: { planPath, outputPath, sourceMedia } });
 
     try {
       const rendered = await this.runAutoShorts({
@@ -70,7 +71,7 @@ export class RenderService {
         timeoutMs: 60 * 1000,
       });
       if (quality.passed !== true) {
-        await this.contents.update(content.id, { status: CONTENT_STATUS.QUALITY_FAILED, quality, render: { planPath, outputPath, sourceMedia: content.media, result: rendered } });
+        await this.contents.update(content.id, { status: CONTENT_STATUS.QUALITY_FAILED, quality, render: { planPath, outputPath, sourceMedia, result: rendered } });
         throw new Error('rendered video failed quality checks');
       }
       const bytes = await readFile(outputPath);
@@ -81,7 +82,7 @@ export class RenderService {
         status: CONTENT_STATUS.AWAITING_REVIEW,
         media: { name: 'final.mp4', path: outputPath, mime: 'video/mp4', size: info.size, sha256: createHash('sha256').update(bytes).digest('hex') },
         quality,
-        render: { planPath, outputPath, sourceMedia: content.media, result: rendered },
+        render: { planPath, outputPath, sourceMedia, result: rendered },
       });
     } catch (error) {
       const latest = await this.contents.get(content.id);

@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { constants } from 'node:fs';
 import { access, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -48,7 +49,7 @@ export class StudioServiceManager {
   }
 
   async #ensurePythonRuntime() {
-    try { await access(this.pythonPath); return; } catch {}
+    try { await access(this.pythonPath, constants.X_OK); return; } catch {}
     await mkdir(dirname(dirname(this.pythonPath)), { recursive: true });
     const result = await this.runner(this.uvPath, ['sync', '--project', this.bundleRoot], {
       env: { ...process.env, UV_PROJECT_ENVIRONMENT: dirname(dirname(this.pythonPath)) },

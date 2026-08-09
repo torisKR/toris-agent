@@ -39,6 +39,11 @@ test('render service materialises an ID-scoped plan and stores passing quality e
     const plan = JSON.parse(await readFile(join(home, 'studio', 'content', 'cnt_source', 'plan', 'plan.json'), 'utf8'));
     assert.equal(plan.segments[0].source, original);
     assert.equal(plan.target_duration, 15);
+    const rerendered = await service.render({ contentId: 'cnt_source', title: 'QA rerender', text: '원본으로 다시 렌더', targetDuration: 15 });
+    const secondPlan = JSON.parse(await readFile(join(home, 'studio', 'content', 'cnt_source', 'plan', 'plan.json'), 'utf8'));
+    assert.equal(secondPlan.segments[0].source, original);
+    assert.equal(rerendered.render.sourceMedia.path, original);
+    assert.deepEqual(calls.map((call) => call.args[0]), ['render', 'quality', 'render', 'quality']);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
