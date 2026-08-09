@@ -1,0 +1,38 @@
+.showcase { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 80px; }
+.eyebrow { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+h1 { max-width: 720px; margin: 10px 0 12px; font-size: clamp(36px, 6vw, 72px); line-height: .98; letter-spacing: -.055em; }
+.lede { max-width: 680px; margin: 0 0 36px; color: var(--muted); font-size: 17px; line-height: 1.65; }
+.primitive-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+.card { grid-column: span 4; min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--panel); }
+.card.wide { grid-column: span 8; }
+.card.full { grid-column: 1 / -1; }
+.card h2 { margin: 0 0 16px; font-size: 15px; letter-spacing: -.01em; }
+.stack { display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.button { min-height: 44px; padding: 0 15px; border: 1px solid transparent; border-radius: var(--radius-control); color: var(--text); background: var(--accent); cursor: pointer; }
+.button.secondary { border-color: var(--border); background: var(--raised); }
+.button.quiet { color: var(--muted); background: transparent; }
+.button.danger { background: var(--failure); color: #19090b; }
+.field { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
+.field input, .field textarea, .field select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); color: var(--text); background: var(--canvas); }
+.field textarea { min-height: 92px; resize: vertical; }
+.badge { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 9px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 999px; color: var(--review); font-size: 12px; }
+.badge::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
+.badge.pass { color: var(--verified); } .badge.fail { color: var(--failure); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+.tab { padding: 9px 10px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; }
+.tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--text); }
+.toast { padding: 12px 14px; border-left: 3px solid var(--verified); background: var(--raised); color: var(--muted); }
+.dialog { max-width: 460px; padding: 22px; border: 1px solid var(--failure); border-radius: var(--radius-card); background: var(--raised); box-shadow: var(--shadow); }
+.dialog h3 { margin-top: 0; }
+.progress { width: 100%; height: 6px; overflow: hidden; border-radius: 4px; background: var(--border); }
+.progress > span { display: block; width: 62%; height: 100%; background: var(--accent); }
+.skeleton { height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--raised), var(--border), var(--raised)); background-size: 200% 100%; }
+.empty-state { display: grid; min-height: 170px; place-items: center; border: 1px dashed var(--border); color: var(--muted); text-align: center; }
+.media-frame { display: grid; aspect-ratio: 9 / 16; max-height: 340px; place-items: center; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-media); background: linear-gradient(155deg, #282027, #0c0f14 64%); color: var(--quiet); }
+.quality-list { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.quality-row { display: grid; grid-template-columns: minmax(90px, 1fr) 1fr auto; gap: 12px; padding: 11px 12px; background: var(--raised); font-size: 13px; }
+.quality-row span:nth-child(2) { color: var(--muted); font-variant-numeric: tabular-nums; }
+.quality-row strong { color: var(--verified); }
+@media (max-width: 900px) { .card, .card.wide { grid-column: span 6; } }
+@media (max-width: 620px) { .showcase { width: min(100% - 24px, 1180px); padding-top: 32px; } .card, .card.wide { grid-column: 1 / -1; } .quality-row { grid-template-columns: 1fr auto; } .quality-row span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; } }

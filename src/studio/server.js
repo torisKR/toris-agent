@@ -1,9 +1,20 @@
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ContentStore } from './content-store.js';
 import { HttpError, Router, assertStudioMutation, readJson } from './http.js';
 import { JobQueue } from './job-queue.js';
 import { mediaResponse, saveMp4Upload } from './media-store.js';
+
+const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
+const STATIC_ASSETS = new Map([
+  ['/design-system', ['design-system.html', 'text/html; charset=utf-8']],
+  ['/assets/tokens.css', ['tokens.css', 'text/css; charset=utf-8']],
+  ['/assets/components.css', ['components.css', 'text/css; charset=utf-8']],
+]);
+const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
 function sendJson(response, status, value) {
   const body = Buffer.from(`${JSON.stringify(value)}\n`);
@@ -19,6 +30,20 @@ function sendJson(response, status, value) {
 function requireJson(request) {
   const type = String(request.headers['content-type'] || '').split(';', 1)[0];
   if (type !== 'application/json') throw new HttpError(415, 'request must use application/json');
+}
+
+async function sendStatic(response, pathname) {
+  const asset = STATIC_ASSETS.get(pathname);
+  if (!asset) throw new HttpError(404, 'asset not found');
+  const body = await readFile(join(UI_ROOT, asset[0]));
+  response.writeHead(200, {
+    'cache-control': 'no-cache',
+    'content-length': String(body.length),
+    'content-security-policy': CONTENT_SECURITY_POLICY,
+    'content-type': asset[1],
+    'x-content-type-options': 'nosniff',
+  });
+  response.end(body);
 }
 
 export async function createStudioServer(options) {
@@ -39,6 +64,9 @@ export async function createStudioServer(options) {
   router.add('GET', '/api/health', async (_request, response) => {
     sendJson(response, 200, { ok: true, name: 'Toris Studio', localOnly: true, status: 'ready' });
   });
+  for (const pathname of STATIC_ASSETS.keys()) {
+    router.add('GET', pathname, async (_request, response) => sendStatic(response, pathname));
+  }
   router.add('GET', '/api/session', async (_request, response) => {
     sendJson(response, 200, { token, origin: origin() });
   });
