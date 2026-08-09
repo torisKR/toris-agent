@@ -19,6 +19,13 @@ ${argumentXml}
     </array>
     <key>WorkingDirectory</key>
     <string>${xml(options.workingDirectory)}</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PATH</key>
+      <string>${xml(options.path || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin')}</string>
+      <key>TORIS_STUDIO_PYTHON</key>
+      <string>${xml(options.pythonPath)}</string>
+    </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>

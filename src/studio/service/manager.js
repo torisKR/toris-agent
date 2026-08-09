@@ -6,10 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { STUDIO_SERVICE_LABEL, generateLaunchAgent } from './launchd.js';
 
 const DEFAULT_BIN = fileURLToPath(new URL('../../../bin/toris.js', import.meta.url));
+const DEFAULT_BUNDLE = fileURLToPath(new URL('../../../python/auto_shorts', import.meta.url));
 
-function runFile(command, args) {
+function runFile(command, args, options = {}) {
   return new Promise((resolve) => {
-    execFile(command, args, { encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(command, args, { encoding: 'utf8', maxBuffer: 1024 * 1024, ...options }, (error, stdout, stderr) => {
       resolve({ exitCode: error?.code && Number.isInteger(error.code) ? error.code : error ? 1 : 0, stdout: stdout || '', stderr: stderr || error?.message || '' });
     });
   });
@@ -27,6 +28,10 @@ export class StudioServiceManager {
     this.runner = options.runner || runFile;
     this.launchAgentsDirectory = join(this.userHome, 'Library', 'LaunchAgents');
     this.logDirectory = join(this.torisHome, 'logs');
+    this.pythonPath = options.pythonPath || join(this.torisHome, 'runtime', 'auto-shorts', 'bin', 'python');
+    this.bundleRoot = options.bundleRoot || DEFAULT_BUNDLE;
+    this.uvPath = options.uvPath || 'uv';
+    this.path = options.path || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
     this.plistPath = join(this.launchAgentsDirectory, `${STUDIO_SERVICE_LABEL}.plist`);
     this.domain = `gui/${this.uid}`;
     this.target = `${this.domain}/${STUDIO_SERVICE_LABEL}`;
@@ -42,8 +47,18 @@ export class StudioServiceManager {
     return result;
   }
 
+  async #ensurePythonRuntime() {
+    try { await access(this.pythonPath); return; } catch {}
+    await mkdir(dirname(dirname(this.pythonPath)), { recursive: true });
+    const result = await this.runner(this.uvPath, ['sync', '--project', this.bundleRoot], {
+      env: { ...process.env, UV_PROJECT_ENVIRONMENT: dirname(dirname(this.pythonPath)) },
+    });
+    if (result.exitCode !== 0) throw new Error(`Studio Python runtime install failed: ${result.stderr || result.stdout}`);
+  }
+
   async install() {
     this.#assertSupported();
+    await this.#ensurePythonRuntime();
     await mkdir(this.launchAgentsDirectory, { recursive: true });
     await mkdir(this.logDirectory, { recursive: true });
     const plist = generateLaunchAgent({
@@ -52,6 +67,8 @@ export class StudioServiceManager {
       torisHome: this.torisHome,
       workingDirectory: this.workingDirectory,
       logDirectory: this.logDirectory,
+      pythonPath: this.pythonPath,
+      path: this.path,
     });
     const temporary = `${this.plistPath}.${process.pid}.tmp`;
     await writeFile(temporary, plist, { encoding: 'utf8', mode: 0o600 });

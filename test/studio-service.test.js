@@ -13,8 +13,9 @@ test('LaunchAgent is a secret-free user service pinned to loopback studio argume
     torisHome: '/Users/me/.toris',
     workingDirectory: '/repo',
     logDirectory: '/Users/me/.toris/logs',
+    pythonPath: '/Users/me/.toris/runtime/auto-shorts/bin/python',
   });
-  for (const value of ['kr.toris.agent.studio', '<key>RunAtLoad</key>', '<key>KeepAlive</key>', '<integer>63</integer>', '/opt/homebrew/bin/node', '/repo/bin/toris.js', '<string>studio</string>', '<string>--home</string>', '/Users/me/.toris']) assert.match(plist, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const value of ['kr.toris.agent.studio', '<key>RunAtLoad</key>', '<key>KeepAlive</key>', '<integer>63</integer>', '/opt/homebrew/bin/node', '/repo/bin/toris.js', '<string>studio</string>', '<string>--home</string>', '/Users/me/.toris', 'TORIS_STUDIO_PYTHON', '/Users/me/.toris/runtime/auto-shorts/bin/python', '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin']) assert.match(plist, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(plist, /token|secret|password|0\.0\.0\.0/i);
 });
 
@@ -34,13 +35,16 @@ test('service install, status, restart, and uninstall stay in the user launch do
     nodePath: '/opt/node',
     binPath: '/repo/bin/toris.js',
     workingDirectory: '/repo',
+    bundleRoot: '/repo/python/auto_shorts',
+    uvPath: '/opt/uv',
     runner,
   });
   try {
     const installed = await manager.install();
     assert.equal(installed.running, true);
     assert.match(await readFile(installed.plistPath, 'utf8'), /kr\.toris\.agent\.studio/);
-    assert.deepEqual(calls.slice(0, 3).map((call) => call.slice(0, 3)), [
+    assert.deepEqual(calls.slice(0, 4).map((call) => call.slice(0, 3)), [
+      ['/opt/uv', 'sync', '--project'],
       ['launchctl', 'bootout', 'gui/501'],
       ['launchctl', 'bootstrap', 'gui/501'],
       ['launchctl', 'kickstart', '-k'],

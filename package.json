@@ -29,6 +29,7 @@
     "bin",
     "src",
     "python",
+    "docs",
     "skills",
     "README.md",
     "LICENSE"

@@ -71,7 +71,7 @@
         <section class="inspector-section publish-section">
           <div class="section-title"><span>03</span><h2>외부 공개</h2></div>
           <p>로컬 검토가 끝난 콘텐츠만 별도 확인 창에서 진행합니다.</p>
-          <button id="open-publish" class="button danger" type="button" disabled>공개 게시 검토</button>
+          <button id="open-publish" class="button danger" type="button" disabled>외부 공개 차단 확인</button>
         </section>
       </aside>
     </div>
@@ -81,11 +81,11 @@
   <dialog id="publish-dialog">
     <form method="dialog" class="publish-dialog-card">
       <p class="kicker">Production boundary</p>
-      <h2>외부 공개 게시</h2>
+      <h2>외부 공개 차단</h2>
       <p><code>submitted</code>는 <code>live verified</code>가 아닙니다.</p>
       <label class="confirm-check"><input id="publish-check" type="checkbox"> 실제 외부 계정에 공개될 수 있음을 확인했습니다.</label>
       <label class="field">확인 문구 <span>PUBLISH &lt;contentId&gt;</span><input id="publish-confirmation" autocomplete="off"></label>
-      <div class="row dialog-actions"><button class="button secondary" value="cancel">돌아가기</button><button id="publish-submit" class="button danger" type="button" disabled>공개 게시</button></div>
+      <div class="row dialog-actions"><button class="button secondary" value="cancel">돌아가기</button><button id="publish-submit" class="button danger" type="button" disabled>차단 상태 확인</button></div>
     </form>
   </dialog>
   <script type="module" src="/assets/app.js"></script>

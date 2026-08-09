@@ -18,10 +18,10 @@ function blocked(reason) {
 }
 
 export function checkRelease(content, input = {}) {
-  if (input.confirmPublicPublish !== true) return blocked('public publish confirmation is required');
-  if (input.confirmationText !== `PUBLISH ${content.id}`) return blocked('confirmation text does not match');
-  if (input.contentHash !== contentHash(content)) return blocked('content changed after review');
-  if (content.media && content.quality?.passed !== true) return blocked('video quality must pass before publish');
-  if (!Array.isArray(content.channels) || content.channels.length === 0) return blocked('at least one publish channel is required');
-  return blocked('external publishing is disabled in this local Studio');
+  if (input.confirmPublicPublish !== true) return blocked('외부 공개 확인이 필요합니다.');
+  if (input.confirmationText !== `PUBLISH ${content.id}`) return blocked('확인 문구가 일치하지 않습니다.');
+  if (input.contentHash !== contentHash(content)) return blocked('검토 이후 콘텐츠가 변경됐습니다.');
+  if (content.media && content.quality?.passed !== true) return blocked('품질 검사를 통과한 영상만 공개 검토할 수 있습니다.');
+  if (!Array.isArray(content.channels) || content.channels.length === 0) return blocked('검토할 채널이 하나 이상 필요합니다.');
+  return blocked('이 로컬 Studio에서는 외부 게시가 비활성화되어 있습니다.');
 }

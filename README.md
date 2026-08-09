@@ -75,6 +75,23 @@ toris doctor
 
 Uninstall with `npm uninstall -g toris-agent`.
 
+## Toris Studio
+
+Toris Studio is a local review room for Korean post drafts and vertical MP4s. It stores content under `~/.toris`, renders with the bundled `auto_shorts` engine, and records an evidence-based quality report before anything can leave review.
+
+Requirements on macOS: `uv` and `ffmpeg` available on `PATH`.
+
+```bash
+# foreground, then open http://127.0.0.1:5824
+toris studio
+
+# install a per-user LaunchAgent that starts at login and restarts on failure
+toris studio service install
+toris studio service status
+```
+
+The service installer creates a dedicated Python environment at `~/.toris/runtime/auto-shorts`. The web server binds only to `127.0.0.1`, mutations require the current local origin plus an in-memory session token, and external publishing is disabled. See [docs/STUDIO.md](./docs/STUDIO.md) for the storage, render, recovery, and removal contracts.
+
 ## Quickstart
 
 **1. Check your environment.** `doctor` tells you exactly what is missing before you waste a run:

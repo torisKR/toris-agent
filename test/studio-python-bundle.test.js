@@ -34,7 +34,7 @@ test('the bundled auto_shorts engine contains the local render and draft contrac
   await Promise.all(required.map((path) => access(join(bundle, path))));
 
   const metadata = JSON.parse(await readFile(join(bundle, 'BUNDLE.json'), 'utf8'));
-  assert.equal(metadata.source, '/Users/toris/projects/auto_shorts');
+  assert.equal(metadata.source, 'local:auto_shorts');
   assert.equal(metadata.package, 'auto-shorts');
   assert.equal(metadata.version, '0.1.0');
 });

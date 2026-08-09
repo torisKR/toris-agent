@@ -1,5 +1,5 @@
 {
-  "source": "/Users/toris/projects/auto_shorts",
+  "source": "local:auto_shorts",
   "package": "auto-shorts",
   "version": "0.1.0",
   "bundledAt": "2026-08-09",
