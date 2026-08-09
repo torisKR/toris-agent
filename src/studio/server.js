@@ -7,6 +7,8 @@ import { ContentStore } from './content-store.js';
 import { HttpError, Router, assertStudioMutation, readJson } from './http.js';
 import { JobQueue } from './job-queue.js';
 import { mediaResponse, saveMp4Upload } from './media-store.js';
+import { RenderService } from './render-service.js';
+import { checkRelease, contentHash } from './release-guard.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
@@ -35,6 +37,10 @@ function requireJson(request) {
   if (type !== 'application/json') throw new HttpError(415, 'request must use application/json');
 }
 
+function editableContentPatch(input) {
+  return Object.fromEntries(['title', 'brief', 'channels'].filter((key) => Object.hasOwn(input, key)).map((key) => [key, input[key]]));
+}
+
 async function sendStatic(response, pathname) {
   const asset = STATIC_ASSETS.get(pathname);
   if (!asset) throw new HttpError(404, 'asset not found');
@@ -55,7 +61,14 @@ export async function createStudioServer(options) {
   if (host !== '127.0.0.1') throw new Error('Toris Studio only binds to 127.0.0.1');
   const token = options.token || randomBytes(32).toString('base64url');
   const contents = await new ContentStore(options.home).init();
-  const jobs = await new JobQueue(options.home, { runners: options.jobRunners || {} }).init();
+  const renderService = options.renderService || new RenderService({
+    home: options.home,
+    contents,
+    pythonPath: options.pythonPath,
+    bundleRoot: options.bundleRoot,
+    runAutoShorts: options.runAutoShorts,
+  });
+  const jobs = await new JobQueue(options.home, { runners: { render: (job) => renderService.render(job), ...(options.jobRunners || {}) } }).init();
   const router = new Router();
   let server;
 
@@ -89,7 +102,7 @@ export async function createStudioServer(options) {
   router.add('PATCH', '/api/contents/:id', async (request, response, params) => {
     requireJson(request);
     if (!await contents.get(params.id)) throw new HttpError(404, 'content not found');
-    sendJson(response, 200, await contents.update(params.id, await readJson(request)));
+    sendJson(response, 200, await contents.update(params.id, editableContentPatch(await readJson(request))));
   });
   router.add('POST', '/api/contents/:id/upload', async (request, response, params) => {
     const content = await contents.get(params.id);
@@ -104,12 +117,36 @@ export async function createStudioServer(options) {
     response.writeHead(media.status, media.headers);
     media.stream.pipe(response);
   });
+  router.add('GET', '/api/contents/:id/quality', async (_request, response, params) => {
+    const content = await contents.get(params.id);
+    if (!content) throw new HttpError(404, 'content not found');
+    if (!content.quality) throw new HttpError(404, 'quality evidence not found');
+    sendJson(response, 200, content.quality);
+  });
+  router.add('GET', '/api/contents/:id/review', async (_request, response, params) => {
+    const content = await contents.get(params.id);
+    if (!content) throw new HttpError(404, 'content not found');
+    sendJson(response, 200, { contentId: content.id, contentHash: contentHash(content), publishReady: (!content.media || content.quality?.passed === true) && content.channels.length > 0 });
+  });
+  router.add('POST', '/api/contents/:id/release-check', async (request, response, params) => {
+    requireJson(request);
+    const content = await contents.get(params.id);
+    if (!content) throw new HttpError(404, 'content not found');
+    sendJson(response, 200, checkRelease(content, await readJson(request)));
+  });
+  router.add('POST', '/api/renders', async (request, response) => {
+    requireJson(request);
+    const body = await readJson(request);
+    if (!await contents.get(body.contentId)) throw new HttpError(404, 'content not found');
+    sendJson(response, 202, await jobs.enqueue('render', body));
+  });
   router.add('GET', '/api/jobs', async (_request, response) => {
     sendJson(response, 200, { items: await jobs.list() });
   });
   router.add('POST', '/api/jobs', async (request, response) => {
     requireJson(request);
     const body = await readJson(request);
+    if (!jobs.canRun(body.type)) throw new HttpError(400, 'unknown job type');
     const job = await jobs.enqueue(body.type, { ...body, type: undefined });
     sendJson(response, 202, job);
   });

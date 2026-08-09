@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from auto_shorts.media import MediaTools, probe_duration, render_plan, validate_media
+from auto_shorts.media import MediaTools, probe_duration, quality_report, render_plan, validate_media
 from auto_shorts.models import ReelPlan
 
 
@@ -54,3 +54,7 @@ def test_render_plan_loops_short_source_to_target_duration(tmp_path: Path):
 
     assert result.duration == 15
     assert 14.7 <= probe_duration(output) <= 15.3
+    report = quality_report(output)
+    assert report['passed'] is True
+    assert {rule['name'] for rule in report['rules']} == {'video_codec', 'audio_codec', 'resolution', 'duration', 'frame_rate'}
+    assert all(rule['passed'] for rule in report['rules'])

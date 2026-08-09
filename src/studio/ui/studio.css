@@ -49,6 +49,8 @@ body { overflow-x: hidden; }
 .import-box { display: grid; gap: 10px; margin-top: 20px; padding: 14px; border: 1px dashed var(--border); border-radius: var(--radius-control); }
 .import-box label { display: grid; gap: 4px; } .import-box label span, .publish-section p { color: var(--quiet); font-size: 12px; line-height: 1.5; }
 .import-box input { width: 100%; color: var(--muted); font-size: 11px; }
+.render-form { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.render-form .button { width: 100%; }
 .muted-row strong { color: var(--review); }
 .sr-toast { position: fixed; z-index: 20; right: 18px; bottom: 18px; max-width: 360px; padding: 12px 14px; border-left: 3px solid var(--verified); background: var(--raised); box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .18s ease; }
 .sr-toast.is-visible { opacity: 1; }

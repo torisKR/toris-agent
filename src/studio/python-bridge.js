@@ -1,4 +1,5 @@
 import { spawn as nodeSpawn } from 'node:child_process';
+import { join } from 'node:path';
 
 export class PythonBridgeError extends Error {
   constructor(code, message, details = {}) {
@@ -85,5 +86,16 @@ export function runProcess(options) {
 
     const input = options.input == null ? '' : `${JSON.stringify(options.input)}\n`;
     child.stdin.end(input);
+  });
+}
+
+export function runAutoShorts(options) {
+  return runProcess({
+    bin: options.pythonPath,
+    args: ['-m', 'auto_shorts', ...(options.args || [])],
+    cwd: options.projectRoot,
+    env: { PYTHONPATH: join(options.projectRoot, 'src'), ...(options.env || {}) },
+    timeoutMs: options.timeoutMs,
+    maxOutputBytes: options.maxOutputBytes,
   });
 }

@@ -37,35 +37,69 @@ class RenderResult:
     segment_count: int
 
 
-def validate_media(path: Path, *, tools: MediaTools | None = None, width: int = 1080, height: int = 1920) -> dict[str, object]:
-    tools = tools or MediaTools.discover()
+def _frame_rate(value: object) -> float:
+    try:
+        numerator, denominator = str(value).split('/', 1)
+        return float(numerator) / float(denominator)
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+
+
+def _inspect_media(path: Path, tools: MediaTools) -> dict[str, object]:
     result = run_command(
         [
             tools.ffprobe,
-            "-v",
-            "error",
-            "-show_entries",
-            "stream=codec_type,codec_name,width,height:format=duration",
-            "-of",
-            "json",
+            '-v',
+            'error',
+            '-show_entries',
+            'stream=codec_type,codec_name,width,height,avg_frame_rate:format=duration',
+            '-of',
+            'json',
             str(path),
         ]
     )
     try:
         value = json.loads(result.stdout)
-        streams = value["streams"]
-        video = next(stream for stream in streams if stream.get("codec_type") == "video")
-        audio = next(stream for stream in streams if stream.get("codec_type") == "audio")
-        duration = float(value["format"]["duration"])
+        streams = value['streams']
+        video = next(stream for stream in streams if stream.get('codec_type') == 'video')
+        audio = next(stream for stream in streams if stream.get('codec_type') == 'audio')
+        duration = float(value['format']['duration'])
     except (KeyError, StopIteration, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise MediaError(f"invalid media probe result: {path}") from exc
-    if video.get("codec_name") != "h264" or video.get("width") != width or video.get("height") != height:
+        raise MediaError(f'invalid media probe result: {path}') from exc
+    return {
+        'path': str(path),
+        'duration': duration,
+        'width': int(video.get('width') or 0),
+        'height': int(video.get('height') or 0),
+        'video_codec': str(video.get('codec_name') or ''),
+        'audio_codec': str(audio.get('codec_name') or ''),
+        'frame_rate': _frame_rate(video.get('avg_frame_rate')),
+    }
+
+
+def quality_report(path: Path, *, tools: MediaTools | None = None, width: int = 1080, height: int = 1920, min_duration: float = 15, max_duration: float = 60) -> dict[str, object]:
+    tools = tools or MediaTools.discover()
+    metrics = _inspect_media(path, tools)
+    rules = [
+        {'name': 'video_codec', 'measured': metrics['video_codec'], 'expected': 'h264', 'passed': metrics['video_codec'] == 'h264'},
+        {'name': 'audio_codec', 'measured': metrics['audio_codec'], 'expected': 'aac', 'passed': metrics['audio_codec'] == 'aac'},
+        {'name': 'resolution', 'measured': f"{metrics['width']}x{metrics['height']}", 'expected': f'{width}x{height}', 'passed': metrics['width'] == width and metrics['height'] == height},
+        {'name': 'duration', 'measured': metrics['duration'], 'expected': f'{min_duration}-{max_duration}s', 'passed': min_duration <= metrics['duration'] <= max_duration},
+        {'name': 'frame_rate', 'measured': metrics['frame_rate'], 'expected': '>0', 'passed': metrics['frame_rate'] > 0},
+    ]
+    return {'path': str(path), 'passed': all(rule['passed'] for rule in rules), 'metrics': metrics, 'rules': rules}
+
+
+def validate_media(path: Path, *, tools: MediaTools | None = None, width: int = 1080, height: int = 1920) -> dict[str, object]:
+    tools = tools or MediaTools.discover()
+    metrics = _inspect_media(path, tools)
+    if metrics['video_codec'] != 'h264' or metrics['width'] != width or metrics['height'] != height:
         raise MediaError(f"video must be H.264 {width}x{height}: {path}")
-    if audio.get("codec_name") != "aac":
+    if metrics['audio_codec'] != 'aac':
         raise MediaError(f"audio must be AAC: {path}")
-    if duration <= 0:
+    if metrics['duration'] <= 0:
         raise MediaError(f"media duration must be positive: {path}")
-    return {"path": str(path), "duration": duration, "width": width, "height": height, "video_codec": "h264", "audio_codec": "aac"}
+    return metrics
 
 
 def run_command(command: Sequence[str]) -> subprocess.CompletedProcess[str]:

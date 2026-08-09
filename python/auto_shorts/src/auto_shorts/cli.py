@@ -9,7 +9,7 @@ import secrets
 import sys
 
 from .klipy import KlipyClient, KlipyError
-from .media import MediaError, render_plan, validate_media
+from .media import MediaError, quality_report, render_plan, validate_media
 from .models import ReelPlan
 from .publish import PublishError, PublishMetadata, create_draft, load_draft, publish_zernio, resolve_zernio_credentials
 from .social_agents import (
@@ -40,6 +40,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = subparsers.add_parser("validate", help="완성 MP4의 코덱·해상도·오디오를 검증합니다.")
     validate.add_argument("video", type=Path)
+
+    quality = subparsers.add_parser("quality", help="완성 MP4의 숏폼 품질 규칙을 JSON으로 측정합니다.")
+    quality.add_argument("video", type=Path)
 
     tts = subparsers.add_parser("tts", help="외부 TTS로 나레이션 오디오를 생성합니다.")
     tts_subparsers = tts.add_subparsers(dest="tts_provider", required=True)
@@ -129,6 +132,11 @@ def command_render(args: argparse.Namespace) -> int:
 
 def command_validate(args: argparse.Namespace) -> int:
     print(json.dumps({"status": "validated", **validate_media(args.video)}, ensure_ascii=False))
+    return 0
+
+
+def command_quality(args: argparse.Namespace) -> int:
+    print(json.dumps({'status': 'quality_checked', **quality_report(args.video)}, ensure_ascii=False))
     return 0
 
 
@@ -275,6 +283,8 @@ def main(argv: list[str] | None = None) -> int:
             return command_render(args)
         if args.command == "validate":
             return command_validate(args)
+        if args.command == "quality":
+            return command_quality(args)
         if args.command == "tts":
             return command_tts(args)
         if args.command == "publish":

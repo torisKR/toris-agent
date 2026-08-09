@@ -1,5 +1,5 @@
 const state = { token: '', contents: [], selectedId: null, filter: 'all' };
-const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit'].map((id) => [id, document.getElementById(id)]));
+const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit'].map((id) => [id, document.getElementById(id)]));
 
 function announce(message) {
   elements.toast.textContent = message;
@@ -58,7 +58,7 @@ function renderQuality(item) {
 function renderWorkspace() {
   const item = itemById(state.selectedId);
   elements['workspace-empty'].hidden = Boolean(item); elements['workspace-detail'].hidden = !item;
-  if (!item) return;
+  if (!item) { elements['render-button'].disabled = true; return; }
   elements['detail-kind'].textContent = item.kind.toUpperCase(); elements['detail-title'].textContent = item.title; elements['detail-status'].textContent = item.status;
   elements['timeline-meta'].textContent = item.media ? `${Math.round(item.media.size / 1024)} KB · LOCAL MP4` : 'LOCAL DRAFT';
   elements['media-preview'].replaceChildren();
@@ -77,6 +77,9 @@ function renderWorkspace() {
   ];
   elements['evidence-list'].replaceChildren(...evidence.map((text) => { const li = document.createElement('li'); li.textContent = text; return li; }));
   renderQuality(item);
+  const busy = ['queued', 'running', 'rendering'].includes(item.status);
+  elements['render-button'].disabled = !item.media || busy;
+  elements['render-button'].textContent = busy ? '렌더 진행 중' : `${elements['render-duration'].value}초 렌더 시작`;
   elements['open-publish'].disabled = !(item.quality?.passed === true);
 }
 
@@ -105,12 +108,51 @@ elements['video-import'].addEventListener('submit', async (event) => {
   } catch (error) { announce(error.message); }
 });
 
+async function waitForJob(id) {
+  for (let attempt = 0; attempt < 1_800; attempt += 1) {
+    const job = await api(`/api/jobs/${id}`);
+    if (['succeeded', 'failed', 'cancelled'].includes(job.status)) return job;
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+  }
+  throw new Error('렌더 상태 확인 시간이 초과되었습니다.');
+}
+
+elements['render-duration'].addEventListener('change', () => renderWorkspace());
+elements['render-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const item = itemById(state.selectedId);
+  if (!item?.media) return;
+  elements['render-button'].disabled = true;
+  elements['render-button'].textContent = '렌더 요청 중';
+  try {
+    const job = await api('/api/renders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contentId: item.id, title: item.title, text: elements['render-text'].value || item.title, targetDuration: Number(elements['render-duration'].value) }) });
+    announce('로컬 렌더를 시작했습니다.');
+    const completed = await waitForJob(job.id);
+    await refresh(item.id);
+    if (completed.status !== 'succeeded') throw new Error(completed.error || '렌더에 실패했습니다.');
+    announce('렌더와 품질 검사가 끝났습니다.');
+  } catch (error) {
+    await refresh(item.id);
+    announce(error.message);
+  }
+});
+
 for (const button of document.querySelectorAll('[data-filter]')) button.addEventListener('click', () => { document.querySelector('.filter.is-active')?.classList.remove('is-active'); button.classList.add('is-active'); state.filter = button.dataset.filter; renderQueue(); });
 
 elements['open-publish'].addEventListener('click', () => { const item = itemById(state.selectedId); if (!item) return; elements['publish-confirmation'].placeholder = `PUBLISH ${item.id}`; elements['publish-dialog'].showModal(); });
 function updatePublishGate() { const item = itemById(state.selectedId); elements['publish-submit'].disabled = !item || !elements['publish-check'].checked || elements['publish-confirmation'].value !== `PUBLISH ${item.id}`; }
 elements['publish-check'].addEventListener('change', updatePublishGate); elements['publish-confirmation'].addEventListener('input', updatePublishGate);
-elements['publish-submit'].addEventListener('click', () => announce('공개 게시 어댑터는 아직 호출하지 않았습니다.'));
+elements['publish-submit'].addEventListener('click', async () => {
+  const item = itemById(state.selectedId);
+  if (!item) return;
+  elements['publish-submit'].disabled = true;
+  try {
+    const review = await api(`/api/contents/${item.id}/review`);
+    const result = await api(`/api/contents/${item.id}/release-check`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmPublicPublish: true, confirmationText: elements['publish-confirmation'].value, contentHash: review.contentHash }) });
+    announce(result.reason);
+  } catch (error) { announce(error.message); }
+  updatePublishGate();
+});
 
 try {
   const session = await api('/api/session'); state.token = session.token; await refresh(); document.getElementById('live-status').textContent = `${new URL(session.origin).host} · local`;

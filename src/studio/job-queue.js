@@ -59,6 +59,10 @@ export class JobQueue {
     return job ? clone(job) : null;
   }
 
+  canRun(type) {
+    return typeof this.runners === 'function' || typeof this.runners?.[type] === 'function';
+  }
+
   enqueue(typeOrInput, payload) {
     if (!this.initialized) return Promise.reject(new Error('JobQueue must be initialized'));
     const input = typeof typeOrInput === 'string'
@@ -66,6 +70,7 @@ export class JobQueue {
       : { ...(typeOrInput || {}) };
     const type = String(input.type || '').trim();
     if (!type) return Promise.reject(new Error('job type is required'));
+    if (!this.canRun(type)) return Promise.reject(new Error(`Unknown job type: ${type}`));
     const now = timestamp(this.clock);
     const job = {
       ...clone(input), id: input.id || this.idFactory(), type,
@@ -125,4 +130,3 @@ export class JobQueue {
     for (const resolve of waiters) resolve();
   }
 }
-

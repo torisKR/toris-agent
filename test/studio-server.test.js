@@ -64,6 +64,32 @@ test('content creation requires the current origin and token and persists awaiti
   });
 });
 
+test('content patch cannot overwrite internal media, quality, status, or publication evidence', async () => {
+  await withServer(async ({ base }) => {
+    const created = await (await fetch(`${base}/api/contents`, mutation(base, JSON.stringify({ kind: 'post', title: 'safe', channels: ['threads'] }), { 'content-type': 'application/json' }))).json();
+    const response = await fetch(`${base}/api/contents/${created.id}`, {
+      method: 'PATCH',
+      headers: { origin: base, 'x-toris-studio-token': 'test-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'edited', status: 'submitted', media: { path: '/tmp/forged.mp4' }, quality: { passed: true }, publication: { liveVerified: true } }),
+    });
+    assert.equal(response.status, 200);
+    const content = await response.json();
+    assert.equal(content.title, 'edited');
+    assert.equal(content.status, 'awaiting_review');
+    assert.equal(content.media, null);
+    assert.equal(content.quality, null);
+    assert.equal(content.publication, null);
+  });
+});
+
+test('unknown job types are rejected before persistence', async () => {
+  await withServer(async ({ base, studio }) => {
+    const response = await fetch(`${base}/api/jobs`, mutation(base, JSON.stringify({ type: 'publish' }), { 'content-type': 'application/json' }));
+    assert.equal(response.status, 400);
+    assert.equal((await studio.jobs.list()).length, 0);
+  });
+});
+
 test('raw MP4 upload checks magic bytes and supports byte ranges', async () => {
   await withServer(async ({ base }) => {
     const created = await (await fetch(`${base}/api/contents`, mutation(base, JSON.stringify({ kind: 'video', title: 'short' }), { 'content-type': 'application/json' }))).json();

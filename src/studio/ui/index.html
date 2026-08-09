@@ -60,6 +60,11 @@
 
         <section class="inspector-section" id="quality-panel">
           <div class="section-title"><span>02</span><h2>품질 증거</h2></div>
+          <form id="render-form" class="render-form stack">
+            <label class="field">렌더 문구<input id="render-text" maxlength="240" placeholder="영상에 남길 한 문장"></label>
+            <label class="field">길이<select id="render-duration"><option value="15">15초</option><option value="30">30초</option><option value="45">45초</option><option value="60">60초</option></select></label>
+            <button id="render-button" class="button secondary" type="submit" disabled>15초 렌더 시작</button>
+          </form>
           <div class="quality-list" id="quality-list"><div class="quality-row muted-row"><span>상태</span><span>렌더 후 측정값이 표시됩니다.</span><strong>WAIT</strong></div></div>
         </section>
 
