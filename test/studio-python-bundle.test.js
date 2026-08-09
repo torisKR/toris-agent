@@ -41,7 +41,7 @@ test('the bundled auto_shorts engine contains the local render and draft contrac
 
 test('the engine snapshot excludes runtime state and credentials', async () => {
   const files = (await walk(bundle)).map((path) => path.slice(bundle.length + 1));
-  for (const forbidden of ['.venv', '.env', '__pycache__', 'output/', 'assets/']) {
+  for (const forbidden of ['.venv', '.env', '__pycache__', '.egg-info', 'output/', 'assets/']) {
     assert.equal(files.some((path) => path.includes(forbidden)), false, forbidden);
   }
 });
