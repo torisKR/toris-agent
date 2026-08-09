@@ -39,3 +39,19 @@ test('studio command turns EADDRINUSE into a stable local error', async () => {
     }),
   }), (error) => error.code === 'E_STUDIO_IN_USE' && /5824/.test(error.message));
 });
+
+test('studio service subcommands delegate without starting the foreground server', async () => {
+  const calls = [];
+  const payloads = [];
+  const manager = {
+    install: async () => { calls.push('install'); return { installed: true, running: true }; },
+    status: async () => { calls.push('status'); return { installed: true, running: true }; },
+    restart: async () => { calls.push('restart'); return { installed: true, running: true }; },
+    uninstall: async () => { calls.push('uninstall'); return { installed: false, running: false }; },
+  };
+  for (const subcommand of ['install', 'status', 'restart', 'uninstall']) {
+    assert.equal(await cmdStudio({ home: '/tmp/home', json: true }, ['service', subcommand], {}, { serviceManager: manager, printJson: (value) => payloads.push(value) }), 0);
+  }
+  assert.deepEqual(calls, ['install', 'status', 'restart', 'uninstall']);
+  assert.deepEqual(payloads.map((value) => value.running), [true, true, true, false]);
+});
