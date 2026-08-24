@@ -2,7 +2,9 @@
 
 # toris-agent
 
-**A local-first, multi-agent development harness.**
+**로컬 우선 멀티 에이전트 개발 하네스.**
+
+하나의 목표를 계획·실행·검증 가능한 작업으로 나누고, 프로젝트 검사 결과를 영수증으로 남깁니다.
 Turn a goal into planned, executed and verified work — with an evidence receipt for every run.
 
 [![CI](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml)
