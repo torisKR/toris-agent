@@ -27,13 +27,15 @@ import {
   mkdirSync,
   copyFileSync,
   writeFileSync,
+  readFileSync,
   rmSync,
   chmodSync,
   existsSync,
   statSync,
 } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -160,8 +162,14 @@ function main() {
     if (existsSync(intermediate)) rmSync(intermediate);
   }
 
+  // Emit a checksum sidecar in the `<sha256>␠␠<filename>` shape that both
+  // sha256sum and shasum verify, so the installer and CI need no per-OS logic.
+  const digest = createHash('sha256').update(readFileSync(binary)).digest('hex');
+  writeFileSync(`${binary}.sha256`, `${digest}  ${basename(binary)}\n`);
+
   const sizeMb = (statSync(binary).size / 1024 / 1024).toFixed(1);
   process.stdout.write(`\nBuilt ${binary} (${sizeMb} MB)\n`);
+  process.stdout.write(`sha256 ${digest}\n`);
 }
 
 try {
