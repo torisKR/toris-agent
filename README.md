@@ -1,17 +1,16 @@
 <div align="center">
 
-# toris-agent
+# toris
 
-**로컬 우선 멀티 에이전트 개발 하네스.**
+**A local-first AI coding agent for your terminal.**
 
-하나의 목표를 계획·실행·검증 가능한 작업으로 나누고, 프로젝트 검사 결과를 영수증으로 남깁니다.
 Turn a goal into planned, executed and verified work — with an evidence receipt for every run.
 
 [![CI](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/toris-agent.svg)](https://www.npmjs.com/package/toris-agent)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.6-brightgreen.svg)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
-[![Dependencies](https://img.shields.io/badge/runtime%20deps-0-success.svg)](./package.json)
+[![Runtime deps](https://img.shields.io/badge/runtime%20deps-0-success.svg)](./package.json)
 
 </div>
 
@@ -26,481 +25,190 @@ Run run_kymt5ph09d7548
   #  AGENT        STATUS   TITLE
   1  implementer  pending  Add GET /health endpoint returning service status JSON
   2  test-author  pending  Add automated tests covering the health endpoint
-  3  doc-writer   pending  Document the health endpoint in README and API docs
+  3  doc-writer   pending  Document the health endpoint in README
 ```
 
-`toris` decomposes a goal into tasks, assigns each one to a specialised agent profile, runs them
-through your existing **Claude Code** or **Codex** CLI, verifies the result with your project's own
-checks, and writes a receipt you can read, diff and archive.
+`toris` is a terminal-native AI coding agent. It decomposes a goal into tasks, assigns each one to a
+specialised agent profile, runs them through your existing **Claude Code** or **Codex** CLI (or an API
+key), verifies the result with your project's own checks, and writes a receipt you can read, diff and
+archive. Everything is local: every run, event and receipt is a plain file under `~/.toris`.
 
-It is a *harness*, not a model. Your provider CLI does the thinking; toris decides **what** gets
-thought about, **in what order**, **how much may happen without you**, and **whether it actually worked**.
+## Features
 
-## Why
-
-Agent tools are easy to start and hard to trust. toris is built around four opinions:
-
-| Opinion | What it means in practice |
-| --- | --- |
-| **Local-first** | Every run, event and receipt is a plain file under `~/.toris`. No account, no server, no telemetry, no network calls of its own. |
-| **Evidence over vibes** | A run is not "done" because an agent said so. It is done when the project's own `lint`/`test`/`build` pass — and the receipt shows the exit codes. |
-| **Autonomy is a dial** | L1 plans and touches nothing. L5 commits and pushes. You choose per run, and anything above the line asks first. |
-| **Zero dependencies** | The entire runtime is Node's standard library. Nothing in your supply chain but you and your provider CLI. |
+- **Chat-first TUI** — a clean, calm, open-webui-inspired terminal chat with a live slash-command
+  palette, streaming responses and a compact status banner.
+- **Plan → execute → verify** — a goal becomes ordered, verifiable tasks; nothing is "done" until your
+  project's own `lint`/`test`/`build` actually pass.
+- **Evidence receipts** — machine- and human-readable receipts (`toris receipt <runId> [--md]`) capture
+  the goal, plan, per-task status, check exit codes, duration and cost.
+- **Autonomy as a dial** — L1 plans and touches nothing; L5 commits and pushes. You choose per run, and
+  anything above the line asks first.
+- **Bring your own model** — Claude Code (`claude`) or Codex (`codex`) CLIs, or Anthropic/OpenAI API
+  keys. toris decides *what* to do and *whether it worked*; your provider does the thinking.
+- **Local-first & private** — no account, no server, no telemetry. State is plain files under `~/.toris`.
+- **Zero runtime dependencies** — the entire runtime is Node's standard library.
+- **Ships as a single binary** — standalone executables built with Node's Single Executable Application
+  feature, installable with one command.
 
 ## Requirements
 
-- **Node.js >= 22.6.0** (`node --version`)
-- At least one provider CLI on your `PATH`:
-  - [Claude Code](https://claude.com/claude-code) — `claude`
-  - [Codex CLI](https://developers.openai.com/codex/cli) — `codex`
-- `git` (optional, but required for commit/push autonomy levels)
+- **Node.js >= 22.6.0** — required to run from npm or source (the standalone binary bundles its own runtime).
+- At least one model backend:
+  - [Claude Code](https://claude.com/claude-code) CLI (`claude`) or an `ANTHROPIC_API_KEY`
+  - [Codex CLI](https://developers.openai.com/codex/cli) (`codex`) or an `OPENAI_API_KEY`
+- `git` — optional, but required for the commit/push autonomy levels.
 
 ## Install
 
+### One-line install (standalone binary)
+
+Downloads the prebuilt binary for your OS/arch from GitHub Releases, verifies its checksum and installs
+it to `~/.local/bin`:
+
 ```bash
-# Global CLI (recommended)
+curl -fsSL https://raw.githubusercontent.com/torisKR/toris-agent/main/scripts/install.sh | sh
+```
+
+Override the target directory or pin a version:
+
+```bash
+TORIS_INSTALL=/usr/local/bin TORIS_VERSION=v0.3.0 \
+  curl -fsSL https://raw.githubusercontent.com/torisKR/toris-agent/main/scripts/install.sh | sh
+```
+
+Prebuilt binaries are published for `linux-x64`, `darwin-x64`, `darwin-arm64` and `win-x64`.
+
+### From npm
+
+```bash
 npm install -g toris-agent
-toris --help
+```
 
-# One-off, no install
-npx toris-agent doctor
+### From source
 
-# Latest unreleased code, straight from git
-npm install -g git+https://github.com/torisKR/toris-agent.git
-
-# From source, for development
+```bash
 git clone https://github.com/torisKR/toris-agent.git
 cd toris-agent
-npm link          # no `npm install` needed — there are no dependencies
-toris doctor
+node bin/toris.js --help
 ```
-
-Uninstall with `npm uninstall -g toris-agent`.
-
-## Toris Studio
-
-Toris Studio is a local review room for Korean post drafts and vertical MP4s. It stores content under `~/.toris`, renders with the bundled `auto_shorts` engine, and records an evidence-based quality report before anything can leave review.
-
-Requirements on macOS: `uv` and `ffmpeg` available on `PATH`.
-
-```bash
-# foreground, then open http://127.0.0.1:5824
-toris studio
-
-# install a per-user LaunchAgent that starts at login and restarts on failure
-toris studio service install
-toris studio service status
-```
-
-The service installer creates a dedicated Python environment at `~/.toris/runtime/auto-shorts`. The web server binds only to `127.0.0.1`, mutations require the current local origin plus an in-memory session token, and external publishing is disabled. See [docs/STUDIO.md](./docs/STUDIO.md) for the storage, render, recovery, and removal contracts.
 
 ## Quickstart
 
-**1. Check your environment.** `doctor` tells you exactly what is missing before you waste a run:
-
-```console
-$ toris doctor
-toris doctor
-
-  PASS  node               v24.16.0 (requires >= 22.6.0)
-  PASS  provider:claude    /usr/local/bin/claude
-  PASS  provider:codex     /usr/local/bin/codex
-  PASS  providers          at least one agent CLI available
-  PASS  git                /usr/bin/git
-  WARN  config             not created yet, run: toris init
-  PASS  store              /Users/you/.toris
-  PASS  cwd-git            /Users/you/projects/my-app
-
-All required checks passed.
+```bash
+toris init            # create ~/.toris and a default config
+toris doctor          # check runtime, providers, git and store
+toris connect         # connect a model backend (CLI login or API key)
+toris                 # open the interactive chat TUI
 ```
 
-**2. Initialise and register a project.**
+Or drive a goal end-to-end:
 
 ```bash
-toris init                 # creates ~/.toris and a default config
-toris project add .        # register the repo you are standing in
+toris project add .                                   # register the current repo
+toris run "fix the failing parser test" --autonomy L3 # plan and execute
+toris runs                                            # list past runs
+toris receipt <runId> --md > receipt.md               # archive the evidence
 ```
 
-**3. Plan without touching anything.** `--dry-run` never writes a file:
+## Usage
 
-```bash
-toris run "add a health endpoint" --dry-run
-```
+A bare `toris` opens the interactive chat TUI when run at a terminal; otherwise it prints help.
 
-**4. Let it work.** Raise the dial when you trust the plan:
-
-```bash
-toris run "add a health endpoint" --autonomy L3 --budget 2.00
-```
-
-**5. Read the evidence.**
-
-```bash
-toris runs                            # every run, newest first
-toris inspect run_kymt5ph09d7548      # tasks, checks, timings
-toris receipt run_kymt5ph09d7548 --md > receipt.md
-```
-
-## How a run works
-
-```
-   goal
-     │
-     ▼
-┌──────────┐   plan     ┌──────────────┐  dispatch  ┌───────────────┐
-│ planner  │──────────▶ │ orchestrator │──────────▶ │ agent profile │
-└──────────┘  tasks +   └──────────────┘  parallel  │  implementer  │
-              agents +         │          (max 3)   │  test-author  │
-              order            │                    │  reviewer ... │
-                               │                    └───────┬───────┘
-                               │                            │ provider CLI
-                               │                            ▼
-                               │                    ┌───────────────┐
-                               │  retry / fallback  │ claude │ codex│
-                               │ ◀──────────────────└───────────────┘
-                               ▼
-                        ┌──────────────┐
-                        │   verifier   │  npm run lint / test / build
-                        └──────┬───────┘  → real exit codes
-                               ▼
-                        ┌──────────────┐
-                        │   receipt    │  JSON + Markdown, on disk
-                        └──────────────┘
-```
-
-- **Planner** turns one sentence into ordered tasks, each bound to an agent profile.
-- **Orchestrator** runs independent tasks in parallel (default 3), retries failures
-  (default 2), and falls back to the *other* provider before giving up.
-- **Verifier** infers checks from your `package.json` scripts and runs them for real. It stops at
-  the first failure so a broken build does not burn the rest of your budget.
-- **Receipt** records goal, plan, per-task status, check exit codes, duration and cost.
-  Exit code `3` means verification failed — CI can gate on it.
-
-## Chat
-
-`toris run` delegates to agent CLIs. `toris chat` is the other half: toris talks to
-the model itself, with tools, so you can work without a second CLI installed.
-
-Point a profile at a model and route `chat` to it. toris ships **no model IDs** —
-you own that mapping, so swapping models is a config edit, never an upgrade:
-
-```jsonc
-// ~/.toris/config.json
-"models": {
-  "profiles": { "main": { "provider": "anthropic", "model": "<model-id>" } },
-  "routing":  { "chat": "main" }
-}
-```
-
-```bash
-export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY
-toris chat                        # REPL
-toris chat "why does the build fail?"   # one-shot
-```
-
-The model gets `read_file`, `list_files`, `write_file` and `run_command`. Writes and
-commands are gated by your autonomy level — below **L3** every mutation asks first,
-and a denial is reported back to the model instead of silently failing.
-
-```console
-$ toris chat
-  /skills   list loaded skill packages
-  /model    show the active profile
-  /clear    reset the transcript
-  /exit
-```
-
-If chat is not usable yet, `toris doctor` names the exact key or variable to set.
-
-## Skills
-
-A skill is a directory with a `SKILL.md` — a short, durable instruction the model
-follows during chat. Discovery is **builtin → `~/.toris/skills` → `<project>/.toris/skills`**,
-later definitions overriding earlier ones by name, so a project can sharpen a rule
-without forking it.
-
-```console
-$ toris skills
-Skills (3)
-
-  NAME             SOURCE   DESCRIPTION
-  release-check    builtin  Verify a package is actually installable and runnable before publishing or tagging.
-  reproduce-first  builtin  Reproduce a bug with a command before proposing any fix.
-  ship-small       builtin  Land the smallest change that fully solves the problem, with proof it works.
-```
-
-The three built-ins encode solo-developer habits that are easy to skip when you are
-the only reviewer: reproduce before fixing, ship the smallest change, and prove the
-package installs before tagging a release.
-
-```markdown
----
-name: reproduce-first
-description: Reproduce a bug with a command before proposing any fix.
----
-
-Do not propose a fix until you have run a command that shows the failure.
-```
-
-Drop that in `.toris/skills/<name>/SKILL.md` and it applies to the next chat.
-
-## Autonomy levels
-
-Every run has a ceiling. Anything above it becomes an approval request instead of an action.
-
-```console
-$ toris autonomy
-Autonomy levels
-
-  LEVEL  WRITE  COMMIT  PUSH  MEANING
-  L1     no     no      no    plan only
-  L2     yes    no      no    edit working tree, ask before commit
-  L3     yes    yes     no    commit locally, ask before push
-  L4     yes    yes     yes   push to a branch
-  L5     yes    yes     yes   fully autonomous
-```
-
-Default is **L2**. Pending requests queue up until you decide:
-
-```bash
-toris approvals              # what is waiting
-toris approve apr_7x2k9d     # let it through
-toris reject  apr_7x2k9d     # exit code 4, run stops
-```
-
-## Agent profiles
-
-Eleven built-in profiles across four categories. `WRITES` marks the ones allowed to modify files.
-
-```console
-$ toris agents
-Agent profiles (11)
-
-  ID                 CATEGORY  WRITES  SUMMARY
-  planner            plan      no      Decomposes a goal into ordered, verifiable tasks.
-  architect          plan      no      Chooses structure, boundaries and trade-offs before code exists.
-  researcher         plan      no      Finds prior art, libraries and API facts before implementing.
-  implementer        build     yes     Writes the code for exactly one task.
-  test-author        build     yes     Writes failing tests first, then keeps them honest.
-  refactorer         build     yes     Removes duplication and dead code without changing behaviour.
-  code-reviewer      review    no      Reviews a diff for correctness, clarity and contract drift.
-  security-reviewer  review    no      Audits for secrets, injection, authz and unsafe file/network use.
-  verifier           verify    no      Runs the project checks and reports pass/fail with evidence.
-  doc-writer         ship      yes     Updates README, changelog and usage docs to match reality.
-  release-manager    ship      yes     Prepares version bumps, changelogs and release notes.
-```
-
-Filter with `toris agents --category build`.
-
-## Receipts
-
-Every run produces an auditable record. Markdown for humans, JSON for machines.
-
-```markdown
-# Run receipt `run_kymt9dy9c5017d`
-
-**Goal** — add a health endpoint
-
-| Field | Value |
+| Command | Description |
 | --- | --- |
-| Status | `succeeded` |
-| Autonomy | L3 |
-| Provider | claude |
-| Duration | 25.4s |
-| Cost | $0.0000 |
+| `toris init` | Create `~/.toris` and a default config. |
+| `toris doctor` | Check runtime, providers, git and store. |
+| `toris connect` | Connect a model backend (CLI login or API key). |
+| `toris chat ["<message>"]` | Talk to a model with tools (REPL if no message). |
+| `toris project add [path]` | Register a project (defaults to the current directory). |
+| `toris project list \| inspect <id> \| remove <id>` | Manage registered projects. |
+| `toris run "<goal>"` | Plan and execute a goal. |
+| `toris runs` | List past runs. |
+| `toris inspect <runId>` | Show a run in detail. |
+| `toris receipt <runId> [--md]` | Evidence receipt for a run. |
+| `toris logs <runId>` | Event log for a run. |
+| `toris cancel <runId>` | Mark a run cancelled. |
+| `toris approvals` / `approve <id>` / `reject <id>` | Review and decide approval requests. |
+| `toris agents [--category <c>]` | Built-in agent profiles. |
+| `toris skills` | Skill packages the model follows in chat. |
+| `toris autonomy` | Autonomy levels and what each permits. |
+| `toris update [--check]` | Update toris to the latest published version. |
+| `toris version` | Print version. |
 
-## Tasks (4/4 succeeded)
+### Run options
 
-- ✅ Add /health endpoint route handler _(implementer)_
-- ✅ Write unit tests for health payload builder _(test-author)_
-- ✅ Add integration test for the /health HTTP route _(test-author)_
-- ✅ Document the health endpoint in README _(doc-writer)_
+```
+-p, --project <ref>     Project id, name or unique prefix
+    --autonomy <L1..L5>  How much may happen unattended
+    --budget <usd>       Cost ceiling for this run
+    --dry-run            Plan only; never edits files
+    --provider <name>    claude | codex
 ```
 
-```bash
-toris receipt <runId>          # JSON on stdout
-toris receipt <runId> --md     # Markdown, ready to paste into a PR
-toris logs <runId>             # raw JSONL event stream
-```
-
-## Command reference
+### Global flags
 
 ```
-init                      Create ~/.toris and a default config
-doctor                    Check runtime, providers, git and store
-chat ["<message>"]        Talk to a model with tools (REPL if no message)
-project add [path]        Register a project (defaults to cwd)
-project list              List registered projects
-project inspect <id>      Show one project
-project remove <id>       Unregister a project
-run "<goal>"              Plan and execute a goal
-runs                      List past runs
-inspect <runId>           Show a run in detail
-receipt <runId> [--md]    Evidence receipt for a run
-logs <runId>              Event log for a run
-cancel <runId>            Mark a run cancelled
-approvals                 List approval requests
-approve <id> | reject <id>
-agents [--category <c>]   Built-in agent profiles
-skills                    Skill packages the model follows in chat
-autonomy                  Autonomy levels and what each permits
-daemon status             Background daemon (not in 0.1.0)
-update [--check]          Update toris to the latest published version
-version                   Print version
+--json        Machine-readable output on stdout (available on every command)
+--home <dir>  Override ~/.toris
+--no-color    Disable ANSI colour
+--verbose     Stream events as they happen
+-h, --help    Show help
 ```
 
-**Updating**
+### Exit codes
 
-```bash
-toris update            # fetch the latest version and install it in place
-toris update --check    # only report whether a newer version exists
-toris update --json     # machine-readable result
-```
-
-`update` works out how this copy was installed before it changes anything. A global
-npm install is upgraded with `npm install -g toris-agent@latest`; pnpm, yarn and bun
-installs get their own manager's command. A git checkout or a local project
-dependency is never overwritten — toris prints the command it would have run and
-leaves the decision to you.
-
-**Run options**
-
-| Flag | Meaning |
-| --- | --- |
-| `-p, --project <ref>` | Project id, name or unique prefix |
-| `--autonomy <L1..L5>` | How much may happen unattended (default `L2`) |
-| `--budget <usd>` | Cost ceiling for this run |
-| `--dry-run` | Plan only; never edits files |
-| `--provider <name>` | `claude` or `codex` |
-
-**Global options**
-
-| Flag | Meaning |
-| --- | --- |
-| `--json` | Machine-readable output on stdout |
-| `--home <dir>` | Override `~/.toris` |
-| `--no-color` | Disable ANSI colour |
-| `--verbose` | Stream events as they happen |
-
-## Scripting
-
-`--json` makes every command pipeable, and exit codes are stable:
-
-| Code | Meaning |
-| --- | --- |
-| `0` | ok |
-| `1` | failure |
-| `2` | usage error |
-| `3` | verification failed |
-| `4` | approval denied |
-| `5` | daemon unavailable |
-
-```bash
-# Fail a CI job if the agent's work does not pass the project checks
-toris run "$GOAL" --autonomy L3 --json > run.json || exit $?
-
-# Attach the receipt to a pull request
-toris receipt "$(jq -r .run.id run.json)" --md >> "$GITHUB_STEP_SUMMARY"
-```
+`0` ok · `1` failure · `2` usage · `3` verification failed · `4` approval denied · `5` daemon unavailable.
 
 ## Configuration
 
-State lives under `$TORIS_HOME` (default `~/.toris`) and is all plain text:
+`toris init` writes `~/.toris/config.json` (override the home directory with `--home` or the
+`TORIS_HOME` environment variable). The default config:
 
-```
-~/.toris
-├── config.json                       # settings below
-├── projects.json                     # registered projects
-├── runs/run_kymt9dy9c5017d.json      # one file per run
-└── events/run_kymt9dy9c5017d.jsonl   # append-only event log
-```
-
-`config.json` defaults:
-
-```json
+```jsonc
 {
   "version": 1,
-  "defaultAutonomy": "L2",
+  "defaultAutonomy": "L3",   // recommended solo default
   "maxParallelAgents": 3,
   "maxDailyCostUsd": 20,
-  "maxRetriesPerTask": 2,
-  "providerTimeoutMs": 900000,
-  "defaultProvider": "claude",
-  "providers": {
-    "claude": { "bin": "claude", "enabled": true },
-    "codex": { "bin": "codex", "enabled": true }
+  "models": {
+    "profiles": {},          // name -> { provider, model }
+    "routing": {}            // role  -> profile name (e.g. { "chat": "main" })
   }
 }
 ```
 
-Unknown keys are preserved, so a newer config survives an older binary.
+- **Model profiles start empty on purpose.** `toris connect` fills them in, or you can edit
+  `models.profiles.<name>` and `models.routing.chat` by hand. Every error names the exact key to set.
+- **API keys never live in the config file.** Export `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in your
+  environment; `toris doctor` reports which are set.
 
-**Environment variables**
+## Autonomy levels
 
-| Variable | Effect |
-| --- | --- |
-| `TORIS_HOME` | Override the state directory |
-| `TORIS_CLAUDE_BIN` | Path to the `claude` executable |
-| `TORIS_CODEX_BIN` | Path to the `codex` executable |
-| `TORIS_DEBUG` | Verbose internal logging |
-| `NO_COLOR` | Disable ANSI colour (respects the [standard](https://no-color.org)) |
+Autonomy is chosen per run with `--autonomy`, and `defaultAutonomy` sets the baseline. Higher levels
+widen what may happen without you; anything above the configured line asks for approval first.
 
-## Project layout
-
-```
-bin/toris.js         # executable entry point
-src/
-├── cli/             # arg parsing, help, output formatting, commands/
-└── core/
-    ├── planner.js       goal → tasks
-    ├── orchestrator.js  parallel execution, retries, fallback
-    ├── providers.js     claude / codex adapters
-    ├── verifier.js      runs project checks, collects exit codes
-    ├── receipt.js       JSON + Markdown evidence
-    ├── autonomy.js      L1..L5 gating
-    ├── agents.js        the 11 profiles
-    ├── store.js         local JSON persistence
-    └── config.js        defaults, merge, paths
-test/                # node:test, one file per module
-docs/
-├── CONTRACT.md      # frozen v0.1.0 interface contract
-└── specs/           # per-module specifications
-```
+| Level | Write | Commit | Push | Meaning |
+| --- | --- | --- | --- | --- |
+| **L1** | no | no | no | Plan only — nothing on disk changes. |
+| **L2** | yes | no | no | Edit the working tree, ask before commit. |
+| **L3** | yes | yes | no | Commit locally, ask before push. *(recommended solo default)* |
+| **L4** | yes | yes | yes | Push to a side branch; your default branch is untouched. |
+| **L5** | yes | yes | yes | Fully autonomous, including pushing to the default branch. |
 
 ## Development
 
-No install step — there are no dependencies.
-
 ```bash
-git clone https://github.com/torisKR/toris-agent.git
-cd toris-agent
-npm test                          # node --test test/
-npm run lint                      # syntax check
-node bin/toris.js doctor          # run the CLI from source
-node --test test/planner.test.js  # a single suite
+npm run lint        # syntax-check every source file (node --check)
+npm test            # run the node:test suite (node --test)
+npm run build:sea   # build a standalone binary for the host platform (dist/sea/)
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and the rules around
-[the frozen interface contract](./docs/CONTRACT.md).
-
-## Roadmap
-
-`0.1.0` is the CLI foundation. Next up:
-
-- [ ] Background daemon (`toris daemon start`) for long-running and scheduled goals
-- [ ] Git worktree isolation so parallel writers never collide
-- [ ] Cost tracking and budget enforcement across runs, not just within one
-- [ ] More provider adapters
-- [ ] Custom agent profiles from a project-local file
-
-Ideas and complaints both welcome in [issues](https://github.com/torisKR/toris-agent/issues).
-
-## Contributing
-
-Pull requests are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) and
-[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) first. For vulnerabilities, follow
-[SECURITY.md](./SECURITY.md) rather than opening a public issue.
+- **ESM only**, **zero runtime dependencies**, and **no lockfile** — do not add runtime deps. Build-only
+  tooling (esbuild, postject) is invoked through `npx` and never installed.
+- An optional Rust native module (`crates/toris-native`) speeds up process control, with a pure-JS
+  fallback that is always correct. Build it with `npm run build:native`.
+- See [CONTRIBUTING.md](./CONTRIBUTING.md) for style and immutability conventions.
 
 ## License
 
-[Apache-2.0](./LICENSE) © toris
+[Apache-2.0](./LICENSE)
