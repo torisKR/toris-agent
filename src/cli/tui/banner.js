@@ -170,7 +170,7 @@ function boxedBanner(info, rows, boxWidth) {
     return `${SYM.vertical} ${padTo(clipped, inner)} ${SYM.vertical}`;
   };
 
-  const title = `${c.accent(SYM.star)} ${c.accent('toris')} ${c.dim(versionLabel(info.version))}`;
+  const title = `${c.accent(SYM.star)} ${c.accent('toris')} ${c.dim(versionLabel(info.version))} ${c.dim(`${SYM.bullet} local ai agent`)}`;
   const field = ([label, value]) => row(`${ROW_INDENT}${c.dim(padTo(label, LABEL_WIDTH))}${value}`);
 
   return [

@@ -9,6 +9,7 @@
 import { c } from '../output.js';
 import { configPath } from '../../core/config.js';
 import { shortenPath } from './banner.js';
+import { WORDMARK } from './theme.js';
 
 /**
  * @param {{configExists:boolean, profileCount:number}} state
@@ -51,16 +52,17 @@ export function renderOnboarding({ version, configExists, profileCount, home }) 
   const steps = onboardingSteps({ configExists, profileCount, home });
   const headline = configExists
     ? 'No model profile is configured, so there is nothing to chat with yet.'
-    : 'Nothing is set up yet, so there is nothing to chat with.';
+    : 'Welcome. Nothing is set up yet, so there is nothing to chat with.';
 
   return [
-    `${c.bold('toris')} ${c.dim(version)}`,
+    ...WORDMARK.map((row, i) => (i === 0 ? c.accent(row) : c.dim(row))),
+    c.dim(`  ${version}`),
     '',
     headline,
     '',
     ...steps.map(
       (step, i) =>
-        `  ${step.done ? c.green('✓') : c.dim(String(i + 1))} ${step.title}\n` +
+        `  ${step.done ? c.green('✓') : c.accent(String(i + 1))} ${step.title}\n` +
         `    ${c.dim(step.detail)}`,
     ),
     '',
