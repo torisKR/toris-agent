@@ -1,5 +1,4 @@
 import { createInterface } from 'node:readline/promises';
-import { createRequire } from 'node:module';
 import { stdin, stdout } from 'node:process';
 
 import { TorisError, EXIT } from '../../core/errors.js';
@@ -37,9 +36,8 @@ import { completeSlash, createPaletteController } from '../tui/palette.js';
 import { stripAnsi, stringWidth } from '../tui/text.js';
 import { createInterruptPolicy } from '../tui/interrupt.js';
 import { SYM } from '../tui/theme.js';
+import { torisVersion } from '../../core/version.js';
 import { c, printJson } from '../output.js';
-
-const require = createRequire(import.meta.url);
 
 /** An aborted request is a deliberate interrupt, not a failure to report. */
 const isAbort = (err) => err?.name === 'AbortError' || err?.code === 'ABORT_ERR';
@@ -527,7 +525,7 @@ export async function cmdChat(ctx, args, flags) {
   transport.prewarm?.();
 
   for (const text of renderBanner({
-    version: require('../../../package.json').version,
+    version: torisVersion(),
     profile: active.profile,
     provider: active.provider,
     model: active.model,

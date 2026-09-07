@@ -1,11 +1,9 @@
-import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 
 import { EXIT, TorisError } from '../../core/errors.js';
 import { detectInstall, fetchLatestVersion, planUpdate, PACKAGE_NAME } from '../../core/update.js';
+import { torisVersion } from '../../core/version.js';
 import { printJson, line, c } from '../output.js';
-
-const require = createRequire(import.meta.url);
 
 const show = (command) => command.join(' ');
 
@@ -30,7 +28,7 @@ function runInstall(command) {
  * @param {Record<string,any>} flags
  */
 export async function cmdUpdate(ctx, _args, flags) {
-  const current = require('../../../package.json').version;
+  const current = torisVersion();
   const install = detectInstall();
 
   let latest;
