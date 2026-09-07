@@ -256,7 +256,9 @@ export function createClaudeCliProvider({
             fail(new TorisError(`${bin} did not finish within ${timeoutMs}ms.`, 'E_PROVIDER_CLI'));
           }, timeoutMs)
         : null;
-    timer?.unref?.();
+    // Left referenced on purpose: this timer is the only thing that ends a turn
+    // whose CLI has gone silent, and the `finally` below always clears it, so it
+    // never keeps the process alive past a settled turn.
 
     const onAbort = () => {
       kill();

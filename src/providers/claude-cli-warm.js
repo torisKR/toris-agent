@@ -288,7 +288,10 @@ export function createWarmSession({
             );
           }, turnTimeoutMs)
         : null;
-    timer?.unref?.();
+    // The turn timeout is intentionally left referenced: it is the only thing
+    // that rescues a turn whose child goes silent, and it is always cleared in
+    // the `finally` below once the turn settles, so it can never keep an idle
+    // process alive between turns.
 
     // SIGINT is how the CLI is asked to abandon a turn. If it takes the whole
     // process with it, `close` drops the child and the next turn respawns.

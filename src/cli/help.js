@@ -1,6 +1,6 @@
 import { line, c } from './output.js';
 
-export const USAGE = `${'toris'} - local-first multi-agent development harness
+export const USAGE = `${'toris'} - a local-first AI coding agent for your terminal
 
 USAGE
   toris                     Open the interactive chat TUI (at a terminal)
@@ -26,9 +26,7 @@ COMMANDS
   agents [--category <c>]   Built-in agent profiles
   skills                    Skill packages the model follows in chat
   autonomy                  Autonomy levels and what each permits
-  daemon status             Background daemon (not in 0.1.0)
-  studio                    Local creator studio on 127.0.0.1:5824
-  studio service <action>   Install, status, restart or uninstall autostart
+  daemon status             Background daemon (not yet available)
   update [--check]          Update toris to the latest published version
   version                   Print version
 

@@ -230,11 +230,13 @@ export function createCodexCliProvider({
       }
     };
 
+    // Left referenced on purpose: this timer is the only thing that ends a turn
+    // whose CLI has gone silent, and the `finally` below always clears it, so it
+    // never keeps the process alive past a settled turn.
     const timer = setTimeout(() => {
       timedOut = true;
       kill();
     }, timeoutMs);
-    timer.unref?.();
 
     const onAbort = () => {
       cancelled = true;

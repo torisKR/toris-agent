@@ -1,5 +1,3 @@
-import { createRequire } from 'node:module';
-
 import { resolveHome, loadConfig } from '../core/config.js';
 import { listProfiles } from '../core/models.js';
 import { Store } from '../core/store.js';
@@ -17,7 +15,7 @@ import { cmdDaemon } from './commands/daemon.js';
 import { cmdChat } from './commands/chat.js';
 import { cmdConnect } from './commands/connect.js';
 import { cmdUpdate } from './commands/update.js';
-import { cmdStudio } from './commands/studio.js';
+import { torisVersion } from '../core/version.js';
 
 const COMMANDS = {
   init: cmdInit,
@@ -38,19 +36,15 @@ const COMMANDS = {
   skills: cmdSkills,
   autonomy: cmdAutonomy,
   daemon: cmdDaemon,
-  studio: cmdStudio,
   update: cmdUpdate,
   version: cmdVersion,
 };
 
 /** Commands that must not fail merely because config does not exist yet. */
-const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'studio', 'version', 'update']);
+const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'version', 'update']);
 
 /** What a bare `toris` runs when a human is watching. */
 const DEFAULT_INTERACTIVE_COMMAND = 'chat';
-
-const require = createRequire(import.meta.url);
-const torisVersion = () => require('../../package.json').version;
 
 /** Both halves matter: a TUI needs somewhere to draw *and* someone to type. */
 export const isInteractiveTerminal = (streams = process) =>

@@ -1,7 +1,7 @@
-import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEFAULT_CONFIG, saveConfig, configPath } from '../../core/config.js';
+import { torisVersion, torisName } from '../../core/version.js';
 import { ADAPTERS, detectBinary } from '../../core/providers.js';
 import {
   API_PROVIDERS,
@@ -16,15 +16,14 @@ import { EXIT } from '../../core/errors.js';
 import { isRepo } from '../../core/git.js';
 import { printJson, line, keyValues, c, statusColor } from '../output.js';
 
-const require = createRequire(import.meta.url);
-
 export async function cmdVersion(ctx) {
-  const pkg = require('../../../package.json');
+  const name = torisName();
+  const version = torisVersion();
   if (ctx.json) {
-    printJson({ name: pkg.name, version: pkg.version, node: process.version });
+    printJson({ name, version, node: process.version });
     return EXIT.OK;
   }
-  line(`${c.bold(pkg.name)} ${pkg.version}  ${c.dim(`(node ${process.version})`)}`);
+  line(`${c.bold(name)} ${version}  ${c.dim(`(node ${process.version})`)}`);
   return EXIT.OK;
 }
 

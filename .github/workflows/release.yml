@@ -1,6 +1,12 @@
 name: release
 
-# Publishing is a two-stage handshake. The platform packages must exist on the
+# A tagged release does three things, in dependency order:
+#   1. build the optional native npm packages (one per platform),
+#   2. publish them to npm, root package last, and
+#   3. build the standalone SEA binaries and attach them — with checksums and
+#      the install script — to the GitHub Release the tag created.
+#
+# The npm handshake is delicate: the platform packages must exist on the
 # registry *before* the root package that lists them as optionalDependencies,
 # otherwise a fresh `npm install toris-agent` resolves the optional deps to
 # nothing and every user silently drops to the JS fallback.
@@ -10,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Build and pack, but do not publish
+        description: Build and pack, but do not publish or create a release
         type: boolean
         default: true
 
@@ -147,3 +153,83 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
+
+  # Stage 3a: build a standalone SEA binary per platform, on its own runner.
+  # SEA cannot cross-compile — the base binary is the runner's own `node`, so
+  # each artifact must be produced on a host of that platform.
+  sea:
+    name: sea ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: linux-x64
+            runner: ubuntu-22.04
+          - label: darwin-x64
+            runner: macos-13
+          - label: darwin-arm64
+            runner: macos-14
+          - label: win-x64
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build standalone binary
+        run: node scripts/build-sea.js --label ${{ matrix.label }}
+
+      # Smoke-test the artifact before it ships: a binary that packs but cannot
+      # even print its version is worse than no binary at all.
+      - name: Smoke-test the binary (unix)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x "dist/sea/toris-${{ matrix.label }}"
+          "./dist/sea/toris-${{ matrix.label }}" --version
+      - name: Smoke-test the binary (windows)
+        if: runner.os == 'Windows'
+        run: ./dist/sea/toris-${{ matrix.label }}.exe --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sea-${{ matrix.label }}
+          path: |
+            dist/sea/toris-${{ matrix.label }}*
+          if-no-files-found: error
+          retention-days: 7
+
+  # Stage 3b: attach the SEA binaries, their checksums and the installer to the
+  # GitHub Release the tag created. Skipped on a manual dry run.
+  github-release:
+    name: attach binaries to the release
+    needs: sea
+    if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sea-*
+          path: dist/sea
+          merge-multiple: true
+
+      - name: Combine checksums
+        run: |
+          cd dist/sea
+          cat *.sha256 > checksums.txt
+          cat checksums.txt
+
+      - name: Attach assets to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sea/toris-*
+            dist/sea/checksums.txt
+            scripts/install.sh
+          fail_on_unmatched_files: true
