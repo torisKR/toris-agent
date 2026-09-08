@@ -1,0 +1,4 @@
+interface:
+  display_name: "App Store Listing Creator"
+  short_description: "Create store icons, screenshots, and conversion copy"
+  default_prompt: "Use $app-store-listing-creator to inspect my app evidence, create the complete store listing package, verify current constraints, and report only the upload steps I must perform."

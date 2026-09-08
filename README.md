@@ -221,17 +221,26 @@ without forking it.
 
 ```console
 $ toris skills
-Skills (3)
+Skills (10)
 
-  NAME             SOURCE   DESCRIPTION
-  release-check    builtin  Verify a package is actually installable and runnable before publishing or tagging.
-  reproduce-first  builtin  Reproduce a bug with a command before proposing any fix.
-  ship-small       builtin  Land the smallest change that fully solves the problem, with proof it works.
+  NAME                                SOURCE   DESCRIPTION
+  app-store-listing-creator           builtin  Create or improve Play Store and App Store listing packages.
+  expo-android-performance            builtin  Diagnose and optimize Expo Android performance.
+  expo-interactive-design             builtin  Design distinctive Expo interfaces and motion.
+  flutter-android-performance         builtin  Diagnose and optimize Flutter Android performance.
+  flutter-interactive-design          builtin  Design distinctive Flutter interfaces and motion.
+  release-check                       builtin  Verify a package is actually installable and runnable before publishing or tagging.
+  reproduce-first                     builtin  Reproduce a bug with a command before proposing any fix.
+  seo-geo-optimizer                   builtin  Audit and improve technical SEO, GEO, and llms.txt.
+  ship-small                          builtin  Land the smallest change that fully solves the problem, with proof it works.
+  toris-flutter-play-store-release    builtin  Operate Flutter Android delivery through Fastlane and GitHub Actions.
 ```
 
-The three built-ins encode solo-developer habits that are easy to skip when you are
+Three of the built-ins encode solo-developer habits that are easy to skip when you are
 the only reviewer: reproduce before fixing, ship the smallest change, and prove the
-package installs before tagging a release.
+package installs before tagging a release. The rest come from
+[product-growth-skills](https://github.com/torisKR/product-growth-skills): store listing,
+SEO/GEO, Flutter/Expo performance and interactive design, and Flutter Play Store delivery.
 
 ```markdown
 ---
@@ -246,27 +255,67 @@ Drop that in `.toris/skills/<name>/SKILL.md` and it applies to the next chat.
 
 ## Autonomy levels
 
-Every run has a ceiling. Anything above it becomes an approval request instead of an action.
+Every run has a ceiling. Coding CLIs (`claude`, `codex`) write in a disposable git worktree, not your checkout. Applying that diff is a separate gate.
 
 ```console
 $ toris autonomy
 Autonomy levels
 
-  LEVEL  WRITE  COMMIT  PUSH  MEANING
-  L1     no     no      no    plan only
-  L2     yes    no      no    edit working tree, ask before commit
-  L3     yes    yes     no    commit locally, ask before push
-  L4     yes    yes     yes   push to a branch
-  L5     yes    yes     yes   fully autonomous
+  LEVEL  WRITE  APPLY  COMMIT  PUSH  MEANING
+  L1     no     no     no      no    plan only
+  L2     yes    no     no      no    edit isolated worktree, ask before applying
+  L3     yes    yes    yes     no    apply to the repo, commit locally, ask before push
+  L4     yes    yes    yes     yes   push to a side branch
+  L5     yes    yes    yes     yes   fully autonomous, including the default branch
 ```
 
-Default is **L2**. Pending requests queue up until you decide:
+Default is **L3**. At L2 a finished run exits `4` with status `awaiting-apply` until you decide:
+
+```bash
+toris patches                # isolated diffs waiting on you
+toris apply pat_7x2k9d       # land the diff on the original repo
+toris discard pat_7x2k9d     # drop the worktree
+toris run "fix the parser" --apply   # L2, but apply without asking
+```
+
+Push and other gated actions still queue as approvals:
 
 ```bash
 toris approvals              # what is waiting
 toris approve apr_7x2k9d     # let it through
 toris reject  apr_7x2k9d     # exit code 4, run stops
 ```
+
+## Slack and Telegram
+
+`toris bot` long-polls Telegram and opens Slack Socket Mode. Coding work from a messenger always goes through `/run` (isolated), never through free-form chat.
+
+```bash
+export TORIS_TELEGRAM_BOT_TOKEN=...
+export TORIS_SLACK_BOT_TOKEN=xoxb-...
+export TORIS_SLACK_APP_TOKEN=xapp-...   # Socket Mode
+# optional outbound-only: TORIS_SLACK_WEBHOOK_URL
+
+toris bot
+```
+
+From Slack or Telegram:
+
+```
+/run add a health endpoint
+/patches
+/apply pat_7x2k9d          # or /last for the newest pending patch
+/discard pat_7x2k9d
+/status
+/workspace                 # show the repo the bot will use
+/workspace prj_abc         # pin it (also: a path)
+/projects
+/runs
+/receipt
+/autonomy L2
+```
+
+Restrict senders with `channels.telegram.allowFrom` / `channels.slack.allowFrom` (user ids). Pin the repo with `channels.workspace` or `/workspace`. Pending patches also notify those channels when chatId / Slack channel is set.
 
 ## Agent profiles
 
@@ -345,7 +394,12 @@ agents [--category <c>]   Built-in agent profiles
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
 daemon status             Background daemon (not in 0.1.0)
-update [--check]          Update toris to the latest published version
+  studio                    Local creator studio on 127.0.0.1:5824
+  bot                       Listen for Slack and Telegram commands
+  patches                   Isolated diffs waiting to be applied
+  apply <patchId>           Apply a patch to the original repo
+  discard <patchId>         Drop a patch and its worktree
+  update [--check]          Update toris to the latest published version
 version                   Print version
 ```
 
@@ -368,9 +422,10 @@ leaves the decision to you.
 | Flag | Meaning |
 | --- | --- |
 | `-p, --project <ref>` | Project id, name or unique prefix |
-| `--autonomy <L1..L5>` | How much may happen unattended (default `L2`) |
+| `--autonomy <L1..L5>` | How much may happen unattended (default `L3`) |
 | `--budget <usd>` | Cost ceiling for this run |
 | `--dry-run` | Plan only; never edits files |
+| `--apply` | Apply an isolated L2 diff without asking |
 | `--provider <name>` | `claude` or `codex` |
 
 **Global options**
@@ -443,6 +498,10 @@ Unknown keys are preserved, so a newer config survives an older binary.
 | `TORIS_CLAUDE_BIN` | Path to the `claude` executable |
 | `TORIS_CODEX_BIN` | Path to the `codex` executable |
 | `TORIS_DEBUG` | Verbose internal logging |
+| `TORIS_TELEGRAM_BOT_TOKEN` | Telegram bot token for `toris bot` |
+| `TORIS_SLACK_BOT_TOKEN` | Slack bot token (`xoxb-`) for replies |
+| `TORIS_SLACK_APP_TOKEN` | Slack app token (`xapp-`) for Socket Mode |
+| `TORIS_SLACK_WEBHOOK_URL` | Optional outbound-only Slack webhook |
 | `NO_COLOR` | Disable ANSI colour (respects the [standard](https://no-color.org)) |
 
 ## Project layout
@@ -488,7 +547,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and the rules aro
 `0.1.0` is the CLI foundation. Next up:
 
 - [ ] Background daemon (`toris daemon start`) for long-running and scheduled goals
-- [ ] Git worktree isolation so parallel writers never collide
+- [x] Git worktree isolation so coding CLIs never write the original checkout
 - [ ] Cost tracking and budget enforcement across runs, not just within one
 - [ ] More provider adapters
 - [ ] Custom agent profiles from a project-local file

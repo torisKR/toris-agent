@@ -1,14 +1,25 @@
 import { spawn } from 'node:child_process';
 
-export function git(args, cwd) {
+export function git(args, cwd, { stdin, trim = true } = {}) {
   return new Promise((resolvePromise) => {
-    const child = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('git', args, { cwd, stdio: [stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (c) => { stdout += c; });
     child.stderr.on('data', (c) => { stderr += c; });
     child.on('error', (err) => resolvePromise({ ok: false, stdout: '', stderr: err.message, code: 127 }));
-    child.on('close', (code) => resolvePromise({ ok: code === 0, stdout: stdout.trim(), stderr: stderr.trim(), code: code ?? 1 }));
+    child.on('close', (code) =>
+      resolvePromise({
+        ok: code === 0,
+        stdout: trim ? stdout.trim() : stdout,
+        stderr: trim ? stderr.trim() : stderr,
+        code: code ?? 1,
+      }),
+    );
+    if (stdin != null) {
+      child.stdin.on('error', () => {});
+      child.stdin.end(stdin);
+    }
   });
 }
 

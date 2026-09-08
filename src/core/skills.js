@@ -103,6 +103,15 @@ export function skillSearchPaths({ builtinDir, home, projectPath } = {}) {
   ].filter(Boolean);
 }
 
+/** True when `dir` looks like a skill package rather than shared references. */
+async function hasSkillMarkdown(dir) {
+  try {
+    return (await readdir(dir)).includes('SKILL.md');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Load every skill found across `dirs`. A later directory wins on name
  * collision, so a project can override a built-in skill without forking it.
@@ -125,6 +134,8 @@ export async function discoverSkills(dirs) {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const skillDir = join(dir, entry.name);
+      // Shared reference folders and other siblings are not skills.
+      if (!(await hasSkillMarkdown(skillDir))) continue;
       try {
         const skill = await loadSkill(skillDir);
         byName.set(skill.name, skill);

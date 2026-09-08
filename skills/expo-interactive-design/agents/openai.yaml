@@ -1,0 +1,4 @@
+interface:
+  display_name: "Expo Interactive Design"
+  short_description: "Build polished Expo UI with interactive 2D and 3D"
+  default_prompt: "Use $expo-interactive-design to inspect this app, implement a distinctive interactive Expo experience, and verify Android accessibility and performance."

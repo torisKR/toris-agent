@@ -186,6 +186,7 @@ export function createCodexCliProvider({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   env = process.env,
   spawnImpl,
+  cwd,
 } = {}) {
   const spawn = spawnImpl ?? nodeSpawn;
 
@@ -207,7 +208,7 @@ export function createCodexCliProvider({
     const prompt = buildPrompt({ system: opts.system, messages: opts.messages, sessionId });
     const args = buildArgs({ model: opts.model, sessionId, prompt });
 
-    const child = spawn(bin, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(bin, args, { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stderrTail = '';
     child.stderr?.on('data', (chunk) => {

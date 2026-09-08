@@ -111,3 +111,18 @@ test('a missing chat setup never fails the exit code - runs do not need it', asy
     }
   });
 });
+
+test('telegram and slack tokens are optional warnings, not failures', async () => {
+  await withEnv(
+    {
+      TORIS_TELEGRAM_BOT_TOKEN: null,
+      TORIS_SLACK_BOT_TOKEN: null,
+      TORIS_SLACK_APP_TOKEN: null,
+    },
+    async () => {
+      const checks = await runDoctor();
+      assert.equal(checks.get('telegram').status, 'WARN');
+      assert.equal(checks.get('slack').status, 'WARN');
+    },
+  );
+});

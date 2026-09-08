@@ -43,6 +43,7 @@ export async function cmdRun(ctx, positionals, flags) {
     dryRun,
     budgetUsd: asNumber(flags.budget, 'budget'),
     provider: typeof flags.provider === 'string' ? flags.provider : undefined,
+    apply: Boolean(flags.apply),
     checks: project?.checks ?? [],
   });
 
@@ -52,7 +53,7 @@ export async function cmdRun(ctx, positionals, flags) {
     printRun(run);
   }
   if (run.verification?.passed === false) return EXIT.VERIFICATION_FAILED;
-  if (run.status === 'awaiting-approval') return EXIT.APPROVAL_DENIED;
+  if (run.status === 'awaiting-approval' || run.status === 'awaiting-apply') return EXIT.APPROVAL_DENIED;
   return run.status === 'failed' ? EXIT.FAILURE : EXIT.OK;
 }
 
@@ -64,6 +65,7 @@ function printRun(run) {
     line(c.yellow(`  no provider CLI detected - used deterministic fallback plan`));
   }
   if (run.blockedReason) line(c.yellow(`  blocked: ${run.blockedReason}`));
+  if (run.patchId) line(c.yellow(`  patch: ${run.patchId}  toris apply ${run.patchId}`));
   line();
   line(c.bold(`  Tasks (${run.tasks.length})`));
   table(['#', 'AGENT', 'STATUS', 'TITLE'],

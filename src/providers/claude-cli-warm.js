@@ -95,6 +95,7 @@ export function createWarmSession({
   env = process.env,
   spawnImpl,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cwd,
   onSessionId = () => {},
 } = {}) {
   /** @type {any} */
@@ -132,7 +133,7 @@ export function createWarmSession({
 
   function spawnChild() {
     const args = warmArgs({ model, system });
-    const proc = spawnImpl(bin, args, { stdio: ['pipe', 'pipe', 'pipe'], env });
+    const proc = spawnImpl(bin, args, { stdio: ['pipe', 'pipe', 'pipe'], env, cwd });
     const parser = createNdjsonParser();
 
     proc.stdout?.setEncoding?.('utf8');

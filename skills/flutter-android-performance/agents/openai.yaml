@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter Android Performance"
+  short_description: "Measure and optimize Flutter performance on Android"
+  default_prompt: "Use $flutter-android-performance to inspect this project, fix the evidenced Android bottleneck, and verify the result with comparable measurements."

@@ -1,0 +1,5 @@
+# Local-only Android signing fallback. Keep android/key.properties untracked.
+storeFile=/absolute/path/to/upload.jks
+storePassword=replace-locally
+keyAlias=upload
+keyPassword=replace-locally

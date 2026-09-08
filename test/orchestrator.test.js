@@ -388,4 +388,49 @@ test('the task prompt tells the agent nobody is there to answer questions', asyn
   // Assert: a mid-run question just stalls the task until the provider times out.
   assert.match(prompt, /Do not ask for confirmation/);
   assert.match(prompt, /autonomy L3/);
+  assert.match(prompt, /isolated worktree/);
+});
+
+test('L2 git runs write in a worktree and wait before touching origin', async () => {
+  const { mkdtemp, writeFile, readFile, rm } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const { git } = await import('../src/core/git.js');
+  const { Store } = await import('../src/core/store.js');
+
+  const origin = await mkdtemp(join(tmpdir(), 'toris-iso-'));
+  const home = await mkdtemp(join(tmpdir(), 'toris-iso-home-'));
+  try {
+    await git(['init'], origin);
+    await git(['config', 'user.email', 'toris@example.test'], origin);
+    await git(['config', 'user.name', 'toris'], origin);
+    await writeFile(join(origin, 'README.md'), 'hello\n');
+    await git(['add', '.'], origin);
+    await git(['commit', '-m', 'init'], origin);
+
+    const store = await new Store(home).init();
+    const orch = new Orchestrator({
+      store,
+      config: DEFAULT_CONFIG,
+      notify: async () => undefined,
+      invoke: async (_adapter, prompt, opts) => {
+        if (opts?.cwd && opts.cwd !== origin && /isolated worktree/.test(prompt)) {
+          await writeFile(join(opts.cwd, 'isolated.md'), 'from worktree\n');
+        }
+        return { text: planReply, costUsd: 0 };
+      },
+      detect: async () => true,
+      verifyFn: async () => ({ passed: true, checks: [] }),
+    });
+    const run = await orch.run({
+      goal: 'add isolated.md',
+      autonomy: 'L2',
+      project: { id: 'p', name: 'iso', path: origin },
+    });
+    assert.equal(run.status, 'awaiting-apply');
+    assert.ok(run.patchId);
+    assert.equal(await readFile(join(origin, 'isolated.md'), 'utf8').catch(() => ''), '');
+  } finally {
+    await rm(origin, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true });
+  }
 });

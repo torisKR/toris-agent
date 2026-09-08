@@ -1,0 +1,4 @@
+interface:
+  display_name: "Toris Flutter Play Store Release"
+  short_description: "Automate safe Flutter releases to Google Play"
+  default_prompt: "Use $toris-flutter-play-store-release to inspect this Flutter app, configure safe Android delivery, and verify the Google Play release setup."

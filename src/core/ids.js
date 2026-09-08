@@ -24,3 +24,4 @@ export const newTaskId = (now) => createId('tsk', now);
 export const newProjectId = (now) => createId('prj', now);
 export const newApprovalId = (now) => createId('apv', now);
 export const newEventId = (now) => createId('evt', now);
+export const newPatchId = (now) => createId('pat', now);

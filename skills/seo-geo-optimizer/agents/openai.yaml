@@ -1,0 +1,4 @@
+interface:
+  display_name: "SEO & GEO Optimizer"
+  short_description: "Optimize SEO, GEO, llms.txt, and keyword strategy"
+  default_prompt: "Use $seo-geo-optimizer to inspect this site and repository, implement the highest-confidence SEO and GEO improvements, verify them, and report remaining external actions."

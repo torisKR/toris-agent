@@ -33,7 +33,7 @@ const CLI_FACTORIES = Object.freeze({
  */
 export function createProvider(
   resolved,
-  { env = process.env, fetchImpl, baseUrl, bins = {}, timeoutMs, warm = false } = {},
+  { env = process.env, fetchImpl, baseUrl, bins = {}, timeoutMs, warm = false, cwd } = {},
 ) {
   const cliFactory = CLI_FACTORIES[resolved?.provider];
   if (cliFactory) {
@@ -41,6 +41,7 @@ export function createProvider(
       ...(bins[resolved.provider] ? { bin: bins[resolved.provider] } : {}),
       ...(timeoutMs ? { timeoutMs } : {}),
       ...(warm ? { warm: true } : {}),
+      ...(cwd ? { cwd } : {}),
       env,
     });
   }

@@ -1,0 +1,755 @@
+name: Release Android
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Release version (v?MAJOR.MINOR.PATCH[-prerelease])"
+        required: true
+        type: string
+      flutter_version:
+        description: "Optional exact Flutter SDK version; project pins take precedence for release events"
+        required: false
+        type: string
+      track:
+        description: "Google Play track"
+        required: true
+        default: internal
+        type: choice
+        options: [internal, alpha, beta, production]
+      release_status:
+        description: "Google Play release status"
+        required: true
+        default: completed
+        type: choice
+        options: [draft, completed, inProgress]
+      rollout:
+        description: "Required decimal strictly between 0 and 1 for an authorized inProgress release"
+        required: false
+        type: string
+      run_tests:
+        description: "Run Flutter tests before building"
+        required: true
+        default: true
+        type: boolean
+      distribution_target:
+        description: "Delivery destination"
+        required: true
+        default: play-store
+        type: choice
+        options: [play-store, firebase, both]
+      firebase_artifact_type:
+        description: "Firebase artifact type"
+        required: true
+        default: AAB
+        type: choice
+        options: [AAB, APK]
+      firebase_release_notes:
+        description: "Optional Firebase release notes"
+        required: false
+        type: string
+      confirm_firebase_package_match:
+        description: "Confirm package mapping only when google-services.json evidence is absent"
+        required: true
+        default: false
+        type: boolean
+      confirm_firebase_aab_play_linked:
+        description: "Confirm the Firebase AAB app is reviewed and linked to Google Play"
+        required: true
+        default: false
+        type: boolean
+      confirm_dual_delivery:
+        description: "Separately authorize delivery to both Google Play and Firebase"
+        required: true
+        default: false
+        type: boolean
+      confirm_play_release_policy:
+        description: "Separately authorize draft or inProgress status and any rollout"
+        required: true
+        default: false
+        type: boolean
+      confirm_slack_notification:
+        description: "Separately authorize one Slack message for this first run attempt"
+        required: true
+        default: false
+        type: boolean
+      retry_unknown_upload:
+        description: "Mark this fresh dispatch as a reconciled retry of an unknown provider outcome"
+        required: true
+        default: false
+        type: boolean
+      confirm_upload_reconciled:
+        description: "Confirm the exact unknown upload was reconciled as not delivered"
+        required: true
+        default: false
+        type: boolean
+      reconciled_version_name:
+        description: "Exact prior version name for a marked retry"
+        required: false
+        type: string
+      reconciled_version_code:
+        description: "Exact prior positive Play version code for a marked retry"
+        required: false
+        type: string
+      reconciled_artifact_sha256:
+        description: "Exact lowercase SHA-256 of the prior artifact for a marked retry"
+        required: false
+        type: string
+      reconciled_destinations:
+        description: "Exact prior destination: play-store, firebase, or play-store,firebase"
+        required: false
+        type: string
+      reconciled_provider_state:
+        description: "Must be exactly not-delivered for a marked retry"
+        required: false
+        type: string
+      confirm_production:
+        description: "Required acknowledgement for the production Play track"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# queue: max is a current GitHub.com feature. The pinned Node 24 actions require
+# a current GitHub-hosted runner. Never make this group depend on a ref or track.
+concurrency:
+  group: play-store-release
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  preflight:
+    name: Reject unsafe dispatches before Environment secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deployment_environment: ${{ steps.route.outputs.deployment_environment }}
+    steps:
+      - name: Validate dispatch policy and route a fixed Environment
+        id: route
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          ENABLE_GITHUB_RELEASE_DEPLOY: ${{ vars.ENABLE_GITHUB_RELEASE_DEPLOY }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          FLUTTER_VERSION: ${{ inputs.flutter_version }}
+          TRACK: ${{ inputs.track }}
+          RELEASE_STATUS: ${{ inputs.release_status }}
+          ROLLOUT: ${{ inputs.rollout }}
+          RUN_TESTS: ${{ inputs.run_tests }}
+          DISTRIBUTION_TARGET: ${{ inputs.distribution_target }}
+          FIREBASE_ARTIFACT_TYPE: ${{ inputs.firebase_artifact_type }}
+          FIREBASE_RELEASE_NOTES: ${{ inputs.firebase_release_notes }}
+          CONFIRM_FIREBASE_PACKAGE_MATCH: ${{ inputs.confirm_firebase_package_match }}
+          CONFIRM_FIREBASE_AAB_PLAY_LINKED: ${{ inputs.confirm_firebase_aab_play_linked }}
+          CONFIRM_DUAL_DELIVERY: ${{ inputs.confirm_dual_delivery }}
+          CONFIRM_PLAY_RELEASE_POLICY: ${{ inputs.confirm_play_release_policy }}
+          CONFIRM_SLACK_NOTIFICATION: ${{ inputs.confirm_slack_notification }}
+          RETRY_UNKNOWN_UPLOAD: ${{ inputs.retry_unknown_upload }}
+          CONFIRM_UPLOAD_RECONCILED: ${{ inputs.confirm_upload_reconciled }}
+          RECONCILED_VERSION_NAME: ${{ inputs.reconciled_version_name }}
+          RECONCILED_VERSION_CODE: ${{ inputs.reconciled_version_code }}
+          RECONCILED_ARTIFACT_SHA256: ${{ inputs.reconciled_artifact_sha256 }}
+          RECONCILED_DESTINATIONS: ${{ inputs.reconciled_destinations }}
+          RECONCILED_PROVIDER_STATE: ${{ inputs.reconciled_provider_state }}
+          CONFIRM_PRODUCTION: ${{ inputs.confirm_production }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_RUN_ATTEMPT" != "1" ]]; then
+            printf 'Workflow rerun rejected: reconcile the exact version, artifact SHA-256, and destination at the provider, then start a fresh authorized dispatch.\n' >&2
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            [[ "$ENABLE_GITHUB_RELEASE_DEPLOY" == "true" ]] || {
+              printf 'GitHub Release deployment is disabled; explicitly set ENABLE_GITHUB_RELEASE_DEPLOY=true during CI setup to authorize fixed play-store/internal delivery.\n' >&2
+              exit 1
+            }
+            printf 'deployment_environment=play-store-nonproduction\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$EVENT_NAME" == "workflow_dispatch" ]] || {
+            printf 'Unsupported event: %s\n' "$EVENT_NAME" >&2
+            exit 1
+          }
+          [[ "$VERSION_NAME" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]] || {
+            printf 'version_name must be an exact supported release version\n' >&2
+            exit 1
+          }
+          [[ -z "$FLUTTER_VERSION" || "$FLUTTER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.-]+)?$ ]] || {
+            printf 'flutter_version must be an exact SDK version\n' >&2
+            exit 1
+          }
+          [[ "$TRACK" =~ ^(internal|alpha|beta|production)$ ]]
+          [[ "$RELEASE_STATUS" =~ ^(draft|completed|inProgress)$ ]]
+          [[ "$RUN_TESTS" =~ ^(true|false)$ ]]
+          [[ "$DISTRIBUTION_TARGET" =~ ^(play-store|firebase|both)$ ]]
+          [[ "$FIREBASE_ARTIFACT_TYPE" =~ ^(AAB|APK)$ ]]
+          [[ "$CONFIRM_FIREBASE_PACKAGE_MATCH" =~ ^(true|false)$ ]]
+          [[ "$CONFIRM_FIREBASE_AAB_PLAY_LINKED" =~ ^(true|false)$ ]]
+          [[ "$CONFIRM_DUAL_DELIVERY" =~ ^(true|false)$ ]]
+          [[ "$CONFIRM_PLAY_RELEASE_POLICY" =~ ^(true|false)$ ]]
+          [[ "$CONFIRM_SLACK_NOTIFICATION" =~ ^(true|false)$ ]]
+          [[ "$RETRY_UNKNOWN_UPLOAD" =~ ^(true|false)$ ]]
+          [[ "$CONFIRM_UPLOAD_RECONCILED" =~ ^(true|false)$ ]]
+          [[ "$CONFIRM_PRODUCTION" =~ ^(true|false)$ ]]
+          if [[ "$RETRY_UNKNOWN_UPLOAD" == "true" ]]; then
+            [[ "$CONFIRM_UPLOAD_RECONCILED" == "true" ]] || {
+              printf 'Unknown upload retry requires confirm_upload_reconciled=true.\n' >&2
+              exit 1
+            }
+            [[ "$RECONCILED_VERSION_NAME" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]
+            [[ "${RECONCILED_VERSION_NAME#v}" == "${VERSION_NAME#v}" ]] || {
+              printf 'Reconciled version name does not match version_name.\n' >&2
+              exit 1
+            }
+            [[ "$RECONCILED_VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]]
+            (( RECONCILED_VERSION_CODE <= 2100000000 ))
+            [[ "$RECONCILED_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+            expected_destinations="$DISTRIBUTION_TARGET"
+            [[ "$expected_destinations" != "both" ]] || expected_destinations=play-store,firebase
+            [[ "$RECONCILED_DESTINATIONS" == "$expected_destinations" ]]
+            [[ "$RECONCILED_PROVIDER_STATE" == "not-delivered" ]]
+          else
+            [[ "$CONFIRM_UPLOAD_RECONCILED" == "false" ]]
+            [[ -z "$RECONCILED_VERSION_NAME$RECONCILED_VERSION_CODE$RECONCILED_ARTIFACT_SHA256$RECONCILED_DESTINATIONS$RECONCILED_PROVIDER_STATE" ]] || {
+              printf 'Reconciliation tuple requires retry_unknown_upload=true.\n' >&2
+              exit 1
+            }
+          fi
+          if [[ "$DISTRIBUTION_TARGET" == "both" && "$CONFIRM_DUAL_DELIVERY" != "true" ]]; then
+            printf 'Dual delivery rejected: set confirm_dual_delivery=true after authorizing both destinations.\n' >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_STATUS" != "completed" || -n "$ROLLOUT" ]]; then
+            [[ "$CONFIRM_PLAY_RELEASE_POLICY" == "true" ]] || {
+              printf 'Non-default Play release policy requires confirm_play_release_policy=true.\n' >&2
+              exit 1
+            }
+          fi
+          if [[ "$RELEASE_STATUS" == "inProgress" ]]; then
+            python3 - "$ROLLOUT" <<'PY'
+          import sys
+          value = float(sys.argv[1])
+          if not 0.0 < value < 1.0:
+              raise SystemExit("rollout must be strictly between 0 and 1")
+          PY
+          elif [[ -n "$ROLLOUT" ]]; then
+            printf 'rollout is accepted only with release_status=inProgress.\n' >&2
+            exit 1
+          fi
+          if [[ "$TRACK" == "production" && "$CONFIRM_PRODUCTION" != "true" ]]; then
+            printf 'Production dispatch rejected: set confirm_production=true after review.\n' >&2
+            exit 1
+          fi
+          if [[ "$TRACK" == "production" ]]; then
+            printf 'deployment_environment=play-store-production\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'deployment_environment=play-store-nonproduction\n' >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    name: Verified Android release
+    needs: preflight
+    if: ${{ needs.preflight.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ${{ needs.preflight.outputs.deployment_environment }}
+    env:
+      SLACK_NOTIFICATION_OWNER: github-actions
+      RELEASE_RESULT_PATH: ${{ runner.temp }}/release-result.json
+    steps:
+      - name: Checkout immutable event commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate source, release tag, and every untrusted input
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          FLUTTER_VERSION: ${{ inputs.flutter_version }}
+          REPOSITORY_FLUTTER_VERSION: ${{ vars.FLUTTER_VERSION }}
+          TRACK: ${{ inputs.track }}
+          RELEASE_STATUS: ${{ inputs.release_status }}
+          ROLLOUT: ${{ inputs.rollout }}
+          RUN_TESTS: ${{ inputs.run_tests }}
+          DISTRIBUTION_TARGET: ${{ inputs.distribution_target }}
+          FIREBASE_ARTIFACT_TYPE: ${{ inputs.firebase_artifact_type }}
+          FIREBASE_RELEASE_NOTES: ${{ inputs.firebase_release_notes || vars.FIREBASE_RELEASE_NOTES || '' }}
+          CONFIRM_FIREBASE_PACKAGE_MATCH: ${{ inputs.confirm_firebase_package_match }}
+          CONFIRM_FIREBASE_AAB_PLAY_LINKED: ${{ inputs.confirm_firebase_aab_play_linked }}
+          CONFIRM_DUAL_DELIVERY: ${{ inputs.confirm_dual_delivery }}
+          CONFIRM_PLAY_RELEASE_POLICY: ${{ inputs.confirm_play_release_policy }}
+          CONFIRM_SLACK_NOTIFICATION: ${{ inputs.confirm_slack_notification }}
+          RETRY_UNKNOWN_UPLOAD: ${{ inputs.retry_unknown_upload }}
+          CONFIRM_UPLOAD_RECONCILED: ${{ inputs.confirm_upload_reconciled }}
+          RECONCILED_VERSION_NAME: ${{ inputs.reconciled_version_name }}
+          RECONCILED_VERSION_CODE: ${{ inputs.reconciled_version_code }}
+          RECONCILED_ARTIFACT_SHA256: ${{ inputs.reconciled_artifact_sha256 }}
+          RECONCILED_DESTINATIONS: ${{ inputs.reconciled_destinations }}
+          RECONCILED_PROVIDER_STATE: ${{ inputs.reconciled_provider_state }}
+          CONFIRM_PRODUCTION: ${{ inputs.confirm_production }}
+          RELEASE_EVENT_SLACK_AUTHORIZED: ${{ vars.ENABLE_GITHUB_RELEASE_SLACK_NOTIFICATION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          input_root="$RUNNER_TEMP/toris-flutter-play-store-release-inputs"
+          [[ ! -e "$input_root" ]]
+          install -d -m 700 "$input_root"
+          release_tag="$RELEASE_TAG"
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            git check-ref-format "refs/tags/$release_tag" >/dev/null
+            tag_commit=$(git rev-parse --verify "refs/tags/${release_tag}^{commit}")
+            head_commit=$(git rev-parse --verify HEAD)
+            [[ "$tag_commit" == "$head_commit" ]] || {
+              printf 'Published release tag does not dereference to checked-out github.sha.\n' >&2
+              exit 1
+            }
+            version_name="$release_tag"
+            track=internal
+            release_status=completed
+            rollout=
+            run_tests=true
+            distribution_target=play-store
+            firebase_artifact_type=AAB
+            confirm_package=false
+            confirm_linked=false
+            confirm_dual=false
+            confirm_policy=false
+            confirm_slack="$RELEASE_EVENT_SLACK_AUTHORIZED"
+            retry_unknown=false
+            confirm_reconciled=false
+            reconciled_version_name=
+            reconciled_version_code=
+            reconciled_artifact_sha256=
+            reconciled_destinations=
+            reconciled_provider_state=
+            confirm_production=false
+            [[ "$confirm_slack" =~ ^(true|false)$ ]] || confirm_slack=false
+          else
+            [[ "$EVENT_NAME" == "workflow_dispatch" ]]
+            version_name="$VERSION_NAME"
+            track="$TRACK"
+            release_status="$RELEASE_STATUS"
+            rollout="$ROLLOUT"
+            run_tests="$RUN_TESTS"
+            distribution_target="$DISTRIBUTION_TARGET"
+            firebase_artifact_type="$FIREBASE_ARTIFACT_TYPE"
+            confirm_package="$CONFIRM_FIREBASE_PACKAGE_MATCH"
+            confirm_linked="$CONFIRM_FIREBASE_AAB_PLAY_LINKED"
+            confirm_dual="$CONFIRM_DUAL_DELIVERY"
+            confirm_policy="$CONFIRM_PLAY_RELEASE_POLICY"
+            confirm_slack="$CONFIRM_SLACK_NOTIFICATION"
+            retry_unknown="$RETRY_UNKNOWN_UPLOAD"
+            confirm_reconciled="$CONFIRM_UPLOAD_RECONCILED"
+            reconciled_version_name="$RECONCILED_VERSION_NAME"
+            reconciled_version_code="$RECONCILED_VERSION_CODE"
+            reconciled_artifact_sha256="$RECONCILED_ARTIFACT_SHA256"
+            reconciled_destinations="$RECONCILED_DESTINATIONS"
+            reconciled_provider_state="$RECONCILED_PROVIDER_STATE"
+            confirm_production="$CONFIRM_PRODUCTION"
+          fi
+          [[ "$version_name" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]
+          [[ "$track" =~ ^(internal|alpha|beta|production)$ ]]
+          [[ "$release_status" =~ ^(draft|completed|inProgress)$ ]]
+          [[ "$run_tests" =~ ^(true|false)$ ]]
+          [[ "$distribution_target" =~ ^(play-store|firebase|both)$ ]]
+          [[ "$firebase_artifact_type" =~ ^(AAB|APK)$ ]]
+          [[ "$confirm_package" =~ ^(true|false)$ ]]
+          [[ "$confirm_linked" =~ ^(true|false)$ ]]
+          [[ "$confirm_dual" =~ ^(true|false)$ ]]
+          [[ "$confirm_policy" =~ ^(true|false)$ ]]
+          [[ "$confirm_slack" =~ ^(true|false)$ ]]
+          [[ "$retry_unknown" =~ ^(true|false)$ ]]
+          [[ "$confirm_reconciled" =~ ^(true|false)$ ]]
+          [[ "$confirm_production" =~ ^(true|false)$ ]]
+          if [[ "$retry_unknown" == "true" ]]; then
+            [[ "$confirm_reconciled" == "true" ]]
+            [[ "$reconciled_version_name" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]
+            [[ "${reconciled_version_name#v}" == "${version_name#v}" ]]
+            [[ "$reconciled_version_code" =~ ^[1-9][0-9]{0,9}$ ]]
+            (( reconciled_version_code <= 2100000000 ))
+            [[ "$reconciled_artifact_sha256" =~ ^[0-9a-f]{64}$ ]]
+            expected_destinations="$distribution_target"
+            [[ "$expected_destinations" != "both" ]] || expected_destinations=play-store,firebase
+            [[ "$reconciled_destinations" == "$expected_destinations" ]]
+            [[ "$reconciled_provider_state" == "not-delivered" ]]
+          else
+            [[ "$confirm_reconciled" == "false" ]]
+            [[ -z "$reconciled_version_name$reconciled_version_code$reconciled_artifact_sha256$reconciled_destinations$reconciled_provider_state" ]]
+          fi
+          python3 - "$input_root" "$version_name" "$track" "$release_status" \
+            "$run_tests" "$distribution_target" "$firebase_artifact_type" \
+            "$confirm_package" "$confirm_linked" "$rollout" "$confirm_dual" \
+            "$confirm_policy" "$confirm_slack" "$retry_unknown" "$confirm_reconciled" \
+            "$reconciled_version_name" "$reconciled_version_code" \
+            "$reconciled_artifact_sha256" "$reconciled_destinations" \
+            "$reconciled_provider_state" "$confirm_production" <<'PY'
+          import os, sys
+          root = sys.argv[1]
+          names = ("version_name", "track", "release_status", "run_tests",
+                   "distribution_target", "firebase_artifact_type",
+                   "confirm_package", "confirm_linked", "rollout", "confirm_dual",
+                   "confirm_policy", "confirm_slack", "retry_unknown", "confirm_reconciled",
+                   "reconciled_version_name", "reconciled_version_code",
+                   "reconciled_artifact_sha256", "reconciled_destinations",
+                   "reconciled_provider_state", "confirm_production")
+          for name, value in zip(names, sys.argv[2:]):
+              with open(os.path.join(root, name), "x", encoding="utf-8", newline="") as handle:
+                  handle.write(value)
+              os.chmod(os.path.join(root, name), 0o600)
+          notes = os.environ.get("FIREBASE_RELEASE_NOTES", "")
+          if len(notes.encode("utf-8")) > 10000 or any(ord(ch) < 32 and ch not in "\n\r\t" for ch in notes):
+              raise SystemExit("firebase_release_notes contains unsupported content")
+          with open(os.path.join(root, "firebase_release_notes"), "x", encoding="utf-8", newline="") as handle:
+              handle.write(notes)
+          os.chmod(os.path.join(root, "firebase_release_notes"), 0o600)
+          PY
+
+          flutter_version="$FLUTTER_VERSION"
+          if [[ -z "$flutter_version" && -f .fvmrc && ! -L .fvmrc ]]; then
+            flutter_version=$(python3 - <<'PY'
+          import json
+          with open(".fvmrc", encoding="utf-8") as handle:
+              raw = handle.read().strip()
+          try:
+              value = json.loads(raw)
+              print(value.get("flutter", "") if isinstance(value, dict) else "")
+          except json.JSONDecodeError:
+              print(raw)
+          PY
+            )
+          fi
+          if [[ -z "$flutter_version" && -f .flutter-version && ! -L .flutter-version ]]; then
+            flutter_version=$(tr -d '[:space:]' < .flutter-version)
+          fi
+          if [[ -z "$flutter_version" && -f .fvm/fvm_config.json && ! -L .fvm/fvm_config.json ]]; then
+            flutter_version=$(python3 - <<'PY'
+          import json
+          with open(".fvm/fvm_config.json", encoding="utf-8") as handle:
+              value = json.load(handle)
+          print(value.get("flutterSdkVersion", "") if isinstance(value, dict) else "")
+          PY
+            )
+          fi
+          [[ -n "$flutter_version" ]] || flutter_version="$REPOSITORY_FLUTTER_VERSION"
+          [[ "$flutter_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.-]+)?$ ]] || {
+            printf "No exact Flutter SDK version is configured. Run: gh variable set FLUTTER_VERSION --body '<exact-version>'\n" >&2
+            exit 1
+          }
+          printf '%s' "$flutter_version" > "$input_root/flutter_version"
+          chmod 600 "$input_root/flutter_version"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install checksum-verified official Flutter SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter_version=$(cat "$RUNNER_TEMP/toris-flutter-play-store-release-inputs/flutter_version")
+          tool/flutter-play-store-release/install_flutter_sdk.sh \
+            --version "$flutter_version" \
+            --channel stable \
+            --architecture x64 \
+            --destination "$RUNNER_TEMP/flutter-sdk"
+          printf '%s\n' "$RUNNER_TEMP/flutter-sdk/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Ruby and frozen Android Bundler cache
+        uses: ruby/setup-ruby@8e41b362d2589a22a44c1cfa214b3c83052c195b # v1.318.0
+        with:
+          ruby-version: "3.3"
+          bundler: "4.0.16"
+          bundler-cache: true
+          working-directory: android
+        env:
+          BUNDLE_FROZEN: "true"
+          BUNDLE_DEPLOYMENT: "true"
+
+      - name: Restore Flutter dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+
+      - name: Restore only target-required credentials and signing material
+        env:
+          APP_PACKAGE_NAME: ${{ secrets.APP_PACKAGE_NAME }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ (github.event_name == 'release' || inputs.distribution_target == 'play-store' || inputs.distribution_target == 'both') && secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 || '' }}
+          FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: ${{ (github.event_name == 'workflow_dispatch' && (inputs.distribution_target == 'firebase' || inputs.distribution_target == 'both')) && secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || '' }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -e android/key.properties ] && {
+            printf 'Refusing to overwrite or remove existing android/key.properties.\n' >&2
+            exit 1
+          }
+          input_root="$RUNNER_TEMP/toris-flutter-play-store-release-inputs"
+          secret_root="$RUNNER_TEMP/toris-flutter-play-store-release-secrets"
+          [[ ! -e "$secret_root" ]]
+          install -d -m 700 "$secret_root"
+          target=$(cat "$input_root/distribution_target")
+          for required_name in APP_PACKAGE_NAME ANDROID_KEYSTORE_BASE64 \
+            ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [[ -n "${!required_name}" ]] || {
+              printf 'Required Environment secret is empty: %s\n' "$required_name" >&2
+              exit 1
+            }
+          done
+          if [[ "$target" == "play-store" || "$target" == "both" ]]; then
+            [[ -n "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64" ]]
+            printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64" |
+              tool/flutter-play-store-release/decode_secret.sh \
+                --output "$secret_root/google-play-service-account.json"
+          fi
+          if [[ "$target" == "firebase" || "$target" == "both" ]]; then
+            [[ -n "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" ]]
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" |
+              tool/flutter-play-store-release/decode_secret.sh \
+                --output "$secret_root/firebase-service-account.json"
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" |
+            tool/flutter-play-store-release/decode_secret.sh \
+              --output "$secret_root/release.keystore"
+          JSON_ROOT="$secret_root" TARGET="$target" python3 - <<'PY'
+          import json, os
+          root = os.environ["JSON_ROOT"]
+          target = os.environ["TARGET"]
+          names = []
+          if target in ("play-store", "both"):
+              names.append("google-play-service-account.json")
+          if target in ("firebase", "both"):
+              names.append("firebase-service-account.json")
+          for name in names:
+              with open(os.path.join(root, name), "rb") as handle:
+                  value = json.load(handle)
+              if not isinstance(value, dict) or not value:
+                  raise SystemExit(f"decoded {name} is not a nonempty JSON object")
+          PY
+          PACKAGE_NAME="$APP_PACKAGE_NAME" PROPERTIES_PATH="$secret_root/key.properties" \
+            KEYSTORE_PATH="$secret_root/release.keystore" \
+            STORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD" KEY_ALIAS_VALUE="$ANDROID_KEY_ALIAS" \
+            KEY_PASSWORD_VALUE="$ANDROID_KEY_PASSWORD" python3 - <<'PY'
+          import os, re
+
+          def java_properties_escape(value):
+              output = []
+              for index, character in enumerate(value):
+                  mapping = {"\\": "\\\\", "\t": "\\t", "\n": "\\n", "\r": "\\r", "\f": "\\f"}
+                  if character in mapping:
+                      output.append(mapping[character])
+                  elif character in "=:#!" or (character == " " and index == 0):
+                      output.append("\\" + character)
+                  else:
+                      output.append(character)
+              return "".join(output)
+
+          package_name = os.environ["PACKAGE_NAME"]
+          if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+", package_name):
+              raise SystemExit("APP_PACKAGE_NAME is invalid")
+          values = {
+              "storeFile": os.environ["KEYSTORE_PATH"],
+              "storePassword": os.environ["STORE_PASSWORD"],
+              "keyAlias": os.environ["KEY_ALIAS_VALUE"],
+              "keyPassword": os.environ["KEY_PASSWORD_VALUE"],
+          }
+          with open(os.environ["PROPERTIES_PATH"], "x", encoding="utf-8", newline="\n") as handle:
+              for key, value in values.items():
+                  handle.write(f"{key}={java_properties_escape(value)}\n")
+          os.chmod(os.environ["PROPERTIES_PATH"], 0o600)
+          with open(os.path.join(os.path.dirname(os.environ["PROPERTIES_PATH"]), "app-package-name"),
+                    "x", encoding="utf-8", newline="") as handle:
+              handle.write(package_name)
+          os.chmod(os.path.join(os.path.dirname(os.environ["PROPERTIES_PATH"]), "app-package-name"), 0o600)
+          PY
+          chmod 600 "$secret_root"/*
+
+      - name: Run local Fastlane release doctor
+        env:
+          FIREBASE_APP_ID: ${{ (github.event_name == 'workflow_dispatch' && (inputs.distribution_target == 'firebase' || inputs.distribution_target == 'both')) && secrets.FIREBASE_APP_ID || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          input_root="$RUNNER_TEMP/toris-flutter-play-store-release-inputs"
+          secret_root="$RUNNER_TEMP/toris-flutter-play-store-release-secrets"
+          DISTRIBUTION_TARGET=$(cat "$input_root/distribution_target")
+          APP_PACKAGE_NAME=$(cat "$secret_root/app-package-name")
+          ANDROID_KEY_PROPERTIES_PATH="$secret_root/key.properties"
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH=
+          FIREBASE_SERVICE_ACCOUNT_JSON_PATH=
+          [[ -f "$secret_root/google-play-service-account.json" ]] && \
+            GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH="$secret_root/google-play-service-account.json"
+          [[ -f "$secret_root/firebase-service-account.json" ]] && \
+            FIREBASE_SERVICE_ACCOUNT_JSON_PATH="$secret_root/firebase-service-account.json"
+          export DISTRIBUTION_TARGET APP_PACKAGE_NAME ANDROID_KEY_PROPERTIES_PATH \
+            GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH FIREBASE_SERVICE_ACCOUNT_JSON_PATH FIREBASE_APP_ID
+          export BUNDLE_FROZEN=true BUNDLE_DEPLOYMENT=true CI=true GITHUB_ACTIONS=true
+          cd android
+          bundle exec fastlane android doctor
+
+      - name: Release one routed Android artifact
+        env:
+          FIREBASE_APP_ID: ${{ (github.event_name == 'workflow_dispatch' && (inputs.distribution_target == 'firebase' || inputs.distribution_target == 'both')) && secrets.FIREBASE_APP_ID || '' }}
+          FIREBASE_TESTER_GROUPS: ${{ (github.event_name == 'workflow_dispatch' && (inputs.distribution_target == 'firebase' || inputs.distribution_target == 'both')) && secrets.FIREBASE_TESTER_GROUPS || '' }}
+          FIREBASE_TESTERS: ${{ (github.event_name == 'workflow_dispatch' && (inputs.distribution_target == 'firebase' || inputs.distribution_target == 'both')) && secrets.FIREBASE_TESTERS || '' }}
+          GITHUB_SERVER_URL_VALUE: ${{ github.server_url }}
+          GITHUB_REPOSITORY_VALUE: ${{ github.repository }}
+          GITHUB_RUN_ID_VALUE: ${{ github.run_id }}
+          GITHUB_SHA_VALUE: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          input_root="$RUNNER_TEMP/toris-flutter-play-store-release-inputs"
+          secret_root="$RUNNER_TEMP/toris-flutter-play-store-release-secrets"
+          VERSION_NAME=$(cat "$input_root/version_name")
+          PLAY_STORE_TRACK=$(cat "$input_root/track")
+          PLAY_STORE_RELEASE_STATUS=$(cat "$input_root/release_status")
+          PLAY_STORE_ROLLOUT=$(cat "$input_root/rollout")
+          RUN_FLUTTER_TESTS=$(cat "$input_root/run_tests")
+          DISTRIBUTION_TARGET=$(cat "$input_root/distribution_target")
+          FIREBASE_ANDROID_ARTIFACT_TYPE=$(cat "$input_root/firebase_artifact_type")
+          FIREBASE_RELEASE_NOTES=$(cat "$input_root/firebase_release_notes")
+          CONFIRM_FIREBASE_PACKAGE_MATCH=$(cat "$input_root/confirm_package")
+          CONFIRM_FIREBASE_AAB_PLAY_LINKED=$(cat "$input_root/confirm_linked")
+          CONFIRM_DUAL_DELIVERY=$(cat "$input_root/confirm_dual")
+          CONFIRM_PLAY_RELEASE_POLICY=$(cat "$input_root/confirm_policy")
+          RETRY_UNKNOWN_UPLOAD=$(cat "$input_root/retry_unknown")
+          CONFIRM_UPLOAD_RECONCILED=$(cat "$input_root/confirm_reconciled")
+          RECONCILED_VERSION_NAME=$(cat "$input_root/reconciled_version_name")
+          RECONCILED_VERSION_CODE=$(cat "$input_root/reconciled_version_code")
+          RECONCILED_ARTIFACT_SHA256=$(cat "$input_root/reconciled_artifact_sha256")
+          RECONCILED_DESTINATIONS=$(cat "$input_root/reconciled_destinations")
+          RECONCILED_PROVIDER_STATE=$(cat "$input_root/reconciled_provider_state")
+          CONFIRM_PRODUCTION_DEPLOY=$(cat "$input_root/confirm_production")
+          APP_PACKAGE_NAME=$(cat "$secret_root/app-package-name")
+          ANDROID_KEY_PROPERTIES_PATH="$secret_root/key.properties"
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH=
+          FIREBASE_SERVICE_ACCOUNT_JSON_PATH=
+          [[ -f "$secret_root/google-play-service-account.json" ]] && \
+            GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH="$secret_root/google-play-service-account.json"
+          [[ -f "$secret_root/firebase-service-account.json" ]] && \
+            FIREBASE_SERVICE_ACCOUNT_JSON_PATH="$secret_root/firebase-service-account.json"
+          if [[ "$DISTRIBUTION_TARGET" == "play-store" ]]; then
+            ENABLE_FIREBASE_APP_DISTRIBUTION=false
+          else
+            ENABLE_FIREBASE_APP_DISTRIBUTION=true
+          fi
+          GITHUB_SERVER_URL="$GITHUB_SERVER_URL_VALUE"
+          GITHUB_REPOSITORY="$GITHUB_REPOSITORY_VALUE"
+          GITHUB_RUN_ID="$GITHUB_RUN_ID_VALUE"
+          GITHUB_SHA="$GITHUB_SHA_VALUE"
+          export VERSION_NAME PLAY_STORE_TRACK RUN_FLUTTER_TESTS \
+            DISTRIBUTION_TARGET FIREBASE_ANDROID_ARTIFACT_TYPE FIREBASE_RELEASE_NOTES \
+            CONFIRM_FIREBASE_PACKAGE_MATCH CONFIRM_FIREBASE_AAB_PLAY_LINKED CONFIRM_DUAL_DELIVERY \
+            CONFIRM_PLAY_RELEASE_POLICY CONFIRM_PRODUCTION_DEPLOY RETRY_UNKNOWN_UPLOAD \
+            CONFIRM_UPLOAD_RECONCILED RECONCILED_VERSION_NAME RECONCILED_VERSION_CODE \
+            RECONCILED_ARTIFACT_SHA256 RECONCILED_DESTINATIONS RECONCILED_PROVIDER_STATE \
+            APP_PACKAGE_NAME ANDROID_KEY_PROPERTIES_PATH GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH \
+            FIREBASE_SERVICE_ACCOUNT_JSON_PATH ENABLE_FIREBASE_APP_DISTRIBUTION \
+            FIREBASE_APP_ID FIREBASE_TESTER_GROUPS FIREBASE_TESTERS \
+            GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID GITHUB_SHA
+          export BUNDLE_FROZEN=true BUNDLE_DEPLOYMENT=true CI=true GITHUB_ACTIONS=true
+          cd android
+          lane_args=(distribution_target:"$DISTRIBUTION_TARGET" release_status:"$PLAY_STORE_RELEASE_STATUS")
+          [[ -n "$PLAY_STORE_ROLLOUT" ]] && lane_args+=(rollout:"$PLAY_STORE_ROLLOUT")
+          bundle exec fastlane android release "${lane_args[@]}"
+
+      - name: Add nonsecret release result to the job summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULT_PATH="$RELEASE_RESULT_PATH" ruby -rjson - <<'RUBY'
+          path = ENV.fetch("RESULT_PATH")
+          result = File.file?(path) ? JSON.parse(File.read(path)) : {}
+          status = result.fetch("status", "NOT_RECORDED").to_s
+          version = result.fetch("version", "unknown").to_s
+          target = result.fetch("target", "unknown").to_s
+          artifact = result.fetch("artifact_path", "not available").to_s
+          safe = /\A[0-9A-Za-z._\/-]+\z/
+          status = "INVALID" unless status.match?(safe)
+          version = "invalid" unless version.match?(safe)
+          target = "invalid" unless target.match?(safe)
+          artifact = "not available" if artifact.match?(/[\x00-\x1f\x7f]/)
+          File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a", 0o600) do |file|
+            file.puts "## Android release"
+            file.puts "- Result: #{status}"
+            file.puts "- Version: #{version}"
+            file.puts "- Target: #{target}"
+            file.puts "- Artifact: #{artifact}"
+          end
+          RUBY
+
+      - name: Send the single optional Slack notification
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY_VALUE: ${{ github.repository }}
+          RUN_URL_VALUE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SOURCE_URL_VALUE: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(cat "$RUNNER_TEMP/toris-flutter-play-store-release-inputs/confirm_slack")" == "true" ]] || exit 0
+          [[ "$(cat "$RUNNER_TEMP/toris-flutter-play-store-release-inputs/retry_unknown")" == "false" ]] || exit 0
+          [[ "${GITHUB_RUN_ATTEMPT:-1}" == "1" ]] || exit 0
+          [[ -n "$SLACK_WEBHOOK_URL" ]] || exit 0
+          notify_root="$RUNNER_TEMP/toris-flutter-play-store-release-notification"
+          install -d -m 700 "$notify_root"
+          trap 'rm -rf -- "$notify_root"' EXIT HUP INT TERM
+          RESULT_PATH="$RELEASE_RESULT_PATH" PAYLOAD_PATH="$notify_root/payload.json" \
+            REPOSITORY="$REPOSITORY_VALUE" RUN_URL="$RUN_URL_VALUE" SOURCE_URL="$SOURCE_URL_VALUE" \
+            ruby -Iandroid/fastlane/lib -rflutter_play_store_release -rjson - <<'RUBY'
+          result = File.file?(ENV.fetch("RESULT_PATH")) ? JSON.parse(File.read(ENV.fetch("RESULT_PATH"))) : {}
+          clean = lambda do |value, fallback|
+            text = value.to_s
+            text.match?(/\A[0-9A-Za-z._\/-]+\z/) ? text : fallback
+          end
+          payload = FlutterPlayStoreRelease.slack_payload(
+            repository: clean.call(ENV["REPOSITORY"], "unknown"),
+            version: clean.call(result["version"], "unknown"),
+            track: clean.call(result["track"], "unknown"),
+            result: clean.call(result["status"] || ENV["JOB_STATUS"], "FAILURE"),
+            run_url: ENV.fetch("RUN_URL"),
+            source_url: ENV.fetch("SOURCE_URL")
+          )
+          File.write(ENV.fetch("PAYLOAD_PATH"), payload, mode: "wx", perm: 0o600)
+          RUBY
+          WEBHOOK="$SLACK_WEBHOOK_URL" CONFIG_PATH="$notify_root/curl.conf" ruby - <<'RUBY'
+          value = ENV.fetch("WEBHOOK")
+          raise "invalid Slack webhook" if value.match?(/[\r\n\x00]/) || !value.start_with?("https://")
+          escaped = value.gsub("\\", "\\\\").gsub('"', '\\"')
+          File.write(ENV.fetch("CONFIG_PATH"), "url = \"#{escaped}\"\n", mode: "wx", perm: 0o600)
+          RUBY
+          curl --fail --silent --show-error --proto '=https' --proto-redir '=https' \
+            --header 'Content-Type: application/json' \
+            --data-binary "@$notify_root/payload.json" \
+            --config "$notify_root/curl.conf"
+
+      - name: Remove transaction-owned temporary credentials
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- \
+            "$RUNNER_TEMP/toris-flutter-play-store-release-secrets" \
+            "$RUNNER_TEMP/toris-flutter-play-store-release-inputs" \
+            "$RUNNER_TEMP/toris-flutter-play-store-release-notification"
+          rm -f -- "$RELEASE_RESULT_PATH"

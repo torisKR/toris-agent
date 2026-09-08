@@ -28,6 +28,23 @@ export const DEFAULT_CONFIG = Object.freeze({
     profiles: Object.freeze({}),
     routing: Object.freeze({}),
   }),
+  channels: Object.freeze({
+    workspace: null,
+    telegram: Object.freeze({
+      enabled: true,
+      tokenEnv: 'TORIS_TELEGRAM_BOT_TOKEN',
+      chatId: '',
+      allowFrom: Object.freeze([]),
+    }),
+    slack: Object.freeze({
+      enabled: true,
+      botTokenEnv: 'TORIS_SLACK_BOT_TOKEN',
+      appTokenEnv: 'TORIS_SLACK_APP_TOKEN',
+      webhookEnv: 'TORIS_SLACK_WEBHOOK_URL',
+      channel: '',
+      allowFrom: Object.freeze([]),
+    }),
+  }),
 });
 
 /** Resolve the toris home dir. Order: explicit arg > TORIS_HOME > ~/.toris */

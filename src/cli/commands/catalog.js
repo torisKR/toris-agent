@@ -34,10 +34,11 @@ export async function cmdAutonomy(ctx) {
   line(c.bold('Autonomy levels'));
   line();
   table(
-    ['LEVEL', 'WRITE', 'COMMIT', 'PUSH', 'MEANING'],
+    ['LEVEL', 'WRITE', 'APPLY', 'COMMIT', 'PUSH', 'MEANING'],
     levels.map((l) => [
       l.level,
       l.writes ? 'yes' : 'no',
+      l.applies ? 'yes' : 'no',
       l.commits ? 'yes' : 'no',
       l.pushes ? 'yes' : 'no',
       l.label,

@@ -1,0 +1,43 @@
+# Generated Android Fastlane lanes for toris-flutter-play-store-release.
+require_relative "lib/flutter_play_store_release"
+
+opt_out_usage
+default_platform(:android)
+
+platform :android do
+  desc "Inspect Android release readiness without contacting deployment services"
+  lane :doctor do |options|
+    FlutterPlayStoreRelease.execute_fastlane_lane(:doctor, options, self)
+  end
+
+  desc "Restore Flutter dependencies, generate code when configured, analyze, and test"
+  lane :prepare do |options|
+    FlutterPlayStoreRelease.execute_fastlane_lane(:prepare, options, self)
+  end
+
+  desc "Build and validate one signed release AAB without uploading"
+  lane :build do |options|
+    FlutterPlayStoreRelease.execute_fastlane_lane(:build, options, self)
+  end
+
+  desc "Route one build to Google Play, Firebase, or both"
+  lane :release do |options|
+    FlutterPlayStoreRelease.execute_fastlane_lane(:release, options, self)
+  end
+
+  desc "Delegate one binary-only release to the selected Google Play track"
+  lane :release_play_store do |options|
+    routed = (options || {}).to_h.merge(distribution_target: "play-store")
+    FlutterPlayStoreRelease.execute_fastlane_lane(:release, routed, self)
+  end
+
+  desc "Delegate one release to Firebase App Distribution"
+  lane :firebase_distribution do |options|
+    routed = (options || {}).to_h.merge(distribution_target: "firebase")
+    FlutterPlayStoreRelease.execute_fastlane_lane(:release, routed, self)
+  end
+end
+
+error do |lane, exception, options|
+  FlutterPlayStoreRelease.handle_fastlane_error(lane, exception, options)
+end

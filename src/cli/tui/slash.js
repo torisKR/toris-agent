@@ -21,6 +21,9 @@ export const SLASH_COMMANDS = Object.freeze([
   Object.freeze({ name: 'tools', args: '', summary: 'tools the model may call' }),
   Object.freeze({ name: 'usage', args: '', summary: 'tokens and turns used so far' }),
   Object.freeze({ name: 'clear', args: '', summary: 'forget the transcript, keep the session' }),
+  Object.freeze({ name: 'patches', args: '', summary: 'pending isolated diffs' }),
+  Object.freeze({ name: 'apply', args: '[id]', summary: 'apply the live isolation or a stored patch' }),
+  Object.freeze({ name: 'discard', args: '[id]', summary: 'drop the live isolation or a stored patch' }),
   Object.freeze({ name: 'exit', args: '', summary: 'leave (also: q, ctrl-d)' }),
 ]);
 
@@ -34,6 +37,9 @@ export const SLASH_ALIASES = Object.freeze({
   cls: 'clear',
   reset: 'clear',
   new: 'clear',
+  patch: 'patches',
+  approve: 'apply',
+  reject: 'discard',
   tokens: 'usage',
   cost: 'usage',
   quit: 'exit',

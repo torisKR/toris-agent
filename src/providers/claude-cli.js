@@ -52,6 +52,7 @@ export function createClaudeCliProvider({
   env = process.env,
   spawnImpl = nodeSpawn,
   warm: warmEnabled = false,
+  cwd,
 } = {}) {
   /**
    * Per-provider conversation state. The first turn learns the id from the
@@ -70,6 +71,7 @@ export function createClaudeCliProvider({
         env,
         spawnImpl,
         timeoutMs,
+        cwd,
         // A cold fallback after a warm turn must resume the same conversation,
         // not start a second one.
         onSessionId: (id) => {
@@ -94,7 +96,7 @@ export function createClaudeCliProvider({
       prompt,
     });
 
-    const child = spawnImpl(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], env });
+    const child = spawnImpl(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], env, cwd });
 
     // --- event plumbing -----------------------------------------------------
     // Node streams push at us, the generator pulls; this queue plus a one-shot

@@ -112,6 +112,22 @@ test('a later directory overrides a built-in skill of the same name', async () =
   });
 });
 
+test('discoverSkills ignores sibling directories that are not skill packages', async () => {
+  await withSkillDir(async (root) => {
+    await writeSkill(root, 'ship-small', { description: 'cut scope' });
+    await mkdir(join(root, 'shared-references'), { recursive: true });
+    await writeFile(join(root, 'shared-references', 'notes.md'), '# notes\n');
+
+    const { skills, problems } = await discoverSkills([root]);
+
+    assert.deepEqual(
+      skills.map((s) => s.name),
+      ['ship-small'],
+    );
+    assert.deepEqual(problems, []);
+  });
+});
+
 test('a malformed skill is reported instead of silently skipped', async () => {
   await withSkillDir(async (root) => {
     await writeSkill(root, 'good', { description: 'fine' });
@@ -175,7 +191,22 @@ test('the shipped skill packages all load', async () => {
   const { skills, problems } = await discoverSkills([dir]);
 
   assert.deepEqual(problems, [], 'a shipped skill failed to load');
-  assert.ok(skills.length >= 3, `expected the shipped skills, got ${skills.length}`);
+  assert.ok(skills.length >= 10, `expected the shipped skills, got ${skills.length}`);
+  const names = skills.map((skill) => skill.name);
+  for (const expected of [
+    'app-store-listing-creator',
+    'expo-android-performance',
+    'expo-interactive-design',
+    'flutter-android-performance',
+    'flutter-interactive-design',
+    'release-check',
+    'reproduce-first',
+    'seo-geo-optimizer',
+    'ship-small',
+    'toris-flutter-play-store-release',
+  ]) {
+    assert.ok(names.includes(expected), `missing shipped skill ${expected}`);
+  }
   for (const skill of skills) {
     assert.ok(skill.description.length > 0, `${skill.name} has no description`);
     assert.ok(skill.body.length > 40, `${skill.name} body is too thin to be a procedure`);

@@ -1,0 +1,2 @@
+# Keep credentials in the coordinator-owned temporary files, not in this Appfile.
+package_name(ENV["APP_PACKAGE_NAME"]) if ENV["APP_PACKAGE_NAME"]

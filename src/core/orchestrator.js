@@ -6,6 +6,8 @@ import { verify, inferChecks, detectChecks } from './verifier.js';
 import { changedFiles, isRepo } from './git.js';
 import { buildReceipt } from './receipt.js';
 import { TorisError } from './errors.js';
+import { openIsolation, settleIsolation } from './isolation.js';
+import { formatPatchNotice, notifyChannels } from './channels.js';
 
 const nowIso = () => new Date().toISOString();
 
@@ -20,11 +22,9 @@ export function buildTaskPrompt(task, run, project) {
     task.detail ? `Details: ${task.detail}` : '',
     task.verify ? `Definition of done: ${task.verify}` : '',
     '',
-    'Make the change directly in the repository. Keep it minimal and focused.',
-    // Nobody is watching the terminal mid-run. A question here just stalls the
-    // task until it times out, so tell the agent the decision is already made.
-    `The operator has pre-approved edits at autonomy ${run.autonomy} and is not present to answer questions.`,
-    'Do not ask for confirmation. If a detail is ambiguous, choose the smallest reasonable option and say so in your summary.',
+    'Make the change in this isolated worktree only. Do not edit, commit or push the original checkout.',
+    'The original repository is off-limits. Toris will apply your diff later if the operator approves.',
+    `This run is autonomy ${run.autonomy}. Do not ask for confirmation; if a detail is ambiguous, choose the smallest reasonable option and say so in your summary.`,
     'When finished, reply with a one-paragraph summary of exactly what you changed.',
   ]
     .filter(Boolean)
@@ -48,6 +48,7 @@ export class Orchestrator {
     detectChecksFn = detectChecks,
     now = Date.now,
     onEvent,
+    notify,
   } = {}) {
     this.store = store;
     this.config = config;
@@ -57,6 +58,7 @@ export class Orchestrator {
     this.detectChecksFn = detectChecksFn;
     this.now = now;
     this.onEvent = onEvent;
+    this.notify = notify ?? ((text) => notifyChannels(this.config, text));
   }
 
   async #emit(run, type, data = {}) {
@@ -119,7 +121,7 @@ export class Orchestrator {
   }
 
   /** Run the checks and fold the evidence into the run. Never throws. */
-  async #verifyRun(run, opts) {
+  async #verifyRun(run, opts, cwd = run.projectPath) {
     const { checks, inferred } = await this.#resolveChecks(run, opts);
     if (checks.length === 0) {
       // Saying so out loud matters: "no checks" and "checks passed" are very
@@ -132,7 +134,7 @@ export class Orchestrator {
       return run;
     }
     await this.#emit(run, 'verify.started', { checks, inferred });
-    const verification = await this.verifyFn(checks, { cwd: run.projectPath });
+    const verification = await this.verifyFn(checks, { cwd: cwd ?? run.projectPath });
     const verified = { ...run, verification };
     await this.#emit(verified, 'verify.finished', {
       passed: verification.passed,
@@ -210,6 +212,19 @@ export class Orchestrator {
       );
     }
 
+    let isolation = null;
+    const originPath = opts.project?.path ?? run.projectPath;
+    if (originPath && this.store?.home && (await isRepo(originPath))) {
+      isolation = await openIsolation({ origin: originPath, home: this.store.home, id: run.id });
+      await this.#emit(planned, 'run.isolated', { worktree: isolation.session.path });
+    } else if (originPath) {
+      await this.#emit(planned, 'run.unisolated', {
+        reason: 'project is not a git repository, so the coding CLI cannot be fenced off',
+      });
+    }
+
+    const execCwd = isolation?.session.path ?? originPath ?? undefined;
+
     // Execute tasks sequentially: each one may depend on the previous edit.
     let current = { ...planned, status: 'running' };
     await this.store?.saveRun(current);
@@ -232,7 +247,7 @@ export class Orchestrator {
       });
       try {
         const result = await this.invoke(adapter, buildTaskPrompt(task, current, opts.project), {
-          cwd: current.projectPath ?? undefined,
+          cwd: execCwd,
           timeoutMs: this.config?.providerTimeoutMs,
         });
         current = { ...current, costUsd: current.costUsd + (result.costUsd || 0) };
@@ -258,16 +273,51 @@ export class Orchestrator {
     }
     current = { ...current, tasks: executed };
 
-    current = await this.#verifyRun(current, opts);
-    if (current.projectPath && (await isRepo(current.projectPath))) {
-      current = { ...current, artifacts: await changedFiles(current.projectPath) };
+    current = await this.#verifyRun(current, opts, execCwd);
+    if (execCwd && (await isRepo(execCwd))) {
+      current = { ...current, artifacts: await changedFiles(execCwd) };
+    }
+
+    let pendingApply = false;
+    if (isolation) {
+      const settled = await settleIsolation({
+        store: this.store,
+        session: isolation.session,
+        before: isolation.before,
+        source: 'run',
+        autonomy: autonomy.level,
+        runId: current.id,
+        forceApply: Boolean(opts.apply),
+      });
+      pendingApply = Boolean(settled.patch && !settled.applied);
+      current = {
+        ...current,
+        patchId: settled.patch?.id ?? null,
+        originTouched: settled.leaked,
+        artifacts: settled.patch?.files ?? current.artifacts,
+      };
+      if (settled.leaked) {
+        await this.#emit(current, 'run.origin-touched', {
+          reason: 'the original checkout changed while the coding CLI ran; apply is blocked',
+        });
+      }
+      if (pendingApply) {
+        await this.#emit(current, 'run.awaiting-apply', { patchId: settled.patch.id });
+        await this.notify?.(formatPatchNotice(settled.patch, `run ${current.id}`)).catch(() => undefined);
+      }
+      if (settled.applied) {
+        await this.#emit(current, 'run.applied', { patchId: settled.patch.id });
+        await this.notify?.(formatPatchNotice(settled.patch, `applied for run ${current.id}`)).catch(
+          () => undefined,
+        );
+      }
     }
 
     const anyFailed = current.tasks.some((t) => t.status === 'failed');
     const verifyFailed = current.verification.passed === false;
     const finished = {
       ...current,
-      status: anyFailed || verifyFailed ? 'failed' : 'succeeded',
+      status: anyFailed || verifyFailed ? 'failed' : pendingApply ? 'awaiting-apply' : 'succeeded',
       finishedAt: nowIso(),
     };
     await this.store?.saveRun(finished);

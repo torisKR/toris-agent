@@ -18,6 +18,8 @@ import { cmdChat } from './commands/chat.js';
 import { cmdConnect } from './commands/connect.js';
 import { cmdUpdate } from './commands/update.js';
 import { cmdStudio } from './commands/studio.js';
+import { cmdBot } from './commands/bot.js';
+import { cmdPatches, cmdDiff, cmdApply, cmdDiscard } from './commands/patches.js';
 
 const COMMANDS = {
   init: cmdInit,
@@ -39,12 +41,17 @@ const COMMANDS = {
   autonomy: cmdAutonomy,
   daemon: cmdDaemon,
   studio: cmdStudio,
+  bot: cmdBot,
+  patches: cmdPatches,
+  diff: cmdDiff,
+  apply: cmdApply,
+  discard: cmdDiscard,
   update: cmdUpdate,
   version: cmdVersion,
 };
 
 /** Commands that must not fail merely because config does not exist yet. */
-const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'studio', 'version', 'update']);
+const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'studio', 'bot', 'version', 'update']);
 
 /** What a bare `toris` runs when a human is watching. */
 const DEFAULT_INTERACTIVE_COMMAND = 'chat';

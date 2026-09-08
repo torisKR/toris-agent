@@ -14,6 +14,7 @@ import {
 import { discoverSkills, skillSearchPaths, BUILTIN_SKILL_DIR } from '../../core/skills.js';
 import { EXIT } from '../../core/errors.js';
 import { isRepo } from '../../core/git.js';
+import { telegramToken, slackBotToken, slackAppToken } from '../../core/channels.js';
 import { printJson, line, keyValues, c, statusColor } from '../output.js';
 
 const require = createRequire(import.meta.url);
@@ -111,6 +112,7 @@ export async function cmdDoctor(ctx) {
 
   for (const check of chatChecks(ctx)) checks.push(check);
   checks.push(await skillCheck(ctx));
+  for (const check of channelChecks(ctx)) checks.push(check);
 
   const failed = checks.filter((check) => check.status === 'FAIL');
   if (ctx.json) {
@@ -177,6 +179,29 @@ function chatChecks(ctx) {
   checks.push({ name: 'chat', status, detail });
 
   return checks;
+}
+
+function channelChecks(ctx) {
+  const telegram = telegramToken(ctx.config);
+  const slackBot = slackBotToken(ctx.config);
+  const slackApp = slackAppToken(ctx.config);
+  return [
+    {
+      name: 'telegram',
+      status: telegram ? 'PASS' : 'WARN',
+      detail: telegram
+        ? 'TORIS_TELEGRAM_BOT_TOKEN set — `toris bot` can long-poll'
+        : 'unset; export TORIS_TELEGRAM_BOT_TOKEN to enable Telegram',
+    },
+    {
+      name: 'slack',
+      status: slackBot && slackApp ? 'PASS' : 'WARN',
+      detail:
+        slackBot && slackApp
+          ? 'Slack bot + app tokens set — `toris bot` can use Socket Mode'
+          : 'need TORIS_SLACK_BOT_TOKEN and TORIS_SLACK_APP_TOKEN for Socket Mode',
+    },
+  ];
 }
 
 /** Skills are the harness config for a solo dev; a broken one changes behaviour silently. */

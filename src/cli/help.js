@@ -29,6 +29,11 @@ COMMANDS
   daemon status             Background daemon (not in 0.1.0)
   studio                    Local creator studio on 127.0.0.1:5824
   studio service <action>   Install, status, restart or uninstall autostart
+  bot                       Listen for Slack and Telegram commands
+  patches                   Isolated diffs waiting to be applied
+  diff <patchId>            Show one stored patch
+  apply <patchId>           Apply a patch to the original repo
+  discard <patchId>         Drop a patch and its worktree
   update [--check]          Update toris to the latest published version
   version                   Print version
 
@@ -37,6 +42,7 @@ RUN OPTIONS
       --autonomy <L1..L5>   How much may happen unattended (default L2)
       --budget <usd>        Cost ceiling for this run
       --dry-run             Plan only; never edits files
+      --apply               Apply an isolated L2 diff without asking
       --provider <name>     claude | codex
 
 GLOBAL
@@ -54,6 +60,8 @@ EXAMPLES
   toris project add .
   toris run "add a health endpoint" --dry-run
   toris run "fix the failing parser test" --autonomy L3
+  toris bot
+  toris apply pat_abc
   toris receipt run_abc123 --md > receipt.md`;
 
 export function printHelp() {

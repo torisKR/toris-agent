@@ -4,7 +4,9 @@
 
 | Version | Supported |
 | --- | --- |
-| 0.1.x | ✅ |
+| 0.3.x | ✅ |
+| 0.2.x | ✅ |
+| 0.1.x | ❌ |
 | < 0.1 | ❌ |
 
 ## Reporting a vulnerability
@@ -31,11 +33,11 @@ toris is a local orchestrator. Understanding what it actually does is most of th
 - **It executes other programs.** toris spawns your provider CLI (`claude`, `codex`) as a child
   process, and runs your project's own checks (`npm run lint`, `npm test`, `npm run build`) inferred
   from `package.json`. Anything those programs can do, a run can cause to happen.
-- **It can operate on your git repository.** Depending on the autonomy level, it may edit the working
-  tree, create commits, and push a branch.
-- **Autonomy is the gate.** L1 plans only. L2 edits the working tree. L3 commits locally. L4 pushes.
-  L5 is fully autonomous. Anything above the level you chose becomes an approval request that waits
-  for a human decision; a rejection stops the run with exit code `4`.
+- **It can operate on your git repository.** Coding CLIs write in an isolated worktree. Applying that
+  diff, committing, and pushing are separate gates.
+- **Autonomy is the gate.** L1 plans only. L2 edits an isolated worktree and asks before applying.
+  L3 applies and commits locally. L4 pushes a side branch. L5 is fully autonomous. Anything above the
+  level you chose becomes an approval or apply request; a rejection stops the run with exit code `4`.
 - **State is local and plain.** Config, projects, runs and event logs live under `$TORIS_HOME`
   (default `~/.toris`) as JSON and JSONL files, with no encryption. Protect that directory the way
   you protect the rest of your home directory.

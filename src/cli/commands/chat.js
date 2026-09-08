@@ -38,6 +38,11 @@ import { stripAnsi, stringWidth } from '../tui/text.js';
 import { createInterruptPolicy } from '../tui/interrupt.js';
 import { SYM } from '../tui/theme.js';
 import { c, printJson } from '../output.js';
+import { isRepo } from '../../core/git.js';
+import { createId } from '../../core/ids.js';
+import { abandonIsolation, openIsolation, settleIsolation } from '../../core/isolation.js';
+import { formatPatchNotice, notifyChannels } from '../../core/channels.js';
+import { applySavedPatch, discardSavedPatch, listPatches } from '../../core/patches.js';
 
 const require = createRequire(import.meta.url);
 
@@ -183,18 +188,44 @@ export async function cmdChat(ctx, args, flags) {
   // inside the spawned CLI; driving a second tool loop from toris would run
   // every action twice. Delegate instead.
   const isCliBacked = CLI_PROVIDERS.includes(resolved.provider);
-  // Held as a value so `/model` can rebuild a transport with identical settings.
+  let isolation = null;
+  if (isCliBacked && (await isRepo(ctx.cwd))) {
+    isolation = await openIsolation({
+      origin: ctx.cwd,
+      home: ctx.home,
+      id: createId('iso'),
+    });
+  }
   const providerOptions = {
     bins: {
       'claude-cli': cliBinFor('claude-cli', config),
       'codex-cli': cliBinFor('codex-cli', config),
     },
     timeoutMs: config.providerTimeoutMs,
+    cwd: isolation?.session.path,
     // An interactive session asks the same CLI many questions, so it keeps one
     // process warm; a one-shot answer has nothing to amortise the boot over.
     warm: !json && args.length === 0,
   };
   const provider = createProvider(resolved, providerOptions);
+  let autonomyLevel = String(flags.autonomy ?? config.defaultAutonomy ?? 'L2').toUpperCase();
+  const foldIsolation = async ({ forceApply = false, abandon = false } = {}) => {
+    if (!isolation) return null;
+    const current = isolation;
+    isolation = null;
+    if (abandon) {
+      await abandonIsolation(current.session);
+      return { abandoned: true };
+    }
+    return settleIsolation({
+      store: ctx.store,
+      session: current.session,
+      before: current.before,
+      source: 'chat',
+      autonomy: autonomyLevel,
+      forceApply: forceApply || Boolean(flags.apply) || Boolean(flags.yes),
+    });
+  };
   const tools = flags['no-tools'] || isCliBacked ? [] : createDefaultTools({ cwd: process.cwd() });
 
   const { skills, problems } =
@@ -228,6 +259,7 @@ export async function cmdChat(ctx, args, flags) {
       approve: async () => autoApprove,
     });
     const result = await session.send(args.join(' '));
+    const settled = await foldIsolation();
     printJson({
       ok: true,
       profile: resolved.profile,
@@ -235,6 +267,8 @@ export async function cmdChat(ctx, args, flags) {
       model: resolved.model,
       text: result.text,
       usage: result.usage,
+      patchId: settled?.patch?.id ?? null,
+      applied: Boolean(settled?.applied),
     });
     return EXIT.OK;
   }
@@ -260,7 +294,6 @@ export async function cmdChat(ctx, args, flags) {
   // /model swaps the transport, /autonomy swaps the approval policy.
   let active = resolved;
   let isAutoApproved = autoApprove;
-  let autonomyLevel = String(flags.autonomy ?? config.defaultAutonomy ?? 'L2').toUpperCase();
   /** Spend from models used earlier in this session, so /usage stays cumulative. */
   let carriedUsage = { inputTokens: 0, outputTokens: 0, turns: 0 };
 
@@ -352,8 +385,25 @@ export async function cmdChat(ctx, args, flags) {
     }
   };
 
+  const closeIsolation = async ({ forceApply = false } = {}) => {
+    const settled = await foldIsolation({ forceApply });
+    if (!settled || settled.abandoned) return settled;
+    if (settled.leaked) {
+      log(c.yellow('  original checkout changed while the CLI ran; apply is blocked'));
+    }
+    if (settled.empty) return settled;
+    if (settled.applied) log(`${c.green('APPLIED')} ${settled.patch.id}`);
+    else {
+      log(`${c.yellow('PENDING')} ${settled.patch.id}`);
+      log(c.dim(`  toris apply ${settled.patch.id}   toris discard ${settled.patch.id}`));
+      await notifyChannels(config, formatPatchNotice(settled.patch)).catch(() => undefined);
+    }
+    return settled;
+  };
+
   if (oneShot) {
     await askModel(args.join(' '));
+    await closeIsolation();
     rl.close();
     transport.dispose?.();
     return EXIT.OK;
@@ -434,6 +484,27 @@ export async function cmdChat(ctx, args, flags) {
     clear: () => {
       session.reset();
       log(c.dim('transcript cleared'));
+    },
+    patches: async () => {
+      const pending = await listPatches(ctx.store, { status: 'pending' });
+      log(pending.length ? pending.map((patch) => `  ${patch.id} ${patch.files?.length ?? 0} files`).join('\n') : '  (none)');
+    },
+    apply: async (rest) => {
+      if (rest[0]) {
+        const patch = await applySavedPatch(ctx.store, rest[0]);
+        log(`${c.green('APPLIED')} ${patch.id}`);
+        return;
+      }
+      await closeIsolation({ forceApply: true });
+    },
+    discard: async (rest) => {
+      if (rest[0]) {
+        const patch = await discardSavedPatch(ctx.store, rest[0]);
+        log(`${c.yellow('DISCARDED')} ${patch.id}`);
+        return;
+      }
+      await foldIsolation({ abandon: true });
+      log(c.dim('dropped the live isolated worktree without applying'));
     },
   };
 
@@ -557,7 +628,7 @@ export async function cmdChat(ctx, args, flags) {
     if (slash) {
       if (slash.name === 'exit') break;
       const handler = slashHandlers[slash.name];
-      if (handler) handler(slash.args);
+      if (handler) await handler(slash.args);
       else log(c.dim(`unknown command "${slash.raw}". /help for the list.`));
       continue;
     }
@@ -579,6 +650,7 @@ export async function cmdChat(ctx, args, flags) {
 
   rl.close();
   transport.dispose?.();
+  await closeIsolation();
   const u = totalUsage();
   log(c.dim(`\n${u.inputTokens} in · ${u.outputTokens} out · ${countOf(u.turns, 'turn')}`));
   return EXIT.OK;

@@ -23,6 +23,7 @@ export const AUTONOMY_LEVELS = Object.freeze({
     commits: false,
     pushes: false,
     pushesDefaultBranch: false,
+    applies: false,
     autoApproves: false,
     label: 'plan only',
     detail:
@@ -36,10 +37,11 @@ export const AUTONOMY_LEVELS = Object.freeze({
     commits: false,
     pushes: false,
     pushesDefaultBranch: false,
+    applies: false,
     autoApproves: false,
-    label: 'edit working tree, ask before commit',
+    label: 'edit isolated worktree, ask before applying',
     detail:
-      'Edits land unstaged, so `git checkout -- .` undoes the whole run. Every mutating tool still asks.',
+      'The coding CLI writes only in a disposable worktree. Applying that diff to your repo still asks.',
   }),
   L3: Object.freeze({
     level: 'L3',
@@ -49,10 +51,11 @@ export const AUTONOMY_LEVELS = Object.freeze({
     commits: true,
     pushes: false,
     pushesDefaultBranch: false,
+    applies: true,
     autoApproves: true,
-    label: 'commit locally, ask before push',
+    label: 'apply to the repo, commit locally, ask before push',
     detail:
-      'The recommended solo default: commits are local, so `git reset` undoes them and nothing reaches a remote.',
+      'Isolated edits are applied to your working tree automatically. Commits stay local; push still asks.',
   }),
   L4: Object.freeze({
     level: 'L4',
@@ -62,6 +65,7 @@ export const AUTONOMY_LEVELS = Object.freeze({
     commits: true,
     pushes: true,
     pushesDefaultBranch: false,
+    applies: true,
     autoApproves: true,
     label: 'push to a side branch',
     detail: 'Work can reach the remote on its own branch. Your default branch is still untouched.',
@@ -74,6 +78,7 @@ export const AUTONOMY_LEVELS = Object.freeze({
     commits: true,
     pushes: true,
     pushesDefaultBranch: true,
+    applies: true,
     autoApproves: true,
     label: 'fully autonomous, including the default branch',
     detail:
@@ -100,6 +105,7 @@ export function resolveAutonomy(level) {
 const ACTION_CAPABILITY = Object.freeze({
   plan: 'plans',
   write: 'writes',
+  apply: 'applies',
   commit: 'commits',
   push: 'pushes',
   'push-default': 'pushesDefaultBranch',

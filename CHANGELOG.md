@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-08
+
+### Added
+
+- Isolated git worktrees so `claude`/`codex` write outside the original checkout, with `toris patches`, `apply`, `discard`, and `--apply`.
+- Slack Socket Mode and Telegram long-poll via `toris bot` (`/run`, `/patches`, `/apply`, `/last`, `/workspace`, `/status`).
+- Product-growth skills bundled under `skills/` (ASO, SEO/GEO, Flutter/Expo performance and interactive design, Play Store release).
+
+### Changed
+
+- L2 now asks before applying an isolated diff; L3+ auto-applies unless the original checkout changed during the run.
+
 ## [0.1.0] - 2026-07-29
 
 Initial public release — the CLI foundation.
@@ -34,5 +46,6 @@ Initial public release — the CLI foundation.
   `4` approval denied, `5` daemon unavailable — plus `--json` output on every command.
 - **Zero runtime dependencies**; requires Node.js >= 22.6.0.
 
-[Unreleased]: https://github.com/torisKR/toris-agent/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/torisKR/toris-agent/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.3.0
 [0.1.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.1.0

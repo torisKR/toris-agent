@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter Interactive Design"
+  short_description: "Build polished Flutter UI with interactive 2D and 3D"
+  default_prompt: "Use $flutter-interactive-design to inspect this app, implement a distinctive interactive Flutter experience, and verify its accessibility and frame performance."
