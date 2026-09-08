@@ -32,6 +32,7 @@ export async function settleIsolation({
   autonomy,
   runId = null,
   forceApply = false,
+  holdApply = false,
 }) {
   const leaked = await originTouched(session.origin, before.porcelain);
   const diff = await worktreeDiff(session);
@@ -54,7 +55,7 @@ export async function settleIsolation({
     originTouched: leaked,
   });
 
-  const decision = forceApply ? 'auto' : applyDecision(autonomy);
+  const decision = forceApply ? 'auto' : holdApply ? 'ask' : applyDecision(autonomy);
   if (decision === 'auto' && !leaked) {
     const applied = await applySavedPatch(store, record.id);
     return {

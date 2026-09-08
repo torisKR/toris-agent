@@ -2,6 +2,7 @@ import { TorisError } from '../core/errors.js';
 import { API_PROVIDERS, CLI_PROVIDERS, readApiKey } from '../core/models.js';
 import { createAnthropicProvider } from './anthropic.js';
 import { createOpenAIProvider } from './openai.js';
+import { createGrokProvider } from './grok.js';
 import { createClaudeCliProvider } from './claude-cli.js';
 import { createCodexCliProvider } from './codex-cli.js';
 
@@ -9,13 +10,14 @@ import { createCodexCliProvider } from './codex-cli.js';
  * Maps a resolved profile onto a live chat transport.
  *
  * Two families exist:
- *  - direct-API providers (anthropic, openai) speak HTTP with an env API key;
+ *  - direct-API providers (anthropic, openai, grok) speak HTTP with an env API key;
  *  - CLI-backed providers (claude-cli, codex-cli) spawn the installed agent
  *    CLI per turn and reuse its existing login session, so no key is needed.
  */
 const API_FACTORIES = Object.freeze({
   anthropic: createAnthropicProvider,
   openai: createOpenAIProvider,
+  grok: createGrokProvider,
 });
 
 const CLI_FACTORIES = Object.freeze({

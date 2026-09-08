@@ -237,6 +237,41 @@ export function normalizeTasks(raw: unknown, options?: { now?: () => number }): 
 export function fallbackPlan(goal: string, options?: { now?: () => number }): Task[];
 
 // ---------------------------------------------------------------------------
+// Second-pass review
+// ---------------------------------------------------------------------------
+
+export type ReviewVerdict = 'pass' | 'fail';
+export type ReviewFindingSeverity = 'blocker' | 'warning' | 'note';
+
+export interface ReviewFinding {
+  severity: ReviewFindingSeverity;
+  title: string;
+  detail: string;
+}
+
+export interface ReviewResult {
+  provider: string | null;
+  passed: boolean | null;
+  skipped: boolean;
+  unparsable?: boolean;
+  verdict?: ReviewVerdict;
+  reason?: string;
+  summary: string;
+  findings: readonly ReviewFinding[];
+}
+
+export function buildReviewPrompt(input: {
+  goal: string;
+  implementer: string;
+  reviewer: string;
+  files?: readonly string[];
+  patch?: string;
+  summaries?: readonly string[];
+}): string;
+
+export function parseReview(text: string, options?: { provider?: string }): ReviewResult;
+
+// ---------------------------------------------------------------------------
 // Verification
 // ---------------------------------------------------------------------------
 

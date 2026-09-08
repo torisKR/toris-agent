@@ -38,12 +38,13 @@ thought about, **in what order**, **how much may happen without you**, and **whe
 
 ## Why
 
-Agent tools are easy to start and hard to trust. toris is built around four opinions:
+Agent tools are easy to start and hard to trust. toris is built around five opinions:
 
 | Opinion | What it means in practice |
 | --- | --- |
 | **Local-first** | Every run, event and receipt is a plain file under `~/.toris`. No account, no server, no telemetry, no network calls of its own. |
 | **Evidence over vibes** | A run is not "done" because an agent said so. It is done when the project's own `lint`/`test`/`build` pass — and the receipt shows the exit codes. |
+| **A model does not grade its own homework** | After `claude` (or `codex`) implements, the other CLI reviews the isolated diff. A fail verdict holds auto-apply. `--no-review` skips it. |
 | **Autonomy is a dial** | L1 plans and touches nothing. L5 commits and pushes. You choose per run, and anything above the line asks first. |
 | **Zero dependencies** | The entire runtime is Node's standard library. Nothing in your supply chain but you and your provider CLI. |
 
@@ -192,8 +193,16 @@ you own that mapping, so swapping models is a config edit, never an upgrade:
 }
 ```
 
+Chat HTTP providers: `anthropic`, `openai`, `grok`. CLI-backed: `claude-cli`, `codex-cli`.
+Grok uses `XAI_API_KEY` (`GROK_API_KEY` also works). You still pick the model id:
+
 ```bash
-export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY
+export XAI_API_KEY=...
+toris connect --provider grok --model <grok-model-id>
+```
+
+```bash
+export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY or XAI_API_KEY
 toris chat                        # REPL
 toris chat "why does the build fail?"   # one-shot
 ```

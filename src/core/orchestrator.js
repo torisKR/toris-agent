@@ -8,6 +8,8 @@ import { buildReceipt } from './receipt.js';
 import { TorisError } from './errors.js';
 import { openIsolation, settleIsolation } from './isolation.js';
 import { formatPatchNotice, notifyChannels } from './channels.js';
+import { worktreeDiff } from './worktree.js';
+import { buildReviewPrompt, parseReview, skippedReview } from './review.js';
 
 const nowIso = () => new Date().toISOString();
 
@@ -76,6 +78,85 @@ export class Orchestrator {
       if (adapter && (await this.detect(adapter.bin))) return { adapter, available: true };
     }
     return { adapter: ADAPTERS[preferred] ?? ADAPTERS.claude, available: false };
+  }
+
+  /** The other CLI, so a model never reviews its own diff. */
+  async resolveReviewer(implementerName) {
+    const name = oppositeProvider(implementerName);
+    const adapter = ADAPTERS[name];
+    if (!adapter) return null;
+    if (!(await this.detect(adapter.bin))) return null;
+    return adapter;
+  }
+
+  /**
+   * Independent second pass after the implementer finishes.
+   * Skipped (and recorded) when the opposite CLI is missing, nothing changed,
+   * or the operator passed --no-review. A fail verdict holds auto-apply.
+   */
+  async #secondPass(run, { isolation, implementer, enabled }) {
+    if (enabled === false) {
+      const review = skippedReview('disabled by --no-review');
+      await this.#emit(run, 'review.skipped', { reason: review.reason });
+      return { ...run, review };
+    }
+    if (!run.tasks.some((t) => t.status === 'succeeded')) {
+      const review = skippedReview('no succeeded tasks to review');
+      await this.#emit(run, 'review.skipped', { reason: review.reason });
+      return { ...run, review };
+    }
+    const reviewer = await this.resolveReviewer(implementer.name);
+    if (!reviewer) {
+      const review = skippedReview(
+        `opposite provider ${oppositeProvider(implementer.name)} is not on PATH`,
+        { provider: oppositeProvider(implementer.name) },
+      );
+      await this.#emit(run, 'review.skipped', { reason: review.reason, provider: review.provider });
+      return { ...run, review };
+    }
+    if (!isolation) {
+      const review = skippedReview('no isolated diff to review');
+      await this.#emit(run, 'review.skipped', { reason: review.reason, provider: reviewer.name });
+      return { ...run, review };
+    }
+    const diff = await worktreeDiff(isolation.session);
+    if (diff.empty) {
+      const review = skippedReview('no file changes', { provider: reviewer.name });
+      await this.#emit(run, 'review.skipped', { reason: review.reason, provider: reviewer.name });
+      return { ...run, review };
+    }
+    await this.#emit(run, 'review.started', {
+      provider: reviewer.name,
+      implementer: implementer.name,
+      files: diff.files,
+    });
+    try {
+      const result = await this.invoke(
+        reviewer,
+        buildReviewPrompt({
+          goal: run.goal,
+          implementer: implementer.name,
+          reviewer: reviewer.name,
+          files: diff.files,
+          patch: diff.patch,
+          summaries: run.tasks.map((t) => t.summary).filter(Boolean),
+        }),
+        { cwd: isolation.session.path, timeoutMs: this.config?.providerTimeoutMs },
+      );
+      const review = parseReview(result.text, { provider: reviewer.name });
+      const next = { ...run, costUsd: run.costUsd + (result.costUsd || 0), review };
+      await this.#emit(next, 'review.finished', {
+        provider: reviewer.name,
+        passed: review.passed,
+        unparsable: Boolean(review.unparsable),
+        findings: review.findings?.length ?? 0,
+      });
+      return next;
+    } catch (err) {
+      const review = skippedReview(err.message, { provider: reviewer.name });
+      await this.#emit(run, 'review.failed', { provider: reviewer.name, error: err.message });
+      return { ...run, review };
+    }
   }
 
   async plan(run, project, adapter, available) {
@@ -278,6 +359,12 @@ export class Orchestrator {
       current = { ...current, artifacts: await changedFiles(execCwd) };
     }
 
+    current = await this.#secondPass(current, {
+      isolation,
+      implementer: adapter,
+      enabled: opts.review,
+    });
+
     let pendingApply = false;
     if (isolation) {
       const settled = await settleIsolation({
@@ -288,6 +375,7 @@ export class Orchestrator {
         autonomy: autonomy.level,
         runId: current.id,
         forceApply: Boolean(opts.apply),
+        holdApply: current.review?.passed === false,
       });
       pendingApply = Boolean(settled.patch && !settled.applied);
       current = {

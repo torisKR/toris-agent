@@ -12,10 +12,10 @@ import { AUTO_MODEL } from '../core/models.js';
 const DEFAULT_BASE_URL = 'https://api.openai.com';
 const DEFAULT_MAX_TOKENS = 4096;
 
-function requireConcreteModel(model) {
+function requireConcreteModel(model, providerName = 'openai') {
   if (!model || model === AUTO_MODEL) {
     throw new TorisError(
-      'The openai provider needs a concrete model id. Set "model" on the profile ' +
+      `The ${providerName} provider needs a concrete model id. Set "model" on the profile ` +
         '(config: models.profiles.<name>.model); "auto" is only valid for CLI-backed providers.',
       'E_MODEL_REQUIRED',
     );
@@ -23,7 +23,7 @@ function requireConcreteModel(model) {
   return model;
 }
 
-async function toHttpError(res) {
+async function toHttpError(res, { label = 'OpenAI', keyHint = 'OPENAI_API_KEY' } = {}) {
   let body = '';
   try {
     body = (await res.text()).slice(0, 500);
@@ -32,14 +32,14 @@ async function toHttpError(res) {
   }
   if (res.status === 401 || res.status === 403) {
     return new TorisError(
-      `OpenAI rejected the credential (HTTP ${res.status}). Check OPENAI_API_KEY. ${body}`,
+      `${label} rejected the credential (HTTP ${res.status}). Check ${keyHint}. ${body}`,
       'E_PROVIDER_AUTH',
     );
   }
   if (res.status === 429) {
-    return new TorisError(`OpenAI rate limit hit (HTTP 429). ${body}`, 'E_PROVIDER_RATE_LIMIT');
+    return new TorisError(`${label} rate limit hit (HTTP 429). ${body}`, 'E_PROVIDER_RATE_LIMIT');
   }
-  return new TorisError(`OpenAI request failed (HTTP ${res.status}). ${body}`, 'E_PROVIDER_HTTP');
+  return new TorisError(`${label} request failed (HTTP ${res.status}). ${body}`, 'E_PROVIDER_HTTP');
 }
 
 /** OpenAI sends tool arguments as a JSON *string*; the loop wants an object. */
@@ -105,14 +105,19 @@ export function toWire(messages) {
 }
 
 /**
- * @param {{apiKey:string, fetchImpl?:Function, baseUrl?:string}} opts
+ * @param {{apiKey:string, fetchImpl?:Function, baseUrl?:string,
+ *          name?:string, label?:string, keyHint?:string}} opts
  */
-export function createOpenAIProvider({ apiKey, fetchImpl = fetch, baseUrl = DEFAULT_BASE_URL }) {
+export function createOpenAIProvider({
+  apiKey,
+  fetchImpl = fetch,
+  baseUrl = DEFAULT_BASE_URL,
+  name = 'openai',
+  label = 'OpenAI',
+  keyHint = 'OPENAI_API_KEY',
+}) {
   if (!apiKey) {
-    throw new TorisError(
-      'No OpenAI API key. Export OPENAI_API_KEY, then retry.',
-      'E_PROVIDER_AUTH',
-    );
+    throw new TorisError(`No ${label} API key. Export ${keyHint}, then retry.`, 'E_PROVIDER_AUTH');
   }
 
   const request = (body, signal) =>
@@ -127,7 +132,7 @@ export function createOpenAIProvider({ apiKey, fetchImpl = fetch, baseUrl = DEFA
     });
 
   const buildBody = ({ model, messages, system, tools, maxTokens }, stream) => ({
-    model: requireConcreteModel(model),
+    model: requireConcreteModel(model, name),
     max_completion_tokens: maxTokens ?? DEFAULT_MAX_TOKENS,
     messages: withSystem(toWire(messages), system),
     ...(tools?.length ? { tools: toOpenAITools(tools) } : {}),
@@ -135,11 +140,11 @@ export function createOpenAIProvider({ apiKey, fetchImpl = fetch, baseUrl = DEFA
   });
 
   return Object.freeze({
-    name: 'openai',
+    name,
 
     async complete(opts) {
       const res = await request(buildBody(opts, false), opts.signal);
-      if (!res.ok) throw await toHttpError(res);
+      if (!res.ok) throw await toHttpError(res, { label, keyHint });
       const json = await res.json();
       const choice = json.choices?.[0];
       return {
@@ -155,8 +160,8 @@ export function createOpenAIProvider({ apiKey, fetchImpl = fetch, baseUrl = DEFA
 
     async *stream(opts) {
       const res = await request(buildBody(opts, true), opts.signal);
-      if (!res.ok) throw await toHttpError(res);
-      if (!res.body) throw new TorisError('OpenAI returned no stream body.', 'E_PROVIDER_HTTP');
+      if (!res.ok) throw await toHttpError(res, { label, keyHint });
+      if (!res.body) throw new TorisError(`${label} returned no stream body.`, 'E_PROVIDER_HTTP');
 
       const decoder = new TextDecoder();
       /** @type {Map<number, {id:string,name:string,args:string}>} */

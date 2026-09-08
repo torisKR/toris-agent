@@ -12,7 +12,7 @@ import { TorisError } from './errors.js';
  */
 
 /** Providers that toris talks to over HTTP itself. */
-export const API_PROVIDERS = Object.freeze(['anthropic', 'openai']);
+export const API_PROVIDERS = Object.freeze(['anthropic', 'openai', 'grok']);
 
 /** Providers that toris drives by spawning an installed agent CLI. */
 export const CLI_PROVIDERS = Object.freeze(['claude-cli', 'codex-cli']);
@@ -108,12 +108,32 @@ export function resolveRole(role, config, opts = {}) {
 }
 
 /**
- * Where a provider's credential comes from. Keys live in the environment, never
- * in config on disk, so a shared config file can never leak one.
- * @param {string} provider
+ * Env vars that hold a provider's key, first one wins.
+ * Keys live in the environment, never in config on disk.
+ * `grok` accepts the official xAI name and the alias operators type.
  */
-export const apiKeyEnvVar = (provider) =>
-  ({ anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' })[provider] ?? null;
+const API_KEY_VARS = Object.freeze({
+  anthropic: Object.freeze(['ANTHROPIC_API_KEY']),
+  openai: Object.freeze(['OPENAI_API_KEY']),
+  grok: Object.freeze(['XAI_API_KEY', 'GROK_API_KEY']),
+});
+
+/**
+ * @param {string} provider
+ * @param {Record<string,string|undefined>} [env]
+ * @returns {string|null} the env var name that currently holds a key
+ */
+export function whichApiKey(provider, env = process.env) {
+  const names = API_KEY_VARS[provider];
+  if (!names) return null;
+  for (const varName of names) {
+    const value = env[varName];
+    if (value && value.trim() !== '') return varName;
+  }
+  return null;
+}
+
+export const apiKeyEnvVar = (provider) => API_KEY_VARS[provider]?.[0] ?? null;
 
 /**
  * @param {string} provider
@@ -121,7 +141,7 @@ export const apiKeyEnvVar = (provider) =>
  * @returns {string|null}
  */
 export function readApiKey(provider, env = process.env) {
-  const varName = apiKeyEnvVar(provider);
+  const varName = whichApiKey(provider, env);
   if (!varName) return null;
   const value = env[varName];
   return value && value.trim() !== '' ? value : null;

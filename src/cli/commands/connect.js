@@ -8,7 +8,7 @@ import {
   CLI_PROVIDERS,
   AUTO_MODEL,
   apiKeyEnvVar,
-  readApiKey,
+  whichApiKey,
 } from '../../core/models.js';
 import { EXIT, TorisError, UsageError } from '../../core/errors.js';
 import { line, c, keyValues, printJson } from '../output.js';
@@ -59,6 +59,14 @@ const CANDIDATES = Object.freeze([
     bin: null,
     configKey: null,
   }),
+  Object.freeze({
+    provider: 'grok',
+    label: 'xAI Grok',
+    note: '환경변수 API 키 사용',
+    kind: 'api',
+    bin: null,
+    configKey: null,
+  }),
 ]);
 
 /** Provider ids the wizard accepts, for validation and error messages. */
@@ -95,7 +103,7 @@ export function detectCandidates({ env = process.env, detect = detectBinary, con
       });
     }
     const varName = apiKeyEnvVar(spec.provider);
-    const hasKey = readApiKey(spec.provider, env) !== null;
+    const used = whichApiKey(spec.provider, env);
     return Object.freeze({
       provider: spec.provider,
       label: spec.label,
@@ -103,8 +111,8 @@ export function detectCandidates({ env = process.env, detect = detectBinary, con
       kind: spec.kind,
       bin: null,
       path: null,
-      available: hasKey,
-      reason: hasKey ? `${varName} set` : `${varName} not set`,
+      available: used !== null,
+      reason: used ? `${used} set` : `${varName} not set`,
     });
   });
 }

@@ -44,6 +44,7 @@ export async function cmdRun(ctx, positionals, flags) {
     budgetUsd: asNumber(flags.budget, 'budget'),
     provider: typeof flags.provider === 'string' ? flags.provider : undefined,
     apply: Boolean(flags.apply),
+    review: flags['no-review'] ? false : true,
     checks: project?.checks ?? [],
   });
 
@@ -66,6 +67,14 @@ function printRun(run) {
   }
   if (run.blockedReason) line(c.yellow(`  blocked: ${run.blockedReason}`));
   if (run.patchId) line(c.yellow(`  patch: ${run.patchId}  toris apply ${run.patchId}`));
+  if (run.review?.skipped) line(c.dim(`  review skipped: ${run.review.reason}`));
+  if (run.review && !run.review.skipped) {
+    line(
+      run.review.passed === false
+        ? c.yellow(`  review: ${run.review.provider} blocked apply`)
+        : c.dim(`  review: ${run.review.provider} passed`),
+    );
+  }
   line();
   line(c.bold(`  Tasks (${run.tasks.length})`));
   table(['#', 'AGENT', 'STATUS', 'TITLE'],

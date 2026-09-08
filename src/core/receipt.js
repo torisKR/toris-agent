@@ -9,18 +9,24 @@ import { failureExcerpt } from './verifier.js';
 export const RECEIPT_SCHEMA_VERSION = 1;
 
 /** Every failure in the run, in one place, so nobody has to diff two sections. */
-function collectFailures(tasks, checks) {
+function collectFailures(tasks, checks, review) {
   const taskFailures = tasks
     .filter((t) => t.status === 'failed')
     .map((t) => ({ kind: 'task', label: t.title ?? t.id, detail: t.error ?? '' }));
   const checkFailures = checks
     .filter((c) => !c.passed)
     .map((c) => ({ kind: 'check', label: c.command, detail: failureExcerpt(c) }));
-  return [...taskFailures, ...checkFailures];
+  const reviewFailures =
+    review?.passed === false
+      ? (review.findings ?? [])
+          .filter((f) => f.severity === 'blocker' || review.verdict === 'fail')
+          .map((f) => ({ kind: 'review', label: f.title, detail: f.detail ?? '' }))
+      : [];
+  return [...taskFailures, ...checkFailures, ...reviewFailures];
 }
 
 /** One line a solo developer can read without opening anything else. */
-function buildVerdict({ status, tasks, verification, durationMs, costUsd }) {
+function buildVerdict({ status, tasks, verification, review, durationMs, costUsd }) {
   const parts = [`${tasks.succeeded}/${tasks.total} tasks succeeded`];
   if (verification.passed === true) {
     parts.push(`${verification.total} check${verification.total === 1 ? '' : 's'} passed`);
@@ -28,6 +34,13 @@ function buildVerdict({ status, tasks, verification, durationMs, costUsd }) {
     parts.push(`${verification.failed} of ${verification.total} checks failed`);
   } else {
     parts.push('nothing verified');
+  }
+  if (review?.skipped) {
+    parts.push('second pass skipped');
+  } else if (review?.passed === true) {
+    parts.push(`${review.provider ?? 'opposite'} review passed`);
+  } else if (review?.passed === false) {
+    parts.push(`${review.provider ?? 'opposite'} review blocked apply`);
   }
   if (durationMs != null) parts.push(`${(durationMs / 1000).toFixed(1)}s`);
   parts.push(`$${costUsd.toFixed(4)}`);
@@ -65,7 +78,7 @@ export function buildReceipt(run, events = []) {
     startedAt: run.createdAt,
     finishedAt: run.finishedAt ?? null,
     durationMs,
-    verdict: buildVerdict({ status, tasks: taskCounts, verification, durationMs, costUsd }),
+    verdict: buildVerdict({ status, tasks: taskCounts, verification, review: run.review, durationMs, costUsd }),
     tasks: taskCounts,
     taskList: tasks.map((t) => ({
       id: t.id,
@@ -75,7 +88,8 @@ export function buildReceipt(run, events = []) {
       error: t.error ?? null,
     })),
     verification,
-    failures: collectFailures(tasks, checks),
+    review: run.review ?? null,
+    failures: collectFailures(tasks, checks, run.review),
     costUsd,
     eventCount: events.length,
     artifacts: run.artifacts ?? [],
@@ -88,6 +102,7 @@ const VERDICT_ICON = Object.freeze({
   failed: '❌',
   'dry-run': '📝',
   'awaiting-approval': '⏸️',
+  'awaiting-apply': '⏸️',
 });
 
 /** Files listed inline before the reader is told to go look at git instead. */
@@ -111,7 +126,7 @@ function failureLines(receipt) {
   if (receipt.failures.length === 0) return [];
   const lines = ['## What went wrong', ''];
   for (const failure of receipt.failures) {
-    lines.push(`- **${failure.kind === 'check' ? 'check' : 'task'}** \`${failure.label}\``);
+    lines.push(`- **${failure.kind}** \`${failure.label}\``);
     if (failure.detail) lines.push('', '  ```', ...indent(failure.detail), '  ```');
     lines.push('');
   }
@@ -127,6 +142,33 @@ function taskLines(receipt) {
     if (task.error) lines.push(`  - error: \`${task.error}\``);
   }
   if ((receipt.taskList ?? []).length > 0) lines.push('');
+  return lines;
+}
+
+function reviewLines(receipt) {
+  const review = receipt.review;
+  if (!review) return [];
+  if (review.skipped) {
+    return [
+      '## Second-pass review',
+      '',
+      `_Skipped: ${review.reason ?? 'no opposite provider'}_`,
+      '',
+    ];
+  }
+  const icon = review.passed === false ? '❌' : '✅';
+  const lines = [
+    '## Second-pass review',
+    '',
+    `${icon} **${review.provider ?? 'reviewer'}** — ${review.passed === false ? 'blocked apply' : 'passed'}`,
+    '',
+  ];
+  if (review.summary) lines.push(review.summary, '');
+  for (const finding of review.findings ?? []) {
+    lines.push(`- **${finding.severity}** ${finding.title}`);
+    if (finding.detail) lines.push(`  - ${finding.detail}`);
+  }
+  if ((review.findings ?? []).length) lines.push('');
   return lines;
 }
 
@@ -183,6 +225,7 @@ export function receiptToMarkdown(receipt) {
     ...failureLines(receipt),
     ...taskLines(receipt),
     ...verificationLines(receipt),
+    ...reviewLines(receipt),
     ...artifactLines(receipt),
     ...detailLines(receipt),
   ].join('\n');

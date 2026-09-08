@@ -265,6 +265,7 @@ test('an unknown provider is a usage error listing the valid ids', () => {
       assert.equal(err.code, 'E_USAGE');
       assert.match(err.message, /claude-cli/);
       assert.match(err.message, /anthropic/);
+      assert.match(err.message, /grok/);
       return true;
     },
   );

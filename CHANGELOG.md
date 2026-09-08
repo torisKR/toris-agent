@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-08
+
+### Added
+
+- Default **cross-model second pass**: after the implementer CLI finishes, the opposite provider (`claude` ↔ `codex`) reviews the isolated diff. A fail verdict holds auto-apply even at L3+. `--no-review` skips it.
+- **Grok (xAI)** as a chat HTTP provider. `toris connect --provider grok`, `XAI_API_KEY` (or `GROK_API_KEY`), OpenAI-compatible `https://api.x.ai`. Coding runs still use `claude` / `codex`.
+
 ## [0.3.0] - 2026-09-08
 
 ### Added
@@ -46,6 +53,7 @@ Initial public release — the CLI foundation.
   `4` approval denied, `5` daemon unavailable — plus `--json` output on every command.
 - **Zero runtime dependencies**; requires Node.js >= 22.6.0.
 
-[Unreleased]: https://github.com/torisKR/toris-agent/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/torisKR/toris-agent/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.4.0
 [0.3.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.3.0
 [0.1.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.1.0

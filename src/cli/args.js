@@ -1,7 +1,7 @@
 import { UsageError } from '../core/errors.js';
 
 const GLOBAL_BOOLEANS = new Set(['json', 'no-color', 'verbose', 'help', 'version']);
-const KNOWN_BOOLEANS = new Set([...GLOBAL_BOOLEANS, 'dry-run', 'yes', 'md', 'follow', 'apply']);
+const KNOWN_BOOLEANS = new Set([...GLOBAL_BOOLEANS, 'dry-run', 'yes', 'md', 'follow', 'apply', 'no-review']);
 const ALIASES = { p: 'project', f: 'follow', h: 'help', v: 'version', s: 'status', n: 'limit' };
 
 /**

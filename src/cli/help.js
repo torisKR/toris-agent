@@ -43,6 +43,7 @@ RUN OPTIONS
       --budget <usd>        Cost ceiling for this run
       --dry-run             Plan only; never edits files
       --apply               Apply an isolated L2 diff without asking
+      --no-review           Skip the opposite-provider second pass
       --provider <name>     claude | codex
 
 GLOBAL
@@ -62,6 +63,7 @@ EXAMPLES
   toris run "fix the failing parser test" --autonomy L3
   toris bot
   toris apply pat_abc
+  toris connect --provider grok --model <grok-model-id>
   toris receipt run_abc123 --md > receipt.md`;
 
 export function printHelp() {

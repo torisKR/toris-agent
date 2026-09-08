@@ -7,5 +7,6 @@ export { ADAPTERS, detectBinary, invokeProvider, oppositeProvider } from './core
 export { verify, runCheck, inferChecks } from './core/verifier.js';
 export { buildReceipt, receiptToMarkdown } from './core/receipt.js';
 export { buildPlanPrompt, extractJsonArray, normalizeTasks, fallbackPlan } from './core/planner.js';
+export { buildReviewPrompt, parseReview } from './core/review.js';
 export { EXIT, TorisError, UsageError, VerificationError } from './core/errors.js';
 export { main } from './cli/index.js';

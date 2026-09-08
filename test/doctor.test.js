@@ -64,10 +64,11 @@ const CONFIGURED = {
 };
 
 test('a fresh install warns that no API key is set', async () => {
-  await withEnv({ ANTHROPIC_API_KEY: null, OPENAI_API_KEY: null }, async () => {
+  await withEnv({ ANTHROPIC_API_KEY: null, OPENAI_API_KEY: null, XAI_API_KEY: null, GROK_API_KEY: null }, async () => {
     const checks = await runDoctor();
     assert.equal(checks.get('api-keys').status, 'WARN');
     assert.match(checks.get('api-keys').detail, /ANTHROPIC_API_KEY/);
+    assert.match(checks.get('api-keys').detail, /XAI_API_KEY/);
   });
 });
 
@@ -81,7 +82,7 @@ test('a key alone is not enough - the profile gap is still reported', async () =
 });
 
 test('a profile without its key is reported, not called ready', async () => {
-  await withEnv({ ANTHROPIC_API_KEY: null, OPENAI_API_KEY: null }, async () => {
+  await withEnv({ ANTHROPIC_API_KEY: null, OPENAI_API_KEY: null, XAI_API_KEY: null, GROK_API_KEY: null }, async () => {
     const checks = await runDoctor({ models: CONFIGURED });
     assert.equal(checks.get('model-profiles').status, 'PASS');
     assert.equal(checks.get('chat').status, 'WARN');
@@ -97,6 +98,27 @@ test('key plus profile reports the concrete model chat will use', async () => {
   });
 });
 
+test('a grok profile is ready when XAI_API_KEY is set', async () => {
+  await withEnv(
+    {
+      XAI_API_KEY: 'xai-test',
+      ANTHROPIC_API_KEY: null,
+      OPENAI_API_KEY: null,
+      GROK_API_KEY: null,
+    },
+    async () => {
+      const checks = await runDoctor({
+        models: {
+          profiles: { main: { provider: 'grok', model: 'operator-owned-id' } },
+          routing: { chat: 'main' },
+        },
+      });
+      assert.equal(checks.get('chat').status, 'PASS');
+      assert.equal(checks.get('chat').detail, 'grok/operator-owned-id');
+    },
+  );
+});
+
 test('the skills that ship with toris are discovered', async () => {
   const checks = await runDoctor();
   assert.equal(checks.get('skills').status, 'PASS');
@@ -104,7 +126,7 @@ test('the skills that ship with toris are discovered', async () => {
 });
 
 test('a missing chat setup never fails the exit code - runs do not need it', async () => {
-  await withEnv({ ANTHROPIC_API_KEY: null, OPENAI_API_KEY: null }, async () => {
+  await withEnv({ ANTHROPIC_API_KEY: null, OPENAI_API_KEY: null, XAI_API_KEY: null, GROK_API_KEY: null }, async () => {
     const checks = await runDoctor();
     for (const name of ['api-keys', 'model-profiles', 'chat']) {
       assert.notEqual(checks.get(name).status, 'FAIL');

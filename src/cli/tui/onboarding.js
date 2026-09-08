@@ -37,7 +37,7 @@ export function onboardingSteps({ configExists, profileCount, home }) {
     },
     {
       done: false,
-      title: 'export ANTHROPIC_API_KEY=... (or OPENAI_API_KEY)',
+      title: 'export ANTHROPIC_API_KEY=... (or OPENAI_API_KEY / XAI_API_KEY)',
       detail: 'keys live in the environment, never in the config file',
     },
   ];

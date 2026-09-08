@@ -434,3 +434,74 @@ test('L2 git runs write in a worktree and wait before touching origin', async ()
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('a run without an isolated diff records a skipped second pass', async () => {
+  const { orch, store } = build();
+  const run = await orch.run({ goal: 'g', autonomy: 'L2' });
+  assert.equal(run.review?.skipped, true);
+  assert.match(run.review.reason, /no isolated diff/);
+  assert.ok(store.events.some((e) => e.type === 'review.skipped'));
+});
+
+test('--no-review is recorded instead of calling the opposite CLI', async () => {
+  const { orch, store } = build();
+  const run = await orch.run({ goal: 'g', autonomy: 'L2', review: false });
+  assert.equal(run.review?.skipped, true);
+  assert.match(run.review.reason, /no-review/);
+  assert.ok(store.events.some((e) => e.type === 'review.skipped'));
+});
+
+test('a failing opposite-provider review holds L3 auto-apply', async () => {
+  const { mkdtemp, writeFile, readFile, rm } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const { git } = await import('../src/core/git.js');
+  const { Store } = await import('../src/core/store.js');
+
+  const origin = await mkdtemp(join(tmpdir(), 'toris-rev-'));
+  const home = await mkdtemp(join(tmpdir(), 'toris-rev-home-'));
+  try {
+    await git(['init'], origin);
+    await git(['config', 'user.email', 'toris@example.test'], origin);
+    await git(['config', 'user.name', 'toris'], origin);
+    await writeFile(join(origin, 'README.md'), 'hello\n');
+    await git(['add', '.'], origin);
+    await git(['commit', '-m', 'init'], origin);
+
+    const store = await new Store(home).init();
+    const orch = new Orchestrator({
+      store,
+      config: DEFAULT_CONFIG,
+      notify: async () => undefined,
+      invoke: async (_adapter, prompt, opts) => {
+        if (/independent/.test(prompt) && /reviewer/.test(prompt)) {
+          return {
+            text: JSON.stringify({
+              verdict: 'fail',
+              summary: 'auth hole',
+              findings: [{ severity: 'blocker', title: 'missing auth', detail: 'endpoint is open' }],
+            }),
+            costUsd: 0.02,
+          };
+        }
+        if (opts?.cwd && opts.cwd !== origin && /isolated worktree/.test(prompt)) {
+          await writeFile(join(opts.cwd, 'isolated.md'), 'from worktree\n');
+        }
+        return { text: planReply, costUsd: 0 };
+      },
+      detect: async () => true,
+      verifyFn: async () => ({ passed: true, checks: [] }),
+    });
+    const run = await orch.run({
+      goal: 'add isolated.md',
+      autonomy: 'L3',
+      project: { id: 'p', name: 'iso', path: origin },
+    });
+    assert.equal(run.review?.passed, false);
+    assert.equal(run.status, 'awaiting-apply');
+    assert.ok(run.patchId);
+    assert.equal(await readFile(join(origin, 'isolated.md'), 'utf8').catch(() => ''), '');
+  } finally {
+    await rm(origin, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true });
+  }
+});
