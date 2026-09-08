@@ -36,7 +36,7 @@ export const TARGETS = Object.freeze([
     rustTarget: 'x86_64-apple-darwin',
     os: 'darwin',
     cpu: 'x64',
-    runner: 'macos-13',
+    runner: 'macos-15-intel',
     dylib: 'libtoris_native.dylib',
   },
   {
