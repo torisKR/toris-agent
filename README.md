@@ -535,6 +535,27 @@ docs/
 └── specs/           # per-module specifications
 ```
 
+## Desktop app (ChatGPT-like)
+
+`toris desktop` is a modern, dark, ChatGPT/open-webui-style **Tauri v2** desktop
+app for **solo entrepreneurs (1인 사업가)**, backed by the same chat engine as the
+CLI. It has a conversation sidebar, streaming assistant messages, tool-use
+activity with approve/deny prompts, a model/provider/autonomy selector, and
+selectable assistant modes (email, weekly planning, marketing copy, doc
+summaries, code help, bookkeeping). A built-in **Demo** provider makes the whole
+app work with **no API key**; configure a real provider in Settings to switch.
+
+```bash
+npm run desktop:dev      # build the UI and launch the app (debug)
+npm run desktop:build    # build the UI and compile a release app
+```
+
+The frontend lives in `desktop/` with its own dev-only dependencies (the root
+package stays zero-runtime-dependency). The Rust backend in `src-tauri/` spawns a
+Node sidecar (`src/desktop/bridge.js`) that drives the real toris chat engine.
+See **[docs/DESKTOP.md](./docs/DESKTOP.md)** for prerequisites, architecture,
+Demo vs. real-provider setup, and details.
+
 ## Development
 
 No install step — there are no dependencies.
