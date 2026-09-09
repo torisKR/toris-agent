@@ -27,29 +27,54 @@ struct BridgeState {
     child: Mutex<Option<Child>>,
 }
 
-/// Absolute path to the Node bridge script.
+/// Locate the Node bridge script and the directory the agent's file tools
+/// should default to.
 ///
-/// Order: `TORIS_BRIDGE_PATH` env override, then the in-repo path derived from
-/// the crate's compile-time manifest dir (`<repo>/src/desktop/bridge.js`).
-fn resolve_bridge_path() -> PathBuf {
+/// Resolution order:
+///   1. `TORIS_BRIDGE_PATH` env override (used by tests / power users).
+///   2. The bundled resource copy shipped inside the installed app
+///      (`<resource_dir>/toris/src/desktop/bridge.js`).
+///   3. The in-repo path from the compile-time manifest dir (dev / `tauri dev`).
+///
+/// Returns `(bridge_script, working_dir)`.
+fn resolve_bridge(app: &AppHandle) -> (PathBuf, PathBuf) {
+    let home = dirs_home();
+
     if let Ok(p) = std::env::var("TORIS_BRIDGE_PATH") {
-        return PathBuf::from(p);
+        let cwd = std::env::var("TORIS_DESKTOP_CWD")
+            .map(PathBuf::from)
+            .unwrap_or(home);
+        return (PathBuf::from(p), cwd);
     }
-    let manifest = env!("CARGO_MANIFEST_DIR");
-    PathBuf::from(manifest)
-        .join("..")
-        .join("src")
-        .join("desktop")
-        .join("bridge.js")
+
+    // Bundled: the whole repo `src/` tree is shipped under `toris/` so the
+    // sidecar's relative imports (`../core/...`) resolve unchanged.
+    if let Ok(res) = app.path().resource_dir() {
+        let bundled = res.join("toris").join("src").join("desktop").join("bridge.js");
+        if bundled.exists() {
+            let cwd = std::env::var("TORIS_DESKTOP_CWD")
+                .map(PathBuf::from)
+                .unwrap_or(home);
+            return (bundled, cwd);
+        }
+    }
+
+    // Dev fallback: run straight from the working tree, with file tools rooted
+    // at the repo so "list the files in this project" is meaningful.
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let bridge = manifest.join("..").join("src").join("desktop").join("bridge.js");
+    let cwd = std::env::var("TORIS_DESKTOP_CWD")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| manifest.join(".."));
+    (bridge, cwd)
 }
 
-/// The repo root, used as the sidecar's working directory so the agent's file
-/// tools operate on the project rather than on `src-tauri/`.
-fn resolve_repo_root() -> PathBuf {
-    if let Ok(p) = std::env::var("TORIS_DESKTOP_CWD") {
-        return PathBuf::from(p);
-    }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+/// The user's home directory, or `.` if it cannot be determined.
+fn dirs_home() -> PathBuf {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("."))
 }
 
 fn node_bin() -> String {
@@ -58,8 +83,7 @@ fn node_bin() -> String {
 
 /// Spawn the Node sidecar and wire its stdout/stderr to the webview.
 fn spawn_bridge(app: &AppHandle) -> Result<(Child, ChildStdin), String> {
-    let bridge = resolve_bridge_path();
-    let cwd = resolve_repo_root();
+    let (bridge, cwd) = resolve_bridge(app);
     let mut cmd = Command::new(node_bin());
     cmd.arg(&bridge)
         .current_dir(&cwd)

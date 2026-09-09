@@ -28,6 +28,8 @@
     "active": true,
     "targets": "all",
     "category": "Productivity",
+    "publisher": "toris",
+    "copyright": "© toris",
     "shortDescription": "A ChatGPT-like desktop copilot for solo entrepreneurs.",
     "longDescription": "toris desktop wraps the toris agent chat engine in a modern, ChatGPT-style desktop app built for one-person businesses. Streaming chat, tool use, autonomy-gated approvals, and solo-entrepreneur assistant modes — with a key-free Demo mode so it works out of the box.",
     "icon": [
@@ -36,6 +38,16 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "../src": "toris/src",
+      "../bin": "toris/bin",
+      "../package.json": "toris/package.json"
+    },
+    "linux": {
+      "deb": {
+        "depends": ["nodejs"]
+      }
+    }
   }
 }
