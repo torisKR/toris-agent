@@ -239,18 +239,39 @@ svg {
   padding-left: 2px;
 }
 .sel select {
-  background: var(--bg-elev-2);
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--bg-elev-2);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa6b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  padding: 6px 26px 6px 10px;
   font-size: 13px;
   cursor: pointer;
-  max-width: 240px;
+  max-width: 260px;
+}
+.sel select option {
+  background: var(--bg-elev-2);
+  color: var(--text);
 }
 .sel select:focus {
   outline: none;
   border-color: var(--accent);
+}
+.modal select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa6b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 26px;
+}
+.modal select option {
+  background: var(--bg-elev-2);
+  color: var(--text);
 }
 .topbar-right {
   margin-left: auto;
@@ -703,6 +724,11 @@ svg {
   place-items: center;
   z-index: 50;
   padding: 20px;
+}
+/* The `hidden` attribute must win over the display:grid above, or an empty
+   backdrop stays on top of the app, dimming it and eating every click. */
+.modal-backdrop[hidden] {
+  display: none !important;
 }
 .modal {
   background: var(--bg-elev);

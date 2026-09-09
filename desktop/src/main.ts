@@ -10,6 +10,8 @@ import {
   saveSettings,
   deriveTitle,
   uid,
+  hasStored,
+  SETTINGS_KEY,
   type Conversation,
   type Message,
   type Settings,
@@ -515,7 +517,7 @@ function applyProviders(evt: BridgeEvent) {
   if (Array.isArray(evt.presets)) state.presets = evt.presets;
   if (Array.isArray(evt.profiles)) state.profiles = evt.profiles;
   if (evt.keys) state.keys = evt.keys;
-  if (evt.defaultAutonomy && !localStorage.getItem('toris.settings.v1')) {
+  if (evt.defaultAutonomy && !hasStored(SETTINGS_KEY)) {
     state.settings.autonomy = evt.defaultAutonomy;
   }
   // Drop a stored profile selection that no longer exists.
@@ -759,10 +761,11 @@ function renderOnboarding() {
     });
   });
   $('#onboardStart')!.addEventListener('click', () => {
+    // Hide first so a storage hiccup can never leave the user stuck on onboarding.
+    modal.hidden = true;
     state.settings.presetId = chosen;
     state.settings.onboarded = true;
     saveSettings(state.settings);
-    modal.hidden = true;
     const c = activeConversation();
     if (c) c.presetId = chosen;
     persist();

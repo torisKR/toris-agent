@@ -193,7 +193,8 @@ function ensureSession(req) {
   const approve = ({ name, input }) => {
     if (autoApprove) return Promise.resolve(true);
     const callId = nextId('appr');
-    emit({ type: 'tool-approval-request', conversationId, callId, name, input });
+    const messageId = activeMessage.get(conversationId) ?? null;
+    emit({ type: 'tool-approval-request', conversationId, messageId, callId, name, input });
     return new Promise((resolvePromise) => pendingApprovals.set(callId, resolvePromise));
   };
 
