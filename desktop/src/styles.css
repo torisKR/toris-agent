@@ -923,6 +923,282 @@ svg {
   filter: brightness(1.08);
 }
 
+/* ---------- sidebar search + conversation actions ---------- */
+.conv-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+}
+.conv-search svg {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.conv-search input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.conv-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.conv-item:hover .conv-actions {
+  opacity: 1;
+}
+.conv-icon {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px;
+  font-size: 14px;
+  border-radius: 5px;
+}
+.conv-icon:hover {
+  color: var(--text);
+}
+.conv-icon.danger:hover {
+  color: var(--danger);
+}
+.conv-rename {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13.5px;
+  outline: none;
+  font-family: inherit;
+}
+
+/* ---------- per-message actions ---------- */
+.msg-tools-col {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 4px;
+}
+.msg-foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.msg:hover .msg-foot,
+.msg-user:hover .msg-tools-col {
+  opacity: 1;
+}
+.msg-tools-col {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.msg-copy {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.msg-copy:hover {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--bg-elev);
+}
+.msg-copy.copied {
+  color: var(--accent-2);
+  border-color: var(--accent);
+}
+.msg-retry {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.msg-retry:hover {
+  border-color: var(--accent);
+}
+.msg-error .content {
+  color: var(--danger);
+}
+
+/* ---------- quick actions + saved templates ---------- */
+.quick-block {
+  margin-bottom: 18px;
+}
+.quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.quick-chip svg {
+  font-size: 14px;
+  color: var(--accent);
+}
+.quick-chip:hover {
+  border-color: var(--accent);
+  background: var(--bg-elev-2);
+}
+.quick-chip.saved {
+  border-style: dashed;
+}
+.chip-del {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 0 0 0 2px;
+  font-size: 13px;
+  display: inline-flex;
+}
+.chip-del:hover {
+  color: var(--danger);
+}
+
+/* ---------- misc buttons + settings extras ---------- */
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+}
+.link-btn:hover {
+  color: var(--accent-2);
+}
+.link-btn svg {
+  font-size: 13px;
+}
+.mini.ghost {
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.mini.ghost:hover {
+  border-color: var(--accent);
+  filter: none;
+}
+.key-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.key-row {
+  grid-template-columns: 96px 1fr auto auto;
+}
+.key-status {
+  font-size: 12px;
+  padding-left: 106px;
+  color: var(--text-faint);
+}
+.key-status.ok {
+  color: var(--accent-2);
+}
+.key-status.bad {
+  color: var(--danger);
+}
+.key-status.pending {
+  color: var(--warn);
+}
+.workspace-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.workspace-current {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.workspace-current svg {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+/* ---------- onboarding provider step ---------- */
+.onboard-provider {
+  padding: 12px 24px;
+}
+.provider-setup {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.provider-setup input,
+.provider-setup select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.provider-setup input:focus,
+.provider-setup select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.onboard-foot-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* composer footer becomes a row with the save-template action */
+.composer-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .only-narrow {
   display: none;
 }

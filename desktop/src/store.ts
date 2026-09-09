@@ -17,6 +17,10 @@ export interface Message {
   demo?: boolean;
   provider?: string;
   model?: string;
+  /** Set when the turn failed, so the UI can offer a retry. */
+  error?: boolean;
+  /** The user text that produced this assistant turn (for retry). */
+  retryText?: string;
 }
 
 export interface Conversation {
@@ -35,10 +39,20 @@ export interface Settings {
   presetId: string;
   autonomy: string;
   onboarded: boolean;
+  /** Optional project folder the agent's file tools operate in. */
+  workspace?: string;
+}
+
+/** A user-saved prompt template, scoped to a preset. */
+export interface Template {
+  id: string;
+  label: string;
+  prompt: string;
 }
 
 const CONV_KEY = 'toris.conversations.v1';
 const SET_KEY = 'toris.settings.v1';
+const TPL_KEY = 'toris.templates.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   profileId: 'demo',
@@ -114,6 +128,44 @@ export function loadSettings(): Settings {
 
 export function saveSettings(s: Settings): void {
   writeItem(SET_KEY, JSON.stringify(s));
+}
+
+// --- saved prompt templates (per preset) -----------------------------------
+
+type TemplateMap = Record<string, Template[]>;
+
+export function loadTemplates(): TemplateMap {
+  try {
+    const raw = readItem(TPL_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveTemplates(map: TemplateMap): void {
+  writeItem(TPL_KEY, JSON.stringify(map));
+}
+
+export function addTemplate(presetId: string, label: string, prompt: string): TemplateMap {
+  const map = loadTemplates();
+  const list = map[presetId] ?? [];
+  list.push({ id: uid('tpl'), label: label.trim() || deriveTitle(prompt), prompt });
+  map[presetId] = list;
+  saveTemplates(map);
+  return map;
+}
+
+export function removeTemplate(presetId: string, id: string): TemplateMap {
+  const map = loadTemplates();
+  if (map[presetId]) {
+    map[presetId] = map[presetId].filter((t) => t.id !== id);
+    if (map[presetId].length === 0) delete map[presetId];
+  }
+  saveTemplates(map);
+  return map;
 }
 
 export function deriveTitle(text: string): string {

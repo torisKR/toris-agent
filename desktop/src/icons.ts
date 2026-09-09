@@ -38,6 +38,14 @@ export const ICONS: Record<string, string> = {
   ),
   bolt: S('<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>'),
   menu: S('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+  search: S('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
+  pencil: S('<path d="M4 20h4L18.5 9.5a2.1 2.1 0 00-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/>'),
+  download: S('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>'),
+  copy: S('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>'),
+  folder: S('<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>'),
+  bookmark: S('<path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z"/>'),
+  refresh: S('<path d="M20 11a8 8 0 10-2.3 6M20 4v6h-6"/>'),
+  arrowRight: S('<path d="M5 12h14M13 6l6 6-6 6"/>'),
 };
 
 export function icon(name: string): string {

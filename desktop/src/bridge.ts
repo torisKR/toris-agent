@@ -79,6 +79,8 @@ class MockBridge implements Bridge {
     setTimeout(() => this.emit(this.readyEvent()), 30);
   }
 
+  private cwd = '(browser preview — no filesystem)';
+
   private readyEvent(): BridgeEvent {
     return {
       type: 'ready',
@@ -87,6 +89,7 @@ class MockBridge implements Bridge {
       keys: { api: { ...this.overrideKeys }, cli: { 'claude-cli': false, 'codex-cli': false } },
       defaultAutonomy: 'L3',
       demoProfileId: 'demo',
+      cwd: this.cwd,
       mock: true,
     };
   }
@@ -137,6 +140,38 @@ class MockBridge implements Bridge {
         });
         this.emit({ ...this.readyEvent(), type: 'providers' });
         break;
+      case 'validate-key': {
+        // No network in the browser mock: a non-empty key "validates".
+        const ok = Boolean((command.key ?? '').trim());
+        this.emit({
+          type: 'key-validation',
+          provider: command.provider,
+          requestId: command.requestId ?? null,
+          ok,
+          status: ok ? 200 : null,
+          message: ok
+            ? `${command.provider} key looks valid (browser preview does not really call the API).`
+            : 'Enter a key first.',
+        });
+        break;
+      }
+      case 'set-cwd':
+        this.cwd = command.path?.trim() || '(browser preview — no filesystem)';
+        this.emit({ type: 'workspace', ok: Boolean(command.path?.trim()), cwd: this.cwd, message: `Workspace set to ${this.cwd}` });
+        this.emit({ ...this.readyEvent(), type: 'providers' });
+        break;
+      case 'export-conversation': {
+        const md = mockMarkdown(command.conversation);
+        this.emit({
+          type: 'export-result',
+          conversationId: command.conversationId,
+          ok: true,
+          path: '(browser preview — copied to clipboard instead of a file)',
+          markdown: md,
+          message: 'Exported (browser preview): copied to clipboard.',
+        });
+        break;
+      }
       default:
         break;
     }
@@ -221,6 +256,15 @@ class MockBridge implements Bridge {
     }
     this.emit({ type: 'turn-end', conversationId: convId, messageId: msgId, usage: { inputTokens: 0, outputTokens: 0, turns: 1 }, provider: 'demo', model: 'demo', demo: true });
   }
+}
+
+/** Minimal Markdown for the browser mock (the real app renders it in Node). */
+function mockMarkdown(conv: any): string {
+  const lines = [`# ${conv?.title ?? 'Conversation'}`, ''];
+  for (const m of conv?.messages ?? []) {
+    lines.push(`## ${m.role === 'user' ? 'You' : 'toris'}`, '', (m.content ?? '').trim() || '_(empty)_', '');
+  }
+  return lines.join('\n');
 }
 
 let singleton: Bridge | null = null;

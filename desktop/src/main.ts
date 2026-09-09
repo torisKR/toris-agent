@@ -2,7 +2,7 @@ import './styles.css';
 import { getBridge, type BridgeEvent } from './bridge';
 import { icon } from './icons';
 import { renderMarkdown } from './markdown';
-import { FALLBACK_PRESETS, type UiPreset } from './presets-ui';
+import { FALLBACK_PRESETS, type UiPreset, type QuickAction } from './presets-ui';
 import {
   loadConversations,
   saveConversations,
@@ -12,10 +12,14 @@ import {
   uid,
   hasStored,
   SETTINGS_KEY,
+  loadTemplates,
+  addTemplate,
+  removeTemplate,
   type Conversation,
   type Message,
   type Settings,
   type ToolActivity,
+  type Template,
 } from './store';
 
 interface ProfileInfo {
@@ -42,6 +46,11 @@ const state = {
   keys: { api: {} as Record<string, boolean>, cli: {} as Record<string, boolean> },
   conversations: loadConversations(),
   settings: loadSettings() as Settings,
+  templates: loadTemplates(),
+  workspace: '' as string,
+  search: '' as string,
+  renamingId: null as string | null,
+  keyStatus: {} as Record<string, { ok: boolean; message: string; pending?: boolean }>,
   activeId: null as string | null,
   ready: false,
   isReal: bridge.isReal,
@@ -53,6 +62,7 @@ const state = {
     toolsEl: HTMLElement;
     msg: Message;
   },
+  lastSend: null as null | { text: string; conversationId: string },
 };
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T | null =>
@@ -80,6 +90,10 @@ function mount() {
           <div class="brand-text"><strong>toris</strong><span>solo copilot</span></div>
         </div>
         <button class="new-chat" id="newChat">${icon('plus')}<span>New chat</span></button>
+        <div class="conv-search">
+          ${icon('search')}
+          <input id="convSearch" type="text" placeholder="Search chats…" autocomplete="off" />
+        </div>
         <div class="conv-list" id="convList"></div>
         <div class="sidebar-foot">
           <button class="ghost-btn" id="openSettings">${icon('settings')}<span>Settings</span></button>
@@ -105,6 +119,8 @@ function mount() {
           </div>
           <div class="topbar-right">
             <span class="badge" id="demoBadge" hidden>Demo</span>
+            <button class="icon-btn" id="renameConv" title="Rename chat">${icon('pencil')}</button>
+            <button class="icon-btn" id="exportConv" title="Export to Markdown">${icon('download')}</button>
           </div>
         </header>
         <div class="chat-scroll" id="chatScroll">
@@ -116,7 +132,10 @@ function mount() {
             <button class="send-btn" id="sendBtn" title="Send">${icon('send')}</button>
             <button class="send-btn stop-btn" id="stopBtn" title="Stop" hidden>${icon('stop')}</button>
           </div>
-          <div class="composer-hint">Enter to send · Shift+Enter for a new line</div>
+          <div class="composer-hint">
+            <span>Enter to send · Shift+Enter for a new line</span>
+            <button class="link-btn" id="saveTemplate" title="Save the current prompt as a reusable template">${icon('bookmark')} Save as template</button>
+          </div>
         </div>
       </main>
     </div>
@@ -127,6 +146,14 @@ function mount() {
   $('#newChat')!.addEventListener('click', () => startNewChat());
   $('#openSettings')!.addEventListener('click', openSettings);
   $('#toggleSidebar')!.addEventListener('click', () => $('#sidebar')!.classList.toggle('open'));
+  $('#renameConv')!.addEventListener('click', () => beginRename(state.activeId));
+  $('#exportConv')!.addEventListener('click', exportActiveConversation);
+
+  const searchInput = $<HTMLInputElement>('#convSearch')!;
+  searchInput.addEventListener('input', () => {
+    state.search = searchInput.value;
+    renderSidebar();
+  });
 
   const input = $<HTMLTextAreaElement>('#input')!;
   input.addEventListener('input', autoGrow);
@@ -138,6 +165,7 @@ function mount() {
   });
   $('#sendBtn')!.addEventListener('click', onSend);
   $('#stopBtn')!.addEventListener('click', onStop);
+  $('#saveTemplate')!.addEventListener('click', saveCurrentAsTemplate);
 
   const presetSel = $<HTMLSelectElement>('#presetSel')!;
   presetSel.addEventListener('change', () => {
@@ -182,34 +210,106 @@ function autoGrow() {
 
 // --- rendering --------------------------------------------------------------
 
+function matchesSearch(c: Conversation, q: string): boolean {
+  if (!q) return true;
+  const needle = q.toLowerCase();
+  if (c.title.toLowerCase().includes(needle)) return true;
+  return c.messages.some((m) => (m.content ?? '').toLowerCase().includes(needle));
+}
+
 function renderSidebar() {
   const list = $('#convList')!;
   if (!state.conversations.length) {
     list.innerHTML = `<div class="empty-hint">No conversations yet.</div>`;
     return;
   }
-  const sorted = [...state.conversations].sort((a, b) => b.updatedAt - a.updatedAt);
+  const q = state.search.trim();
+  const sorted = [...state.conversations]
+    .filter((c) => matchesSearch(c, q))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  if (!sorted.length) {
+    list.innerHTML = `<div class="empty-hint">No chats match “${escapeText(q)}”.</div>`;
+    return;
+  }
   list.innerHTML = sorted
-    .map(
-      (c) => `
+    .map((c) => {
+      if (c.id === state.renamingId) {
+        return `
+      <div class="conv-item renaming" data-id="${c.id}">
+        <input class="conv-rename" data-rename="${c.id}" value="${escapeAttr(c.title)}" />
+      </div>`;
+      }
+      return `
       <div class="conv-item ${c.id === state.activeId ? 'active' : ''}" data-id="${c.id}">
         <span class="conv-title">${escapeText(c.title)}</span>
-        <button class="conv-del" data-del="${c.id}" title="Delete">${icon('trash')}</button>
-      </div>`,
-    )
+        <span class="conv-actions">
+          <button class="conv-icon" data-rename-btn="${c.id}" title="Rename">${icon('pencil')}</button>
+          <button class="conv-icon danger" data-del="${c.id}" title="Delete">${icon('trash')}</button>
+        </span>
+      </div>`;
+    })
     .join('');
   list.querySelectorAll<HTMLElement>('.conv-item').forEach((el) => {
     el.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('.conv-del')) return;
+      const t = e.target as HTMLElement;
+      if (t.closest('.conv-actions') || t.closest('.conv-rename')) return;
       selectConversation(el.dataset.id!);
     });
   });
-  list.querySelectorAll<HTMLElement>('.conv-del').forEach((el) => {
+  list.querySelectorAll<HTMLElement>('[data-del]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       deleteConversation(el.dataset.del!);
     });
   });
+  list.querySelectorAll<HTMLElement>('[data-rename-btn]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      beginRename(el.dataset.renameBtn!);
+    });
+  });
+  const renameInput = list.querySelector<HTMLInputElement>('.conv-rename');
+  if (renameInput) {
+    renameInput.focus();
+    renameInput.select();
+    const commit = () => commitRename(renameInput.dataset.rename!, renameInput.value);
+    renameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        state.renamingId = null;
+        renderSidebar();
+      }
+    });
+    renameInput.addEventListener('blur', commit);
+  }
+}
+
+function beginRename(id: string | null) {
+  if (!id) return;
+  state.renamingId = id;
+  renderSidebar();
+}
+
+function commitRename(id: string, value: string) {
+  const c = state.conversations.find((x) => x.id === id);
+  const name = value.trim();
+  if (c && name) {
+    c.title = name.length > 60 ? name.slice(0, 60) : name;
+    persist();
+  }
+  state.renamingId = null;
+  renderSidebar();
+}
+
+async function exportActiveConversation() {
+  const c = activeConversation();
+  if (!c || !c.messages.length) {
+    showNotice('Nothing to export yet — send a message first.');
+    return;
+  }
+  bridge.send({ type: 'export-conversation', conversationId: c.id, conversation: c });
 }
 
 function renderTopbar() {
@@ -256,11 +356,90 @@ function renderMessages() {
     const raw = decodeURIComponent(el.dataset.raw || '');
     el.innerHTML = renderMarkdown(raw);
   });
+  wireMessageActions(wrap);
   scrollToBottom();
+}
+
+function wireMessageActions(root: ParentNode) {
+  root.querySelectorAll<HTMLElement>('[data-copy]').forEach((el) => {
+    el.addEventListener('click', () => copyToClipboard(decodeURIComponent(el.dataset.copy || ''), el));
+  });
+  root.querySelectorAll<HTMLElement>('[data-retry]').forEach((el) => {
+    el.addEventListener('click', () => retryMessage(el.dataset.retry!));
+  });
+}
+
+async function copyToClipboard(text: string, btn?: HTMLElement) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Fallback for webviews that block the async clipboard API.
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+    } catch {
+      /* give up silently */
+    }
+    ta.remove();
+  }
+  if (btn) {
+    btn.classList.add('copied');
+    setTimeout(() => btn.classList.remove('copied'), 1200);
+  }
+}
+
+function retryMessage(messageId: string) {
+  const c = activeConversation();
+  if (!c || state.streaming) return;
+  const idx = c.messages.findIndex((m) => m.id === messageId);
+  if (idx < 0) return;
+  const failed = c.messages[idx];
+  const text = failed.retryText;
+  if (!text) return;
+  // Drop the failed assistant message and re-run the same user turn.
+  c.messages.splice(idx, 1);
+  persist();
+  renderMessages();
+  runTurn(c, text);
 }
 
 function renderEmptyState(presetId: string): string {
   const p = preset(presetId);
+  const quickActions = p.quickActions ?? [];
+  const saved: Template[] = state.templates[presetId] ?? [];
+  const quickHtml = quickActions.length
+    ? `
+      <div class="quick-block">
+        <div class="starters-label">Quick actions</div>
+        <div class="quick-row">
+          ${quickActions
+            .map(
+              (qa, i) =>
+                `<button class="quick-chip" data-quick="${i}" title="${escapeAttr(qa.prompt)}">${icon('bolt')}${escapeText(qa.label)}</button>`,
+            )
+            .join('')}
+        </div>
+      </div>`
+    : '';
+  const savedHtml = saved.length
+    ? `
+      <div class="quick-block">
+        <div class="starters-label">Your saved templates</div>
+        <div class="quick-row">
+          ${saved
+            .map(
+              (t) =>
+                `<span class="quick-chip saved" data-tpl="${t.id}" title="${escapeAttr(t.prompt)}">${icon('bookmark')}${escapeText(t.label)}<button class="chip-del" data-tpl-del="${t.id}" title="Remove">${icon('x')}</button></span>`,
+            )
+            .join('')}
+        </div>
+      </div>`
+    : '';
   return `
     <div class="empty-state">
       <div class="welcome">
@@ -280,6 +459,8 @@ function renderEmptyState(presetId: string): string {
           )
           .join('')}
       </div>
+      ${quickHtml}
+      ${savedHtml}
       <div class="starters">
         <div class="starters-label">Try in <strong>${escapeText(p.label)}</strong> mode:</div>
         ${p.starters
@@ -305,13 +486,60 @@ function wireEmptyState() {
     });
   });
   document.querySelectorAll<HTMLElement>('.starter').forEach((el) => {
+    el.addEventListener('click', () => fillComposer(el.dataset.starter!));
+  });
+  const presetId = activeConversation()?.presetId ?? state.settings.presetId;
+  const quickActions: QuickAction[] = preset(presetId).quickActions ?? [];
+  document.querySelectorAll<HTMLElement>('[data-quick]').forEach((el) => {
     el.addEventListener('click', () => {
-      const input = $<HTMLTextAreaElement>('#input')!;
-      input.value = el.dataset.starter!;
-      autoGrow();
-      input.focus();
+      const qa = quickActions[Number(el.dataset.quick)];
+      if (qa) useQuickPrompt(qa.prompt);
     });
   });
+  const saved: Template[] = state.templates[presetId] ?? [];
+  document.querySelectorAll<HTMLElement>('[data-tpl]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-tpl-del]')) return;
+      const t = saved.find((x) => x.id === el.dataset.tpl);
+      if (t) useQuickPrompt(t.prompt);
+    });
+  });
+  document.querySelectorAll<HTMLElement>('[data-tpl-del]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.templates = removeTemplate(presetId, el.dataset.tplDel!);
+      renderMessages();
+    });
+  });
+}
+
+/** Put text in the composer and focus it (for editing before sending). */
+function fillComposer(text: string) {
+  const input = $<HTMLTextAreaElement>('#input')!;
+  input.value = text;
+  autoGrow();
+  input.focus();
+}
+
+/**
+ * Run a quick action: templates with a [PLACEHOLDER] load into the composer so
+ * the operator can fill them; self-contained ones send with a single click.
+ */
+function useQuickPrompt(prompt: string) {
+  if (/\[[^\]]+\]/.test(prompt)) {
+    fillComposer(prompt);
+    // Select the first placeholder so it's easy to replace.
+    const input = $<HTMLTextAreaElement>('#input')!;
+    const m = /\[[^\]]+\]/.exec(prompt);
+    if (m) input.setSelectionRange(m.index, m.index + m[0].length);
+  } else {
+    fillComposer(prompt);
+    onSend();
+  }
+}
+
+function copyBtn(m: Message): string {
+  return `<button class="msg-copy" data-copy="${encodeURIComponent(m.content)}" title="Copy">${icon('copy')}</button>`;
 }
 
 function renderMessageHtml(m: Message): string {
@@ -319,16 +547,21 @@ function renderMessageHtml(m: Message): string {
     return `
       <div class="msg msg-user" data-id="${m.id}">
         <div class="bubble"><div class="content">${escapeText(m.content).replace(/\n/g, '<br>')}</div></div>
+        <div class="msg-tools-col">${copyBtn(m)}</div>
         <div class="avatar you">You</div>
       </div>`;
   }
   const toolsHtml = (m.tools ?? []).map(renderToolHtml).join('');
+  const retry = m.error
+    ? `<button class="msg-retry" data-retry="${m.id}">${icon('refresh')} Retry</button>`
+    : '';
   return `
-    <div class="msg msg-assistant" data-id="${m.id}">
+    <div class="msg msg-assistant ${m.error ? 'msg-error' : ''}" data-id="${m.id}">
       <div class="avatar bot">${icon('bolt')}</div>
       <div class="bubble">
         <div class="tools">${toolsHtml}</div>
         <div class="content" data-raw="${encodeURIComponent(m.content)}"></div>
+        <div class="msg-foot">${m.content ? copyBtn(m) : ''}${retry}</div>
       </div>
     </div>`;
 }
@@ -411,8 +644,16 @@ function onSend() {
   c.messages.push(userMsg);
   if (c.title === 'New chat') c.title = deriveTitle(text);
   c.updatedAt = Date.now();
+  persist();
 
-  const prof = state.profiles.find((p) => p.id === c!.profileId);
+  input.value = '';
+  autoGrow();
+  runTurn(c, text);
+}
+
+/** Append a streaming assistant message for `text` and drive the turn. */
+function runTurn(c: Conversation, text: string) {
+  const prof = state.profiles.find((p) => p.id === c.profileId);
   const assistant: Message = {
     id: uid('a'),
     role: 'assistant',
@@ -421,12 +662,12 @@ function onSend() {
     demo: !prof || prof.demo || !prof.usable,
     provider: prof?.provider,
     model: prof?.model,
+    retryText: text,
   };
   c.messages.push(assistant);
+  c.updatedAt = Date.now();
   persist();
 
-  input.value = '';
-  autoGrow();
   renderSidebar();
   renderMessages();
 
@@ -440,6 +681,7 @@ function onSend() {
     toolsEl: node.querySelector('.tools') as HTMLElement,
     msg: assistant,
   };
+  state.lastSend = { text, conversationId: c.id };
   setStreamingUi(true);
 
   bridge.send({
@@ -456,6 +698,20 @@ function onSend() {
 function onStop() {
   if (!state.streaming) return;
   bridge.send({ type: 'abort', conversationId: state.streaming.conversationId });
+}
+
+function saveCurrentAsTemplate() {
+  const input = $<HTMLTextAreaElement>('#input')!;
+  const text = input.value.trim();
+  if (!text) {
+    showNotice('Type a prompt first, then save it as a template.');
+    return;
+  }
+  const presetId = activeConversation()?.presetId ?? state.settings.presetId;
+  const label = deriveTitle(text);
+  state.templates = addTemplate(presetId, label, text);
+  showNotice(`Saved a template for “${preset(presetId).label}”. Find it on the welcome screen.`);
+  if (!activeConversation()?.messages.length) renderMessages();
 }
 
 function setStreamingUi(on: boolean) {
@@ -500,13 +756,25 @@ function handleEvent(evt: BridgeEvent) {
       finalizeTurn(evt);
       break;
     case 'aborted':
-      finalizeTurn(evt, 'interrupted');
+      finalizeTurn(evt, { override: '_interrupted._' });
       break;
     case 'error':
-      finalizeTurn(evt, `⚠️ ${evt.message}`);
+      finalizeTurn(evt, { override: `⚠️ ${evt.message}`, isError: true });
       break;
     case 'notice':
       showNotice(evt.message);
+      break;
+    case 'key-validation':
+      onKeyValidation(evt);
+      break;
+    case 'workspace':
+      onWorkspace(evt);
+      break;
+    case 'export-result':
+      onExportResult(evt);
+      break;
+    case 'bridge-closed':
+      showNotice('The local engine stopped. Restart the app to reconnect.');
       break;
     default:
       break;
@@ -517,12 +785,17 @@ function applyProviders(evt: BridgeEvent) {
   if (Array.isArray(evt.presets)) state.presets = evt.presets;
   if (Array.isArray(evt.profiles)) state.profiles = evt.profiles;
   if (evt.keys) state.keys = evt.keys;
+  if (typeof evt.cwd === 'string') state.workspace = evt.cwd;
   if (evt.defaultAutonomy && !hasStored(SETTINGS_KEY)) {
     state.settings.autonomy = evt.defaultAutonomy;
   }
   // Drop a stored profile selection that no longer exists.
   if (!state.profiles.some((p) => p.id === state.settings.profileId)) {
     state.settings.profileId = 'demo';
+  }
+  // Re-apply a previously chosen workspace once, on the first ready event.
+  if (evt.type === 'ready' && state.settings.workspace && state.settings.workspace !== evt.cwd) {
+    bridge.send({ type: 'set-cwd', path: state.settings.workspace });
   }
 }
 
@@ -593,18 +866,19 @@ function decideApproval(callId: string, allow: boolean) {
   bridge.send({ type: 'approval', callId, allow });
 }
 
-function finalizeTurn(evt: BridgeEvent, override?: string) {
+function finalizeTurn(evt: BridgeEvent, opts: { override?: string; isError?: boolean } = {}) {
   const s = state.streaming;
   if (!s || s.messageId !== evt.messageId) {
     // A late event for an inactive stream; ignore.
     return;
   }
-  if (override) {
-    s.raw = s.raw ? `${s.raw}\n\n${override}` : override;
+  if (opts.override) {
+    s.raw = s.raw ? `${s.raw}\n\n${opts.override}` : opts.override;
   } else if (typeof evt.text === 'string' && evt.text.length >= s.raw.length) {
     s.raw = evt.text;
   }
   s.msg.content = s.raw;
+  s.msg.error = Boolean(opts.isError);
   s.contentEl.innerHTML = renderMarkdown(s.raw);
   const conv = state.conversations.find((c) => c.id === s.conversationId);
   if (conv) conv.updatedAt = Date.now();
@@ -612,7 +886,37 @@ function finalizeTurn(evt: BridgeEvent, override?: string) {
   state.streaming = null;
   setStreamingUi(false);
   renderSidebar();
+  // Redraw so per-message copy / retry controls attach to the finished turn.
+  renderMessages();
   $<HTMLTextAreaElement>('#input')!.focus();
+}
+
+function onKeyValidation(evt: BridgeEvent) {
+  state.keyStatus[evt.provider] = { ok: evt.ok, message: evt.message };
+  renderSettingsBody();
+  renderOnboardingProviderStatus();
+}
+
+function onWorkspace(evt: BridgeEvent) {
+  state.workspace = evt.cwd ?? state.workspace;
+  if (evt.ok && evt.cwd) {
+    state.settings.workspace = evt.cwd;
+    saveSettings(state.settings);
+  }
+  renderTopbar();
+  renderSettingsBody();
+  showNotice(evt.message);
+}
+
+function onExportResult(evt: BridgeEvent) {
+  if (evt.markdown) void copyToClipboard(evt.markdown);
+  if (evt.ok && evt.path) {
+    showNotice(`Exported to ${evt.path} (also copied to clipboard).`);
+  } else if (evt.markdown) {
+    showNotice(evt.message || 'Exported: copied to clipboard.');
+  } else {
+    showNotice(evt.message || 'Export failed.');
+  }
 }
 
 function showNotice(message: string) {
@@ -655,15 +959,33 @@ function renderSettingsBody() {
             Default to <strong>Demo</strong> when no key is set, so the app always works.
           </p>
           <div class="key-rows">
-            ${API_PROVIDERS.map(
-              (p) => `
-              <div class="key-row">
-                <label>${p} <span class="dot ${state.keys.api?.[p] ? 'on' : 'off'}"></span></label>
-                <input type="password" placeholder="${state.keys.api?.[p] ? 'key set — enter to replace' : `${p.toUpperCase()}_API_KEY`}" data-key="${p}" />
-                <button class="mini" data-savekey="${p}">Save</button>
-              </div>`,
-            ).join('')}
+            ${API_PROVIDERS.map((p) => {
+              const st = state.keyStatus[p];
+              const statusHtml = st
+                ? `<div class="key-status ${st.pending ? 'pending' : st.ok ? 'ok' : 'bad'}">${st.pending ? 'Validating…' : escapeText(st.message)}</div>`
+                : '';
+              return `
+              <div class="key-block">
+                <div class="key-row">
+                  <label>${p} <span class="dot ${state.keys.api?.[p] ? 'on' : 'off'}"></span></label>
+                  <input type="password" placeholder="${state.keys.api?.[p] ? 'key set — enter to replace' : `${p.toUpperCase()}_API_KEY`}" data-key="${p}" />
+                  <button class="mini ghost" data-validatekey="${p}">Validate</button>
+                  <button class="mini" data-savekey="${p}">Save</button>
+                </div>
+                ${statusHtml}
+              </div>`;
+            }).join('')}
           </div>
+        </section>
+        <section>
+          <h3>Project workspace</h3>
+          <p class="muted">Choose a folder the file tools (list/read/write, run command) operate in. Leave blank to use the app's default directory.</p>
+          <div class="workspace-row">
+            <input type="text" id="workspacePath" placeholder="/path/to/your/project" value="${escapeAttr(state.settings.workspace ?? '')}" />
+            <button class="mini" id="setWorkspaceBtn">Set</button>
+            <button class="mini ghost" id="clearWorkspaceBtn">Reset</button>
+          </div>
+          <div class="workspace-current">${icon('folder')}<span>${escapeText(state.workspace || 'default')}</span></div>
         </section>
         <section>
           <h3>Add a model profile</h3>
@@ -700,8 +1022,29 @@ function renderSettingsBody() {
       const p = el.dataset.savekey!;
       const inp = modal.querySelector<HTMLInputElement>(`[data-key="${p}"]`)!;
       bridge.send({ type: 'set-key', provider: p, key: inp.value });
+      state.keyStatus[p] = { ok: true, message: 'Key saved (held in memory only).' };
       inp.value = '';
+      renderSettingsBody();
     });
+  });
+  modal.querySelectorAll<HTMLElement>('[data-validatekey]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const p = el.dataset.validatekey!;
+      const inp = modal.querySelector<HTMLInputElement>(`[data-key="${p}"]`)!;
+      state.keyStatus[p] = { ok: false, pending: true, message: 'Validating…' };
+      renderSettingsBody();
+      bridge.send({ type: 'validate-key', provider: p, key: inp.value, requestId: uid('vk') });
+    });
+  });
+  $('#setWorkspaceBtn')!.addEventListener('click', () => {
+    const path = $<HTMLInputElement>('#workspacePath')!.value.trim();
+    bridge.send({ type: 'set-cwd', path });
+  });
+  $('#clearWorkspaceBtn')!.addEventListener('click', () => {
+    $<HTMLInputElement>('#workspacePath')!.value = '';
+    state.settings.workspace = undefined;
+    saveSettings(state.settings);
+    bridge.send({ type: 'set-cwd', path: '' });
   });
   $('#addProfileBtn')!.addEventListener('click', () => {
     const id = $<HTMLInputElement>('#npId')!.value.trim();
@@ -721,10 +1064,40 @@ function renderSettingsBody() {
 
 // --- onboarding -------------------------------------------------------------
 
+const onboard = { step: 1, chosen: '' as string, provider: 'anthropic' as string };
+
 function renderOnboarding() {
+  onboard.step = 1;
+  onboard.chosen = state.settings.presetId;
+  onboard.provider = API_PROVIDERS[0];
+  drawOnboarding();
+}
+
+function finishOnboarding() {
+  const modal = $('#onboarding')!;
+  // Hide first so a storage hiccup can never leave the user stuck on onboarding.
+  modal.hidden = true;
+  state.settings.presetId = onboard.chosen;
+  state.settings.onboarded = true;
+  saveSettings(state.settings);
+  const c = activeConversation();
+  if (c) c.presetId = onboard.chosen;
+  persist();
+  renderTopbar();
+  renderMessages();
+  $<HTMLTextAreaElement>('#input')!.focus();
+}
+
+function drawOnboarding() {
   const modal = $('#onboarding')!;
   modal.hidden = false;
-  modal.innerHTML = `
+  modal.innerHTML = onboard.step === 1 ? onboardStep1() : onboardStep2();
+  if (onboard.step === 1) wireOnboardStep1();
+  else wireOnboardStep2();
+}
+
+function onboardStep1(): string {
+  return `
     <div class="modal onboard">
       <div class="onboard-hero">
         <div class="brand-mark big">${icon('bolt')}</div>
@@ -732,12 +1105,12 @@ function renderOnboarding() {
         <p>Your AI copilot for running a one-person business (1인 사업가). It streams like ChatGPT, keeps everything local, and can actually use tools on your project.</p>
       </div>
       <div class="onboard-modes">
-        <div class="onboard-modes-label">Choose a starting mode</div>
+        <div class="onboard-modes-label">Step 1 of 2 · Choose a starting mode</div>
         <div class="preset-grid">
           ${state.presets
             .map(
               (p) => `
-            <button class="preset-card" data-onboard-preset="${p.id}">
+            <button class="preset-card ${p.id === onboard.chosen ? 'selected' : ''}" data-onboard-preset="${p.id}">
               <span class="preset-ico">${icon(p.icon)}</span>
               <span class="preset-name">${escapeText(p.label)}</span>
               <span class="preset-tag">${escapeText(p.tagline)}</span>
@@ -748,31 +1121,88 @@ function renderOnboarding() {
       </div>
       <div class="onboard-foot">
         <span class="badge">Demo mode is on — no API key needed</span>
-        <button class="primary" id="onboardStart">Start chatting</button>
+        <button class="primary" id="onboardNext">Continue ${icon('arrowRight')}</button>
       </div>
     </div>`;
+}
 
-  let chosen = state.settings.presetId;
+function onboardStep2(): string {
+  const st = state.keyStatus[onboard.provider];
+  const statusHtml = st
+    ? `<div class="key-status ${st.pending ? 'pending' : st.ok ? 'ok' : 'bad'}" id="onboardKeyStatus">${st.pending ? 'Validating…' : escapeText(st.message)}</div>`
+    : `<div class="key-status" id="onboardKeyStatus"></div>`;
+  return `
+    <div class="modal onboard">
+      <div class="onboard-hero">
+        <div class="brand-mark big">${icon('bolt')}</div>
+        <h1>Connect a provider</h1>
+        <p>toris works right now in <strong>Demo mode</strong> with no key. To get real AI answers, add an API key — it's held in memory by the local engine only and never written to disk.</p>
+      </div>
+      <div class="onboard-provider">
+        <div class="onboard-modes-label">Step 2 of 2 · Provider (optional)</div>
+        <div class="provider-setup">
+          <select id="onboardProvider">
+            ${API_PROVIDERS.map((p) => `<option value="${p}" ${p === onboard.provider ? 'selected' : ''}>${p}</option>`).join('')}
+          </select>
+          <input type="password" id="onboardKey" placeholder="Paste API key (optional)" />
+          <button class="mini ghost" id="onboardValidate">Validate</button>
+        </div>
+        ${statusHtml}
+        <p class="muted">You can always add or change this later in Settings, and switch between Demo and real models from the Model selector.</p>
+      </div>
+      <div class="onboard-foot">
+        <button class="link-btn" id="onboardBack">${icon('arrowRight')} Back</button>
+        <div class="onboard-foot-right">
+          <button class="link-btn" id="onboardSkip">Skip — use Demo</button>
+          <button class="primary" id="onboardStart">Start chatting</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function wireOnboardStep1() {
+  const modal = $('#onboarding')!;
   modal.querySelectorAll<HTMLElement>('[data-onboard-preset]').forEach((el) => {
     el.addEventListener('click', () => {
-      chosen = el.dataset.onboardPreset!;
+      onboard.chosen = el.dataset.onboardPreset!;
       modal.querySelectorAll('.preset-card').forEach((c) => c.classList.remove('selected'));
       el.classList.add('selected');
     });
   });
-  $('#onboardStart')!.addEventListener('click', () => {
-    // Hide first so a storage hiccup can never leave the user stuck on onboarding.
-    modal.hidden = true;
-    state.settings.presetId = chosen;
-    state.settings.onboarded = true;
-    saveSettings(state.settings);
-    const c = activeConversation();
-    if (c) c.presetId = chosen;
-    persist();
-    renderTopbar();
-    renderMessages();
-    $<HTMLTextAreaElement>('#input')!.focus();
+  $('#onboardNext')!.addEventListener('click', () => {
+    onboard.step = 2;
+    drawOnboarding();
   });
+}
+
+function wireOnboardStep2() {
+  $('#onboardBack')!.addEventListener('click', () => {
+    onboard.step = 1;
+    drawOnboarding();
+  });
+  $('#onboardSkip')!.addEventListener('click', finishOnboarding);
+  $('#onboardStart')!.addEventListener('click', () => {
+    // If a key was typed, save it before entering; validation is optional.
+    const key = $<HTMLInputElement>('#onboardKey')!.value.trim();
+    if (key) bridge.send({ type: 'set-key', provider: onboard.provider, key });
+    finishOnboarding();
+  });
+  $<HTMLSelectElement>('#onboardProvider')!.addEventListener('change', (e) => {
+    onboard.provider = (e.target as HTMLSelectElement).value;
+    drawOnboarding();
+  });
+  $('#onboardValidate')!.addEventListener('click', () => {
+    const key = $<HTMLInputElement>('#onboardKey')!.value.trim();
+    state.keyStatus[onboard.provider] = { ok: false, pending: true, message: 'Validating…' };
+    drawOnboarding();
+    bridge.send({ type: 'validate-key', provider: onboard.provider, key, requestId: uid('vk') });
+  });
+}
+
+/** Refresh the onboarding step-2 status when a validation result arrives. */
+function renderOnboardingProviderStatus() {
+  const modal = $('#onboarding')!;
+  if (!modal.hidden && onboard.step === 2) drawOnboarding();
 }
 
 // --- helpers ----------------------------------------------------------------
