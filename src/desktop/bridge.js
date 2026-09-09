@@ -15,13 +15,22 @@
  *   { "type":"approval", "callId":string, "allow":boolean }
  *   { "type":"abort", "conversationId":string }
  *   { "type":"reset", "conversationId":string }
+ *   { "type":"set-key", "provider":string, "key":string }
+ *   { "type":"add-profile", "id":string, "provider":string, "model":string }
+ *   { "type":"validate-key", "provider":string, "key"?:string, "requestId"?:string }
+ *   { "type":"set-cwd", "path":string }
+ *   { "type":"export-conversation", "conversationId":string, "conversation":object }
  *
  * stdout (one JSON event per line):
- *   { "type":"ready", "presets":[...], "profiles":[...], "keys":{...}, "defaultAutonomy":"L3" }
+ *   { "type":"ready", "presets":[...], "profiles":[...], "keys":{...}, "defaultAutonomy":"L3", "cwd":string }
+ *   { "type":"providers", "profiles":[...], "keys":{...}, "cwd":string }
  *   { "type":"text", "conversationId", "messageId", "delta":string }
  *   { "type":"tool-approval-request", "conversationId", "messageId", "callId", "name", "input" }
  *   { "type":"tool-start" | "tool-end" | "tool-error" | "tool-denied", ... }
  *   { "type":"turn-end", "conversationId", "messageId", "text", "usage", "provider", "model" }
+ *   { "type":"key-validation", "provider", "requestId", "ok":boolean, "status", "message" }
+ *   { "type":"workspace", "ok":boolean, "cwd":string, "message":string }
+ *   { "type":"export-result", "conversationId", "ok":boolean, "path"?, "markdown"?, "message" }
  *   { "type":"error", "conversationId", "messageId", "message", "code" }
  */
 
@@ -38,8 +47,21 @@ import { detectBinary } from '../core/providers.js';
 import { autoApprovesTools, resolveAutonomy } from '../core/autonomy.js';
 import { getPreset, listPresetsForUi, DEFAULT_PRESET_ID } from './presets.js';
 import { createDemoProvider } from './demo-provider.js';
+import { validateApiKey } from './validate-key.js';
+import { conversationToMarkdown, exportFilename } from './export.js';
+import { statSync, mkdirSync, writeFileSync } from 'node:fs';
+import { resolve as resolvePath, join as joinPath } from 'node:path';
+import { homedir } from 'node:os';
 
 const DEMO_PROFILE_ID = 'demo';
+
+/**
+ * If a turn produces no engine events for this long we assume the provider hung
+ * (a wedged socket, a proxy black hole) and abort it with a clear error rather
+ * than leaving the UI spinning forever. A live tool loop resets the clock on
+ * every event, so only genuine silence trips it.
+ */
+const TURN_IDLE_TIMEOUT_MS = Number(process.env.TORIS_TURN_IDLE_TIMEOUT_MS ?? 90000);
 
 /** Write one NDJSON event to stdout. stdout is reserved for the protocol. */
 function emit(obj) {
@@ -74,11 +96,21 @@ let HOME = null;
  * defines (provider + a model id they type — so no model IDs are pinned in
  * product code, matching the toris config ethos).
  */
-const overrides = { keys: /** @type {Record<string,string>} */ ({}), profiles: {} };
+const overrides = {
+  keys: /** @type {Record<string,string>} */ ({}),
+  profiles: {},
+  /** @type {string|null} chosen project folder the file tools operate in */
+  cwd: null,
+};
 
 /** process.env plus any keys the user entered at runtime. */
 function effectiveEnv() {
   return { ...process.env, ...overrides.keys };
+}
+
+/** The directory the agent's file tools operate in (user choice wins). */
+function effectiveCwd() {
+  return overrides.cwd || process.env.TORIS_DESKTOP_CWD || process.cwd();
 }
 
 /** CONFIG with runtime profiles merged into models.profiles. */
@@ -187,7 +219,7 @@ function ensureSession(req) {
   const { provider, resolved, demo, note } = buildProvider(profileId, effectiveConfig());
   if (note) emit({ type: 'notice', conversationId, message: note });
 
-  const tools = preset.tools ? createDefaultTools({ cwd: process.env.TORIS_DESKTOP_CWD || process.cwd() }) : [];
+  const tools = preset.tools ? createDefaultTools({ cwd: effectiveCwd() }) : [];
   const autoApprove = autoApprovesTools(autonomy);
 
   const approve = ({ name, input }) => {
@@ -231,7 +263,29 @@ function ensureSession(req) {
 /** The active messageId per conversation, so engine events can be tagged. */
 const activeMessage = new Map();
 
+/** Per-conversation idle watchdogs; any engine event resets the timer. */
+const idleTimers = new Map();
+
+function pokeWatchdog(conversationId) {
+  const existing = idleTimers.get(conversationId);
+  if (existing) clearTimeout(existing.timer);
+  const record = conversations.get(conversationId);
+  if (!record?.generation) return;
+  const timer = setTimeout(() => {
+    // Silence for too long: abort the turn so handleSend surfaces an error.
+    record.generation?.abort(new DOMException('Provider timed out', 'TimeoutError'));
+  }, TURN_IDLE_TIMEOUT_MS);
+  idleTimers.set(conversationId, { timer });
+}
+
+function clearWatchdog(conversationId) {
+  const existing = idleTimers.get(conversationId);
+  if (existing) clearTimeout(existing.timer);
+  idleTimers.delete(conversationId);
+}
+
 function forwardEngineEvent(conversationId, evt) {
+  pokeWatchdog(conversationId);
   const messageId = activeMessage.get(conversationId) ?? null;
   if (evt.type === 'text') {
     emit({ type: 'text', conversationId, messageId, delta: evt.delta });
@@ -266,6 +320,7 @@ async function handleSend(req) {
   const generation = new AbortController();
   record.generation = generation;
   emit({ type: 'turn-start', conversationId, messageId, provider: record.resolved.provider, model: record.resolved.model, demo: record.demo });
+  pokeWatchdog(conversationId);
 
   try {
     const result = await record.session.send(text, { signal: generation.signal });
@@ -280,15 +335,29 @@ async function handleSend(req) {
       demo: record.demo,
     });
   } catch (err) {
-    const aborted = err?.name === 'AbortError' || err?.code === 'ABORT_ERR';
-    emit({
-      type: aborted ? 'aborted' : 'error',
-      conversationId,
-      messageId,
-      message: aborted ? 'interrupted' : err.message,
-      code: err.code ?? 'E_TURN',
-    });
+    // A watchdog abort carries a TimeoutError; a user Stop is a plain abort.
+    const reason = generation.signal.reason;
+    const timedOut = reason?.name === 'TimeoutError';
+    const aborted = !timedOut && (err?.name === 'AbortError' || err?.code === 'ABORT_ERR');
+    if (timedOut) {
+      emit({
+        type: 'error',
+        conversationId,
+        messageId,
+        message: `No response from ${record.resolved.provider} after ${Math.round(TURN_IDLE_TIMEOUT_MS / 1000)}s — the request timed out. Check your key/network, or use Demo mode.`,
+        code: 'E_TURN_TIMEOUT',
+      });
+    } else {
+      emit({
+        type: aborted ? 'aborted' : 'error',
+        conversationId,
+        messageId,
+        message: aborted ? 'interrupted' : err.message,
+        code: err.code ?? 'E_TURN',
+      });
+    }
   } finally {
+    clearWatchdog(conversationId);
     record.generation = null;
     activeMessage.delete(conversationId);
   }
@@ -321,6 +390,7 @@ function emitProviders() {
     profiles: profilesForUi(effectiveConfig()),
     keys: providerAvailability(effectiveConfig()),
     defaultAutonomy: CONFIG.defaultAutonomy ?? 'L3',
+    cwd: effectiveCwd(),
   });
 }
 
@@ -351,6 +421,72 @@ function handleAddProfile(req) {
   emitProviders();
 }
 
+/**
+ * Validate a provider key without spending a full turn. Uses the runtime key if
+ * present, else the key supplied in the request (so the UI can validate before
+ * saving). Never blocks the protocol — replies with a `key-validation` event.
+ */
+async function handleValidateKey(req) {
+  const { provider } = req;
+  const requestId = req.requestId ?? null;
+  const varName = apiKeyEnvVar(provider);
+  const key = (typeof req.key === 'string' && req.key.trim())
+    || (varName ? overrides.keys[varName] : '')
+    || (varName ? process.env[varName] : '')
+    || '';
+  const result = await validateApiKey(provider, key);
+  emit({ type: 'key-validation', provider, requestId, ...result });
+}
+
+/** Point the file tools at a project folder the operator chooses. */
+function handleSetCwd(req) {
+  const raw = typeof req.path === 'string' ? req.path.trim() : '';
+  if (!raw) {
+    overrides.cwd = null;
+    conversations.clear();
+    emit({ type: 'workspace', ok: true, cwd: effectiveCwd(), message: 'Workspace reset to the app default.' });
+    emitProviders();
+    return;
+  }
+  const abs = resolvePath(raw.replace(/^~(?=\/|$)/, homedir()));
+  try {
+    const st = statSync(abs);
+    if (!st.isDirectory()) {
+      emit({ type: 'workspace', ok: false, cwd: effectiveCwd(), message: `Not a folder: ${abs}` });
+      return;
+    }
+  } catch {
+    emit({ type: 'workspace', ok: false, cwd: effectiveCwd(), message: `Folder not found: ${abs}` });
+    return;
+  }
+  overrides.cwd = abs;
+  conversations.clear();
+  emit({ type: 'workspace', ok: true, cwd: abs, message: `File tools now operate in ${abs}` });
+  emitProviders();
+}
+
+/** Render a conversation to Markdown, write it to disk, and return the path. */
+function handleExport(req) {
+  const conv = req.conversation;
+  const conversationId = req.conversationId ?? conv?.id ?? null;
+  if (!conv || !Array.isArray(conv.messages)) {
+    emit({ type: 'export-result', conversationId, ok: false, message: 'Nothing to export.' });
+    return;
+  }
+  const markdown = conversationToMarkdown(conv);
+  const dir = process.env.TORIS_EXPORT_DIR || joinPath(homedir(), 'toris-exports');
+  const file = joinPath(dir, exportFilename(conv));
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, markdown, 'utf8');
+    emit({ type: 'export-result', conversationId, ok: true, path: file, markdown, message: `Saved to ${file}` });
+  } catch (err) {
+    // Even if the disk write fails, hand back the Markdown so the UI can still
+    // offer copy-to-clipboard.
+    emit({ type: 'export-result', conversationId, ok: false, markdown, message: `Could not write file: ${err?.message ?? err}` });
+  }
+}
+
 async function dispatch(msg) {
   switch (msg.type) {
     case 'send':
@@ -370,6 +506,15 @@ async function dispatch(msg) {
       break;
     case 'add-profile':
       handleAddProfile(msg);
+      break;
+    case 'validate-key':
+      await handleValidateKey(msg);
+      break;
+    case 'set-cwd':
+      handleSetCwd(msg);
+      break;
+    case 'export-conversation':
+      handleExport(msg);
       break;
     case 'ping':
       emit({ type: 'pong' });
@@ -398,6 +543,7 @@ async function main() {
     keys: providerAvailability(CONFIG),
     defaultAutonomy: CONFIG.defaultAutonomy ?? 'L3',
     demoProfileId: DEMO_PROFILE_ID,
+    cwd: effectiveCwd(),
   });
 
   const rl = createInterface({ input: stdin });
