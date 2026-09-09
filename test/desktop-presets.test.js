@@ -20,6 +20,12 @@ test('every preset has the fields the bridge and UI need', () => {
     // The system prompt is a REAL instruction, not decorative copy.
     assert.ok(p.system.length > 120, `${p.id} system prompt looks too thin`);
     assert.match(p.system, /Mode:/, `${p.id} must declare its Mode:`);
+    // Quick actions are one-click prompt templates, each with a label + prompt.
+    assert.ok(Array.isArray(p.quickActions) && p.quickActions.length > 0, `${p.id} needs quick actions`);
+    for (const qa of p.quickActions) {
+      assert.equal(typeof qa.label, 'string', `${p.id} quick action needs a label`);
+      assert.ok(qa.prompt && qa.prompt.length > 10, `${p.id} quick action needs a real prompt`);
+    }
   }
 });
 
@@ -40,12 +46,13 @@ test('getPreset falls back to the default for an unknown id', () => {
   assert.equal(getPreset('email').id, 'email');
 });
 
-test('listPresetsForUi omits the internal system prompt', () => {
+test('listPresetsForUi omits the internal system prompt but keeps quick actions', () => {
   const ui = listPresetsForUi();
   assert.equal(ui.length, PRESETS.length);
   for (const p of ui) {
     assert.equal(p.system, undefined, 'system prompt must not leak to the UI payload');
     assert.equal(typeof p.label, 'string');
+    assert.ok(Array.isArray(p.quickActions) && p.quickActions.length > 0);
   }
 });
 

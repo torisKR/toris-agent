@@ -319,6 +319,9 @@ async function handleSend(req) {
   activeMessage.set(conversationId, messageId);
   const generation = new AbortController();
   record.generation = generation;
+  // Snapshot the transcript so a failed/aborted turn can be rolled back cleanly
+  // — otherwise the dangling user message would be duplicated on retry.
+  const snapshot = [...record.session.history];
   emit({ type: 'turn-start', conversationId, messageId, provider: record.resolved.provider, model: record.resolved.model, demo: record.demo });
   pokeWatchdog(conversationId);
 
@@ -335,6 +338,8 @@ async function handleSend(req) {
       demo: record.demo,
     });
   } catch (err) {
+    // Restore the pre-send transcript so retrying doesn't stack duplicate turns.
+    record.session.reset(snapshot);
     // A watchdog abort carries a TimeoutError; a user Stop is a plain abort.
     const reason = generation.signal.reason;
     const timedOut = reason?.name === 'TimeoutError';
