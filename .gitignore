@@ -11,3 +11,7 @@ coverage/
 build/
 npm/
 crates/*/target/
+
+# Tauri desktop app build artifacts (Rust target + generated schemas).
+src-tauri/target/
+src-tauri/gen/
