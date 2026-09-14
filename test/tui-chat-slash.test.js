@@ -40,6 +40,9 @@ test('aliases and casing map onto the canonical command', () => {
   assert.equal(parseSlashCommand('/q').name, 'exit');
   assert.equal(parseSlashCommand('/?').name, 'help');
   assert.equal(parseSlashCommand('/profile main').name, 'model');
+  assert.equal(parseSlashCommand('/agents').name, 'agent');
+  assert.equal(parseSlashCommand('/role planner').name, 'agent');
+  assert.equal(parseSlashCommand('/gui').name, 'studio');
   assert.equal(parseSlashCommand('/reset').name, 'clear');
   assert.equal(parseSlashCommand('/tokens').name, 'usage');
 });

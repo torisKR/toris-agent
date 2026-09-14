@@ -75,6 +75,29 @@ test('tab is inert for prose, arguments and unknown commands', () => {
   assert.deepEqual(completeSlash('/zzz')[0], []);
 });
 
+test('/agent arguments suggest matching agent ids', () => {
+  const specs = suggestSlashCommands('/agent impl');
+  assert.deepEqual(
+    specs.map((s) => s.name),
+    ['agent'],
+  );
+  assert.deepEqual(
+    specs.map((s) => s.args),
+    ['implementer'],
+  );
+});
+
+test('tab completes an agent id after /agent', () => {
+  const [candidates, matched] = completeSlash('/agent impl');
+  assert.deepEqual(candidates, ['/agent implementer']);
+  assert.equal(matched, '/agent impl');
+});
+
+test('a bare /agent still completes the command itself', () => {
+  const [candidates] = completeSlash('/ag');
+  assert.deepEqual(candidates, ['/agent ']);
+});
+
 // --- renderPaletteRows --------------------------------------------------------
 
 test('palette rows align labels and carry each summary', () => {

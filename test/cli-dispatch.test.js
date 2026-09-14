@@ -121,9 +121,11 @@ test('bare `toris` in a pipe prints help and fails, so scripts do not hang', asy
   assert.match(out, /USAGE/);
 });
 
-test('help documents that a bare toris opens the TUI', async () => {
+test('help documents TUI and GUI doors onto the agent', async () => {
   const { out } = await captureStdout(() => main(['--help'], { isInteractive: false }));
   assert.match(out, /toris\s+Open the interactive chat TUI/);
+  assert.match(out, /toris --agent/);
+  assert.match(out, /agent room at \/agent/);
 });
 
 // --- first-run onboarding ---------------------------------------------------

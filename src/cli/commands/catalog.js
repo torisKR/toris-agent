@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { listAgents, AGENT_CATEGORIES } from '../../core/agents.js';
+import { listSurfaceAgents, SURFACE_CATEGORIES } from '../../core/agents.js';
 import { AUTONOMY_LEVELS } from '../../core/autonomy.js';
 import { discoverSkills, skillSearchPaths, BUILTIN_SKILL_DIR } from '../../core/skills.js';
 import { UsageError, EXIT } from '../../core/errors.js';
@@ -7,10 +7,10 @@ import { printJson, line, table, c } from '../output.js';
 
 export async function cmdAgents(ctx, _positionals, flags) {
   const category = typeof flags.category === 'string' ? flags.category : undefined;
-  if (category && !AGENT_CATEGORIES.includes(category)) {
-    throw new UsageError(`Unknown category "${category}". One of: ${AGENT_CATEGORIES.join(', ')}`);
+  if (category && !SURFACE_CATEGORIES.includes(category)) {
+    throw new UsageError(`Unknown category "${category}". One of: ${SURFACE_CATEGORIES.join(', ')}`);
   }
-  const agents = listAgents(category);
+  const agents = listSurfaceAgents(category);
   if (ctx.json) {
     printJson({ agents });
     return EXIT.OK;

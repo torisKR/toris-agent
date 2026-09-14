@@ -17,6 +17,7 @@
 import { SLASH_COMMANDS, SLASH_ALIASES } from './slash.js';
 import { stripAnsi, stringWidth, truncate } from './text.js';
 import { c } from '../output.js';
+import { matchSurfaceAgents } from '../../core/agents.js';
 
 const ESC = '';
 const DEFAULT_MAX_ROWS = 8;
@@ -39,8 +40,14 @@ export function suggestSlashCommands(line) {
   const body = line.slice(1);
 
   if (/\s/.test(body)) {
-    const head = body.split(/\s+/, 1)[0].toLowerCase();
+    const parts = body.split(/\s+/);
+    const head = (parts[0] ?? '').toLowerCase();
     const name = SLASH_ALIASES[head] ?? head;
+    if (name === 'agent') {
+      return matchSurfaceAgents(parts[1] ?? '').map((agent) =>
+        Object.freeze({ name: 'agent', args: agent.id, summary: agent.summary }),
+      );
+    }
     const spec = SLASH_COMMANDS.find((cmd) => cmd.name === name);
     return spec && spec.args !== '' ? [spec] : [];
   }
@@ -69,11 +76,15 @@ export function suggestSlashCommands(line) {
  * @returns {[string[], string]}
  */
 export function completeSlash(line) {
-  if (typeof line !== 'string' || !line.startsWith('/') || /\s/.test(line.slice(1))) {
+  if (typeof line !== 'string' || !line.startsWith('/')) {
     return [[], String(line ?? '')];
   }
   const [top] = suggestSlashCommands(line);
   if (!top) return [[], line];
+  if (/\s/.test(line.slice(1))) {
+    if (top.name === 'agent' && top.args) return [[`/agent ${top.args}`], line];
+    return [[], line];
+  }
   return [[`/${top.name}${top.args === '' ? '' : ' '}`], line];
 }
 

@@ -1,7 +1,15 @@
 export { Orchestrator, buildTaskPrompt } from './core/orchestrator.js';
 export { Store } from './core/store.js';
 export { loadConfig, saveConfig, resolveHome, DEFAULT_CONFIG, mergeConfig, validateConfig } from './core/config.js';
-export { AGENT_PROFILES, listAgents, getAgent } from './core/agents.js';
+export {
+  AGENT_PROFILES,
+  SURFACE_AGENT,
+  listAgents,
+  listSurfaceAgents,
+  getAgent,
+  resolveSurfaceAgent,
+} from './core/agents.js';
+export { studioAgentUrl, renderStudioAccess, tuiAgentHint } from './core/access.js';
 export { AUTONOMY_LEVELS, resolveAutonomy, gate, withinBudget } from './core/autonomy.js';
 export { ADAPTERS, detectBinary, invokeProvider, oppositeProvider } from './core/providers.js';
 export { verify, runCheck, inferChecks } from './core/verifier.js';

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AGENT_PROFILES, AGENT_CATEGORIES, listAgents, getAgent } from '../src/core/agents.js';
+import { AGENT_PROFILES, AGENT_CATEGORIES, listAgents, getAgent, listSurfaceAgents, SURFACE_AGENT, resolveSurfaceAgent, matchSurfaceAgents, agentRolePrompt, withAgentPrompt, renderAgentCatalog } from '../src/core/agents.js';
 
 test('every profile is complete enough to show in a picker', () => {
   // Arrange / Act / Assert
@@ -65,3 +65,45 @@ test('at least one agent in every writing category is allowed to write', () => {
   assert.ok(writers.length >= 2, 'the harness needs agents that actually change files');
   assert.ok(writers.some((a) => a.category === 'build'));
 });
+
+test('the TUI/GUI catalogue puts the chat persona first, then every task role', () => {
+  const surface = listSurfaceAgents();
+  assert.equal(surface[0].id, SURFACE_AGENT.id);
+  assert.equal(surface.length, AGENT_PROFILES.length + 1);
+  assert.equal(listSurfaceAgents('core')[0].id, 'toris');
+  assert.equal(listSurfaceAgents('build').length, listAgents('build').length);
+});
+
+test('resolveSurfaceAgent treats a blank id as the chat persona', () => {
+  assert.equal(resolveSurfaceAgent(undefined).id, 'toris');
+  assert.equal(resolveSurfaceAgent('').id, 'toris');
+  assert.equal(resolveSurfaceAgent('implementer').id, 'implementer');
+  assert.throws(() => resolveSurfaceAgent('wizard'), /Known:/);
+});
+
+test('getAgent can resolve the chat persona without putting it in the planner list', () => {
+  assert.equal(getAgent('toris').title, 'Toris');
+  assert.equal(AGENT_PROFILES.some((agent) => agent.id === 'toris'), false);
+});
+
+test('matchSurfaceAgents prefix-matches id, title and category', () => {
+  assert.deepEqual(matchSurfaceAgents('impl').map((agent) => agent.id), ['implementer']);
+  assert.ok(matchSurfaceAgents('plan').some((agent) => agent.id === 'planner'));
+  assert.ok(matchSurfaceAgents('Build').some((agent) => agent.id === 'implementer'));
+  assert.equal(matchSurfaceAgents('').length, listSurfaceAgents().length);
+});
+
+test('role prompts stay silent for the default persona and constrain writers', () => {
+  assert.equal(agentRolePrompt(SURFACE_AGENT), '');
+  assert.match(agentRolePrompt(getAgent('implementer')), /Implementer/);
+  assert.match(agentRolePrompt(getAgent('code-reviewer')), /Do not edit files/);
+  assert.equal(withAgentPrompt('base', SURFACE_AGENT), 'base');
+  assert.match(withAgentPrompt('base', getAgent('planner')), /Planner/);
+});
+
+test('the TUI catalogue marks the selected agent', () => {
+  const text = renderAgentCatalog(listSurfaceAgents(), 'implementer');
+  assert.match(text, /\* implementer/);
+  assert.match(text, /  toris /);
+});
+

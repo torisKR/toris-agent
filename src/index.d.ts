@@ -41,7 +41,7 @@ export class VerificationError extends TorisError {
 // Agents
 // ---------------------------------------------------------------------------
 
-export type AgentCategory = 'plan' | 'build' | 'review' | 'verify' | 'ship';
+export type AgentCategory = 'core' | 'plan' | 'build' | 'review' | 'verify' | 'ship';
 
 export interface AgentProfile {
   id: string;
@@ -53,12 +53,23 @@ export interface AgentProfile {
 }
 
 export const AGENT_PROFILES: readonly AgentProfile[];
+export const SURFACE_AGENT: AgentProfile;
 
-/** All profiles when `category` is omitted, otherwise those in that category. */
-export function listAgents(category?: AgentCategory): readonly AgentProfile[];
+/** Orchestrator task roles when `category` is omitted, otherwise those in that category. */
+export function listAgents(category?: Exclude<AgentCategory, 'core'>): readonly AgentProfile[];
+
+/** TUI/GUI picker: the chat persona first, then every task role. */
+export function listSurfaceAgents(category?: AgentCategory): readonly AgentProfile[];
 
 /** The profile with this id, or `null` when unknown. */
 export function getAgent(id: string): AgentProfile | null;
+
+/** Blank resolves to the default chat persona; unknown ids throw. */
+export function resolveSurfaceAgent(id?: string | null): AgentProfile;
+
+export function studioAgentUrl(port?: number): string;
+export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
+export function tuiAgentHint(agentId?: string): string;
 
 // ---------------------------------------------------------------------------
 // Autonomy
