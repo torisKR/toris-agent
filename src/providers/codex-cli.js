@@ -235,7 +235,7 @@ export function createCodexCliProvider({
       timedOut = true;
       kill();
     }, timeoutMs);
-    timer.unref?.();
+    // Referenced so a hung child still trips the timeout in Node 22's test runner.
 
     const onAbort = () => {
       cancelled = true;

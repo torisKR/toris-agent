@@ -289,7 +289,8 @@ export function createWarmSession({
             );
           }, turnTimeoutMs)
         : null;
-    timer?.unref?.();
+    // Referenced: a silent warm child has nothing else keeping the event loop
+    // alive, and `finally` always clears this timer.
 
     // SIGINT is how the CLI is asked to abandon a turn. If it takes the whole
     // process with it, `close` drops the child and the next turn respawns.
