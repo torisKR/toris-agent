@@ -99,7 +99,7 @@ The service installer creates a dedicated Python environment at `~/.toris/runtim
 
 The chat agent is the same process whether you type in a terminal or a browser.
 
-**TUI** — at a terminal, a bare `toris` opens the chat. `/agent` lists roles, `/agent implementer` switches, `/studio` prints the GUI URL.
+**TUI** — at a terminal, a bare `toris` opens the chat. `/agent` lists roles, `/agent implementer` switches, `/studio` prints the GUI URL and opens it when Studio is already running.
 
 ```bash
 toris
@@ -109,9 +109,11 @@ toris --agent planner
 **GUI** — start Studio and open the agent room:
 
 ```bash
-toris studio
+toris studio --open
 # http://127.0.0.1:5824/agent
 ```
+
+The browser composer streams the same turn events as the TUI, keeps a transcript per role, and understands `/agent`, `/clear`, and `/help`. Enter sends; Shift+Enter inserts a newline.
 
 ## Quickstart
 

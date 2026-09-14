@@ -42,6 +42,41 @@ function requireJson(request) {
   if (type !== 'application/json') throw new HttpError(415, 'request must use application/json');
 }
 
+function wantsEventStream(request) {
+  return String(request.headers.accept || '')
+    .split(',')
+    .some((part) => part.trim().toLowerCase().startsWith('text/event-stream'));
+}
+
+function writeSse(response, event, data) {
+  if (response.writableEnded) return;
+  response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+function startSse(response) {
+  response.writeHead(200, {
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    'content-type': 'text/event-stream; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+  });
+  if (typeof response.flushHeaders === 'function') response.flushHeaders();
+}
+
+function turnHttpStatus(error) {
+  if (error instanceof HttpError) return error.status;
+  if (
+    error.code === 'E_UNKNOWN_PROFILE'
+    || error.code === 'E_PROVIDER_AUTH'
+    || error.code === 'E_PROVIDER_CLI'
+    || error.code === 'E_MODEL_REQUIRED'
+    || error.code === 'E_UNKNOWN_PROVIDER'
+  ) {
+    return 409;
+  }
+  return 500;
+}
+
 function editableContentPatch(input) {
   if (Object.hasOwn(input, 'channels') && !Array.isArray(input.channels)) throw new HttpError(400, 'content channels must be an array');
   return Object.fromEntries(['title', 'brief', 'channels'].filter((key) => Object.hasOwn(input, key)).map((key) => [key, input[key]]));
@@ -129,26 +164,43 @@ export async function createStudioServer(options) {
     const abort = new AbortController();
     request.on('close', () => abort.abort());
     const turn = options.runAgentTurn || runAgentTurn;
-    try {
-      sendJson(
-        response,
-        200,
-        await turn({
-          home: options.home,
-          cwd: options.cwd,
-          agent: body.agent,
-          message,
-          history: body.history,
-          profile: body.profile,
-          signal: abort.signal,
-        }),
-      );
-    } catch (error) {
-      if (error.code === 'E_UNKNOWN_PROFILE' || error.code === 'E_PROVIDER_AUTH' || error.code === 'E_PROVIDER_CLI' || error.code === 'E_MODEL_REQUIRED' || error.code === 'E_UNKNOWN_PROVIDER') {
-        throw new HttpError(409, error.message);
+    const stream = wantsEventStream(request);
+    const payload = {
+      home: options.home,
+      cwd: options.cwd,
+      agent: body.agent,
+      message,
+      history: body.history,
+      profile: body.profile,
+      signal: abort.signal,
+    };
+    if (!stream) {
+      try {
+        sendJson(response, 200, await turn(payload));
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
+        const status = turnHttpStatus(error);
+        if (status === 500) throw error;
+        throw new HttpError(status, error.message);
       }
-      throw error;
+      return;
     }
+    startSse(response);
+    try {
+      const result = await turn({
+        ...payload,
+        onEvent: (evt) => writeSse(response, evt.type || 'message', evt),
+      });
+      writeSse(response, 'done', result);
+    } catch (error) {
+      if (abort.signal.aborted) writeSse(response, 'abort', { ok: false });
+      else {
+        const status = turnHttpStatus(error);
+        const message = status === 500 && !(error instanceof HttpError) ? 'internal server error' : error.message;
+        writeSse(response, 'error', { message, status });
+      }
+    }
+    if (!response.writableEnded) response.end();
   });
   router.add('GET', '/api/contents', async (_request, response) => {
     sendJson(response, 200, { items: await contents.list() });

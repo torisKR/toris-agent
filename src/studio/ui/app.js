@@ -1,3 +1,10 @@
+const AGENT_STORAGE_KEY = 'toris.studio.agentId';
+const GUI_SLASH = {
+  help: 'help', '?': 'help', h: 'help',
+  agent: 'agent', agents: 'agent', role: 'agent', roles: 'agent',
+  clear: 'clear', cls: 'clear', reset: 'clear',
+  studio: 'studio', gui: 'studio', ui: 'studio',
+};
 const state = {
   token: '',
   contents: [],
@@ -9,9 +16,11 @@ const state = {
   agentReady: false,
   agentReason: '',
   agentTui: 'toris\n/agent',
-  messages: [],
+  threads: {},
+  busy: false,
+  abort: null,
 };
-const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace'].map((id) => [id, document.getElementById(id)]));
+const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace'].map((id) => [id, document.getElementById(id)]));
 
 function announce(message) {
   elements.toast.textContent = message;
@@ -181,6 +190,14 @@ elements['publish-submit'].addEventListener('click', async () => {
   updatePublishGate();
 });
 
+function storedAgentId() {
+  try { return localStorage.getItem(AGENT_STORAGE_KEY) || ''; } catch { return ''; }
+}
+
+function rememberAgent(id) {
+  try { localStorage.setItem(AGENT_STORAGE_KEY, id); } catch { /* private mode */ }
+}
+
 function readSurface() {
   if (location.pathname === '/agent' || location.pathname.startsWith('/agent/')) return 'agent';
   if (location.hash === '#agent' || location.hash.startsWith('#agent/')) return 'agent';
@@ -192,12 +209,29 @@ function readAgentId() {
   if (params.get('id')) return params.get('id');
   const hash = location.hash.match(/^#agent\/([^/]+)/);
   if (hash) return hash[1];
-  return state.agentId || 'toris';
+  return storedAgentId() || state.agentId || 'toris';
+}
+
+function threadOf(id = state.agentId) {
+  if (!state.threads[id]) state.threads[id] = [];
+  return state.threads[id];
+}
+
+function parseGuiSlash(input) {
+  const raw = String(input || '').trim();
+  if (!raw.startsWith('/')) return null;
+  const parts = raw.slice(1).split(/\s+/).filter(Boolean);
+  const head = (parts[0] || '').toLowerCase();
+  const name = GUI_SLASH[head] || head;
+  return { name, args: parts.slice(1), known: Boolean(GUI_SLASH[head]), raw };
 }
 
 function showSurface(name, options = {}) {
   state.surface = name === 'agent' ? 'agent' : 'review';
-  if (state.surface === 'agent') state.agentId = options.agentId || readAgentId();
+  if (state.surface === 'agent') {
+    state.agentId = options.agentId || readAgentId();
+    rememberAgent(state.agentId);
+  }
   elements['review-shell'].hidden = state.surface !== 'review';
   elements['agent-shell'].hidden = state.surface !== 'agent';
   elements['nav-review'].setAttribute('aria-current', state.surface === 'review' ? 'page' : 'false');
@@ -250,18 +284,23 @@ function renderAgents() {
     meta.textContent = agent.summary;
     top.append(kind, status);
     button.append(top, title, meta);
-    button.addEventListener('click', () => {
-      state.agentId = agent.id;
-      state.messages = [];
-      showSurface('agent', { agentId: agent.id });
-    });
+    button.addEventListener('click', () => showSurface('agent', { agentId: agent.id }));
     elements['agent-list'].append(button);
   }
 }
 
+function setAgentBusy(busy) {
+  state.busy = busy;
+  elements['agent-send'].hidden = busy;
+  elements['agent-send'].disabled = busy || !state.agentReady;
+  elements['agent-send'].setAttribute('aria-disabled', String(busy || !state.agentReady));
+  elements['agent-stop'].hidden = !busy;
+  elements['agent-input'].disabled = busy;
+}
+
 function renderAgentWorkspace() {
   const agent = currentAgent();
-  const hasTurns = state.messages.length > 0;
+  const hasTurns = threadOf().length > 0;
   elements['agent-empty'].hidden = hasTurns;
   elements['agent-chat'].hidden = false;
   elements['agent-empty-copy'].textContent = state.agentReady
@@ -272,20 +311,18 @@ function renderAgentWorkspace() {
   elements['agent-status-copy'].textContent = state.agentReady
     ? '로컬 채팅 준비됨. 보내기는 이 브라우저에서만 동작합니다.'
     : (state.agentReason || '연결 대기');
-  elements['agent-send'].disabled = !state.agentReady;
-  elements['agent-send'].setAttribute('aria-disabled', String(!state.agentReady));
-  elements['agent-input'].disabled = !state.agentReady;
+  setAgentBusy(state.busy);
   renderAgentLog();
 }
 
 function renderAgentLog() {
   elements['agent-log'].replaceChildren();
-  for (const turn of state.messages) {
+  for (const turn of threadOf()) {
     const article = document.createElement('article');
-    article.className = `chat-turn${turn.role === 'user' ? ' is-user' : ''}`;
+    article.className = `chat-turn${turn.role === 'user' ? ' is-user' : ''}${turn.streaming ? ' is-streaming' : ''}`;
     const who = document.createElement('span');
     who.className = 'who';
-    who.textContent = turn.role === 'user' ? 'YOU' : (turn.agent || 'TORIS').toUpperCase();
+    who.textContent = turn.role === 'user' ? 'YOU' : turn.role === 'system' ? 'STUDIO' : (turn.agent || 'TORIS').toUpperCase();
     const body = document.createElement('p');
     body.textContent = turn.content;
     article.append(who, body);
@@ -302,6 +339,99 @@ function renderAgentLog() {
   elements['agent-log'].scrollTop = elements['agent-log'].scrollHeight;
 }
 
+function note(content) {
+  threadOf().push({ role: 'system', content });
+  renderAgentWorkspace();
+}
+
+function handleAgentSlash(parsed) {
+  if (parsed.name === 'help') {
+    note('/agent [id]  역할 목록 또는 전환\n/clear       이 에이전트 대화만 지움\n/help        이 목록\nEnter 보내기 · Shift+Enter 줄바꿈');
+    return true;
+  }
+  if (parsed.name === 'clear') {
+    state.threads[state.agentId] = [];
+    announce('이 에이전트 대화를 지웠습니다.');
+    renderAgentWorkspace();
+    return true;
+  }
+  if (parsed.name === 'studio') {
+    note(state.agentTui || 'toris\n/agent');
+    return true;
+  }
+  if (parsed.name === 'agent') {
+    const id = parsed.args[0];
+    if (!id) {
+      note(state.agents.map((agent) => `${agent.id}  ${agent.title}`).join('\n') || '에이전트 목록이 없습니다.');
+      return true;
+    }
+    const match = state.agents.find((agent) => agent.id === id || agent.id.startsWith(id));
+    if (!match) {
+      note(`unknown agent "${id}"`);
+      return true;
+    }
+    showSurface('agent', { agentId: match.id });
+    announce(`${match.title}로 전환했습니다.`);
+    return true;
+  }
+  note(`unknown command ${parsed.raw}`);
+  return true;
+}
+
+async function readSse(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replaceAll('\r\n', '\n');
+    let split;
+    while ((split = buffer.indexOf('\n\n')) !== -1) {
+      const block = buffer.slice(0, split);
+      buffer = buffer.slice(split + 2);
+      let eventName = 'message';
+      const data = [];
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) eventName = line.slice(6).trim();
+        else if (line.startsWith('data:')) data.push(line.slice(5).trim());
+      }
+      if (!data.length) continue;
+      try { onEvent(eventName, JSON.parse(data.join('\n'))); } catch { /* drop a malformed event */ }
+    }
+  }
+}
+
+async function streamAgentTurn({ agent, message, history, signal, onEvent }) {
+  const response = await fetch('/api/agent/turn', {
+    method: 'POST',
+    headers: {
+      origin: location.origin,
+      'x-toris-studio-token': state.token,
+      'content-type': 'application/json',
+      accept: 'text/event-stream',
+    },
+    body: JSON.stringify({ agent, message, history }),
+    signal,
+  });
+  const type = response.headers.get('content-type') || '';
+  if (!type.includes('text/event-stream')) {
+    const body = type.includes('application/json') ? await response.json() : await response.text();
+    if (!response.ok) throw new Error(body?.error?.message || `요청 실패 (${response.status})`);
+    return body;
+  }
+  let result = null;
+  let streamError = null;
+  await readSse(response, (event, data) => {
+    onEvent?.(event, data);
+    if (event === 'done') result = data;
+    if (event === 'error') streamError = new Error(data.message || `요청 실패 (${data.status || 500})`);
+  });
+  if (streamError) throw streamError;
+  if (!result) throw new Error('응답이 끝나기 전에 연결이 끊겼습니다.');
+  return result;
+}
+
 async function loadAgents() {
   const status = await api(`/api/agent/status?agent=${encodeURIComponent(state.agentId)}`);
   state.agents = status.agents || [];
@@ -309,6 +439,7 @@ async function loadAgents() {
   state.agentReason = status.reason || '';
   state.agentTui = status.tui || 'toris\n/agent';
   if (status.agent?.id) state.agentId = status.agent.id;
+  rememberAgent(state.agentId);
   renderAgents();
   renderAgentWorkspace();
 }
@@ -324,31 +455,62 @@ window.addEventListener('popstate', () => {
   showSurface(readSurface(), { replace: true });
 });
 
+elements['agent-input'].addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.shiftKey) return;
+  event.preventDefault();
+  elements['agent-form'].requestSubmit();
+});
+
+elements['agent-stop'].addEventListener('click', () => state.abort?.abort());
+
 elements['agent-form'].addEventListener('submit', async (event) => {
   event.preventDefault();
   const text = elements['agent-input'].value.trim();
-  if (!text || !state.agentReady) return;
+  if (!text || state.busy) return;
+  const parsed = parseGuiSlash(text);
+  if (parsed) {
+    elements['agent-input'].value = '';
+    handleAgentSlash(parsed);
+    return;
+  }
+  if (!state.agentReady) return;
   elements['agent-input'].value = '';
-  state.messages.push({ role: 'user', content: text });
+  const thread = threadOf();
+  thread.push({ role: 'user', content: text });
+  const history = thread
+    .filter((item) => (item.role === 'user' || item.role === 'assistant') && !item.streaming)
+    .slice(0, -1)
+    .map((item) => ({ role: item.role, content: item.content }));
+  const assistant = { role: 'assistant', agent: state.agentId, content: '', tools: [], streaming: true };
+  thread.push(assistant);
+  state.abort = new AbortController();
+  setAgentBusy(true);
   renderAgentWorkspace();
-  elements['agent-send'].disabled = true;
   try {
-    const result = await api('/api/agent/turn', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        agent: state.agentId,
-        message: text,
-        history: state.messages.slice(0, -1).map((item) => ({ role: item.role, content: item.content })),
-      }),
+    const result = await streamAgentTurn({
+      agent: state.agentId,
+      message: text,
+      history,
+      signal: state.abort.signal,
+      onEvent: (event, data) => {
+        if (event === 'text' && data.delta) assistant.content += data.delta;
+        if (event === 'tool-start' && data.name) assistant.tools.push(data.name);
+        renderAgentLog();
+      },
     });
-    const tools = (result.events || []).filter((evt) => evt.type === 'tool-start').map((evt) => evt.name);
-    state.messages.push({ role: 'assistant', agent: result.agent?.id, content: result.text, tools });
+    assistant.agent = result.agent?.id || assistant.agent;
+    assistant.content = result.text || assistant.content;
+    assistant.tools = (result.events || []).filter((evt) => evt.type === 'tool-start').map((evt) => evt.name);
+    assistant.streaming = false;
     announce(`${result.agent?.title || '에이전트'}가 답했습니다.`);
   } catch (error) {
-    state.messages.push({ role: 'assistant', agent: state.agentId, content: error.message });
-    announce(error.message);
+    const aborted = error.name === 'AbortError';
+    assistant.streaming = false;
+    if (!assistant.content) assistant.content = aborted ? '중단했습니다.' : error.message;
+    announce(aborted ? '응답을 중단했습니다.' : error.message);
   }
+  state.abort = null;
+  setAgentBusy(false);
   renderAgentWorkspace();
 });
 

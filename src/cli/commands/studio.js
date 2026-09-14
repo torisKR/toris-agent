@@ -1,6 +1,7 @@
 import { EXIT, TorisError, UsageError } from '../../core/errors.js';
 import { createStudioServer } from '../../studio/server.js';
 import { StudioServiceManager } from '../../studio/service/manager.js';
+import { openLocalUrl, studioOrigin } from '../../core/access.js';
 import { line, c, printJson } from '../output.js';
 
 const SERVICE_COMMANDS = new Set(['install', 'status', 'restart', 'uninstall']);
@@ -17,7 +18,7 @@ async function runServiceCommand(ctx, positionals, deps) {
   return EXIT.OK;
 }
 
-export async function cmdStudio(ctx, positionals, _flags, deps = {}) {
+export async function cmdStudio(ctx, positionals, flags = {}, deps = {}) {
   if (positionals[0] === 'service') return await runServiceCommand(ctx, positionals, deps);
   if (positionals.length > 0) throw new UsageError(`Unknown studio subcommand "${positionals.join(' ')}"`);
   const create = deps.createStudioServer || createStudioServer;
@@ -34,9 +35,13 @@ export async function cmdStudio(ctx, positionals, _flags, deps = {}) {
     throw error;
   }
 
-  output(`${c.green('READY')} Toris Studio http://127.0.0.1:5824`);
-  output(c.dim('      agent GUI  http://127.0.0.1:5824/agent'));
+  output(`${c.green('READY')} Toris Studio ${studioOrigin()}`);
+  output(c.dim(`      agent GUI  ${studioOrigin()}/agent`));
   output(c.dim('      agent TUI  toris   ·  /agent  ·  /studio'));
+  if (flags.open) {
+    const opened = await (deps.openLocalUrl || openLocalUrl)(studioOrigin());
+    output(c.dim(opened.ok ? '      opened in browser' : `      browser: ${opened.error || 'unavailable'}`));
+  }
   return await new Promise((resolve, reject) => {
     let stopping = false;
     const cleanup = () => {

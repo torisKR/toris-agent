@@ -9,7 +9,7 @@ export {
   getAgent,
   resolveSurfaceAgent,
 } from './core/agents.js';
-export { studioAgentUrl, renderStudioAccess, tuiAgentHint } from './core/access.js';
+export { studioAgentUrl, studioOrigin, renderStudioAccess, tuiAgentHint, openLocalUrl } from './core/access.js';
 export { AUTONOMY_LEVELS, resolveAutonomy, gate, withinBudget } from './core/autonomy.js';
 export { ADAPTERS, detectBinary, invokeProvider, oppositeProvider } from './core/providers.js';
 export { verify, runCheck, inferChecks } from './core/verifier.js';

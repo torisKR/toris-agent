@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - TUI `/agent` and `/studio` commands, plus `toris --agent <id>`, so a chat session can pick a role and jump to the local GUI.
 - Studio agent room at `http://127.0.0.1:5824/agent` with the same profile catalogue and a localhost chat turn API.
+- Studio agent turns can stream as SSE when the client sends `Accept: text/event-stream`. The GUI shows live deltas and a Stop control.
+- `/studio` opens the loopback agent room in the default browser when Studio is already running. `toris studio --open` does the same after listen.
+- The GUI composer keeps a transcript per agent, accepts `/agent` `/clear` `/help`, and sends on Enter.
 
 ## [0.4.0] - 2026-09-08
 

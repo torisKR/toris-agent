@@ -67,9 +67,11 @@ export function getAgent(id: string): AgentProfile | null;
 /** Blank resolves to the default chat persona; unknown ids throw. */
 export function resolveSurfaceAgent(id?: string | null): AgentProfile;
 
-export function studioAgentUrl(port?: number): string;
-export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
+export function studioOrigin(port?: number): string;
+export function studioAgentUrl(port?: number, agentId?: string): string;
+export function renderStudioAccess(info?: { running?: boolean; port?: number; agentId?: string }): string;
 export function tuiAgentHint(agentId?: string): string;
+export function openLocalUrl(url: string): Promise<{ ok: boolean; error?: string }>;
 
 // ---------------------------------------------------------------------------
 // Autonomy

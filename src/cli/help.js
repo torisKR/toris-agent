@@ -30,6 +30,7 @@ COMMANDS
   autonomy                  Autonomy levels and what each permits
   daemon status             Background daemon (not in 0.1.0)
   studio                    Local GUI on 127.0.0.1:5824 (review + /agent)
+  studio --open             Start Studio and open it in the local browser
   studio service <action>   Install, status, restart or uninstall autostart
   bot                       Listen for Slack and Telegram commands
   patches                   Isolated diffs waiting to be applied
@@ -62,6 +63,7 @@ EXAMPLES
   toris                     # TUI chat
   toris --agent implementer
   toris studio              # GUI; agent room at /agent
+  toris studio --open       # same, then open the local browser
   toris init && toris doctor
   toris project add .
   toris run "add a health endpoint" --dry-run
