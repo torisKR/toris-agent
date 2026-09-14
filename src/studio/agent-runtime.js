@@ -85,7 +85,7 @@ export function publicAgentStatus(status, agentId) {
     ready: status.ready,
     reason: status.reason,
     tui: tuiAgentHint(agent.id),
-    gui: status.gui,
+    gui: studioAgentUrl(undefined, agent.id),
     agent,
     agents: status.agents,
   };

@@ -3,6 +3,28 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { cmdStudio } from '../src/cli/commands/studio.js';
 
+test('studio --open launches the loopback origin after listen', async () => {
+  const signals = new EventEmitter();
+  const opened = [];
+  const lines = [];
+  const code = await cmdStudio({ home: '/tmp/toris-home', json: false }, [], { open: true }, {
+    signals,
+    output(text) { lines.push(text); },
+    openLocalUrl: async (url) => {
+      opened.push(url);
+      return { ok: true };
+    },
+    createStudioServer: async () => ({
+      listen: async () => {},
+      close: async () => {},
+    }),
+    onReady: () => setImmediate(() => signals.emit('SIGTERM')),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(opened, ['http://127.0.0.1:5824']);
+  assert.match(lines.join('\n'), /opened in browser/);
+});
+
 test('studio command binds the fixed loopback address and shuts down on SIGTERM', async () => {
   const signals = new EventEmitter();
   let options;

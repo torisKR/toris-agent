@@ -8,6 +8,7 @@ Foreground mode is useful while developing:
 
 ```bash
 toris studio
+toris studio --open
 ```
 
 On macOS, install the per-user LaunchAgent for login startup and restart-on-failure behavior:
@@ -23,9 +24,9 @@ Install creates `~/.toris/runtime/auto-shorts` with `uv`, then writes `~/Library
 
 ## Agent room
 
-The coding agent from `toris` chat is also on `http://127.0.0.1:5824/agent`. Pick a profile in the left rail and send a message; the inspector shows the matching TUI commands (`toris`, `/agent`, `/studio`). Sending a message auto-approves tools for that turn — the click is the confirmation.
+The coding agent from `toris` chat is also on `http://127.0.0.1:5824/agent`. Pick a profile in the left rail and send a message; the inspector shows the matching TUI commands (`toris`, `/agent`, `/studio`). From the TUI, `/studio` opens that URL when Studio is already running. Sending a message auto-approves tools for that turn — the click is the confirmation.
 
-`GET /api/agents` and `GET /api/agent/status` are readable without a session token. `POST /api/agent/turn` is a mutation: it needs the current local `Origin` and the in-memory session token. Studio still binds only to `127.0.0.1`.
+`GET /api/agents` and `GET /api/agent/status` are readable without a session token. `POST /api/agent/turn` is a mutation: it needs the current local `Origin` and the in-memory session token. Clients that send `Accept: text/event-stream` receive the same turn events as the TUI (`text`, `tool-start`, then `done`); JSON remains the default. Studio still binds only to `127.0.0.1`. The GUI composer keeps a transcript per agent, sends on Enter, and accepts `/agent`, `/clear`, and `/help`.
 
 ## Review flow
 

@@ -16,6 +16,12 @@ test('treats known booleans as flags, not value consumers', () => {
   assert.deepEqual(positionals, ['run', 'goal'], 'boolean must not swallow the next token');
 });
 
+test('studio --open is a boolean and does not swallow the next token', () => {
+  const { positionals, flags } = parseArgs(['studio', '--open', 'service']);
+  assert.equal(flags.open, true);
+  assert.deepEqual(positionals, ['studio', 'service']);
+});
+
 test('supports --key=value form', () => {
   assert.equal(parseArgs(['run', '--budget=2.5']).flags.budget, '2.5');
 });
