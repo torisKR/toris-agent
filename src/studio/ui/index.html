@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="로컬에서 게시물과 세로 영상을 만들고 렌더 품질을 검토하는 Toris Studio입니다.">
+  <meta name="description" content="로컬에서 에이전트와 대화하고, 게시물과 세로 영상을 검토하는 Toris Studio입니다.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <title>Toris Studio</title>
   <link rel="stylesheet" href="/assets/tokens.css">
@@ -14,11 +14,15 @@
   <div class="studio-frame">
     <header class="topbar">
       <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">T</span><span>Toris Studio</span></a>
+      <nav class="surface-nav" aria-label="작업 공간">
+        <a class="tab" id="nav-review" href="/" data-surface="review" aria-current="page">검토</a>
+        <a class="tab" id="nav-agent" href="/agent" data-surface="agent">에이전트</a>
+      </nav>
       <div class="local-state"><span class="pulse" aria-hidden="true"></span><span id="live-status">127.0.0.1:5824 · local</span></div>
       <a class="system-link" href="/design-system">Design system</a>
     </header>
 
-    <div class="studio-shell">
+    <div class="studio-shell" id="review-shell">
       <aside class="queue-panel" aria-labelledby="queue-title">
         <div class="panel-heading"><div><p class="kicker">Review room</p><h1 id="queue-title">검토 큐</h1></div><span class="queue-count" id="queue-count">0</span></div>
         <div class="queue-filters" role="group" aria-label="콘텐츠 필터">
@@ -74,6 +78,45 @@
           <div class="section-title"><span>03</span><h2>외부 공개</h2></div>
           <p>로컬 검토가 끝난 콘텐츠만 별도 확인 창에서 진행합니다.</p>
           <button id="open-publish" class="button danger" type="button" disabled>외부 공개 차단 확인</button>
+        </section>
+      </aside>
+    </div>
+
+    <div class="studio-shell is-agent" id="agent-shell" hidden>
+      <aside class="queue-panel" aria-labelledby="agent-title">
+        <div class="panel-heading"><div><p class="kicker">Local agent</p><h1 id="agent-title">에이전트</h1></div><span class="queue-count" id="agent-count">0</span></div>
+        <p class="agent-lead">TUI의 <code>toris</code>와 같은 에이전트입니다.</p>
+        <div id="agent-list" class="review-queue" role="listbox" aria-label="에이전트 프로필"></div>
+      </aside>
+      <main id="agent-workspace" class="content-workspace" tabindex="-1">
+        <section class="workspace-empty" id="agent-empty">
+          <span class="empty-orbit" aria-hidden="true"></span>
+          <p class="kicker">Same agent</p>
+          <h2>왼쪽에서 역할을 고르고<br>메시지를 보내세요.</h2>
+          <p id="agent-empty-copy">터미널에서는 <code>toris</code> 또는 <code>/agent</code>로 엽니다.</p>
+        </section>
+        <section class="chat-room" id="agent-chat" hidden>
+          <div id="agent-log" class="chat-log" aria-live="polite"></div>
+          <form id="agent-form" class="chat-composer">
+            <label class="field" for="agent-input">메시지<textarea id="agent-input" name="message" maxlength="8000" required placeholder="무엇을 할까요?"></textarea></label>
+            <button class="button" id="agent-send" type="submit">보내기</button>
+          </form>
+        </section>
+      </main>
+      <aside class="inspector" aria-label="에이전트 접근">
+        <section class="inspector-section">
+          <div class="section-title"><span>01</span><h2>접근</h2></div>
+          <p>같은 에이전트를 터미널에서도 엽니다.</p>
+          <pre id="agent-tui-hint" class="access-code">toris
+/agent</pre>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>02</span><h2>역할</h2></div>
+          <p id="agent-role-copy">General coding agent for the repository you are standing in.</p>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>03</span><h2>상태</h2></div>
+          <p id="agent-status-copy">로컬 세션을 확인하는 중입니다.</p>
         </section>
       </aside>
     </div>

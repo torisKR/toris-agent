@@ -1,5 +1,17 @@
-const state = { token: '', contents: [], selectedId: null, filter: 'all' };
-const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit'].map((id) => [id, document.getElementById(id)]));
+const state = {
+  token: '',
+  contents: [],
+  selectedId: null,
+  filter: 'all',
+  surface: 'review',
+  agents: [],
+  agentId: 'toris',
+  agentReady: false,
+  agentReason: '',
+  agentTui: 'toris\n/agent',
+  messages: [],
+};
+const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace'].map((id) => [id, document.getElementById(id)]));
 
 function announce(message) {
   elements.toast.textContent = message;
@@ -169,6 +181,179 @@ elements['publish-submit'].addEventListener('click', async () => {
   updatePublishGate();
 });
 
+function readSurface() {
+  if (location.pathname === '/agent' || location.pathname.startsWith('/agent/')) return 'agent';
+  if (location.hash === '#agent' || location.hash.startsWith('#agent/')) return 'agent';
+  return 'review';
+}
+
+function readAgentId() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('id')) return params.get('id');
+  const hash = location.hash.match(/^#agent\/([^/]+)/);
+  if (hash) return hash[1];
+  return state.agentId || 'toris';
+}
+
+function showSurface(name, options = {}) {
+  state.surface = name === 'agent' ? 'agent' : 'review';
+  if (state.surface === 'agent') state.agentId = options.agentId || readAgentId();
+  elements['review-shell'].hidden = state.surface !== 'review';
+  elements['agent-shell'].hidden = state.surface !== 'agent';
+  elements['nav-review'].setAttribute('aria-current', state.surface === 'review' ? 'page' : 'false');
+  elements['nav-agent'].setAttribute('aria-current', state.surface === 'agent' ? 'page' : 'false');
+  const url = state.surface === 'agent'
+    ? (state.agentId && state.agentId !== 'toris' ? `/agent?id=${encodeURIComponent(state.agentId)}` : '/agent')
+    : '/';
+  if (!options.replace) history.pushState({ surface: state.surface, agentId: state.agentId }, '', url);
+  else history.replaceState({ surface: state.surface, agentId: state.agentId }, '', url);
+  if (state.surface === 'agent') {
+    renderAgents();
+    renderAgentWorkspace();
+    elements['agent-workspace'].focus();
+  }
+}
+
+function currentAgent() {
+  return state.agents.find((item) => item.id === state.agentId) || state.agents[0] || { id: 'toris', title: 'Toris', summary: '', category: 'core', writes: true };
+}
+
+function renderAgents() {
+  const items = state.agents;
+  elements['agent-count'].textContent = String(items.length);
+  elements['agent-list'].replaceChildren();
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'queue-empty';
+    empty.textContent = '에이전트 목록을 불러오지 못했습니다.';
+    elements['agent-list'].append(empty);
+    return;
+  }
+  for (const agent of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `queue-item${agent.id === state.agentId ? ' is-selected' : ''}`;
+    button.dataset.id = agent.id;
+    button.setAttribute('role', 'option');
+    button.setAttribute('aria-selected', String(agent.id === state.agentId));
+    const top = document.createElement('span');
+    top.className = 'queue-item-top';
+    const kind = document.createElement('span');
+    kind.className = 'queue-kind';
+    kind.textContent = agent.category.toUpperCase();
+    const status = document.createElement('span');
+    status.className = 'badge';
+    status.textContent = agent.writes ? 'writes' : 'read';
+    const title = document.createElement('strong');
+    title.textContent = agent.title;
+    const meta = document.createElement('small');
+    meta.textContent = agent.summary;
+    top.append(kind, status);
+    button.append(top, title, meta);
+    button.addEventListener('click', () => {
+      state.agentId = agent.id;
+      state.messages = [];
+      showSurface('agent', { agentId: agent.id });
+    });
+    elements['agent-list'].append(button);
+  }
+}
+
+function renderAgentWorkspace() {
+  const agent = currentAgent();
+  const hasTurns = state.messages.length > 0;
+  elements['agent-empty'].hidden = hasTurns;
+  elements['agent-chat'].hidden = false;
+  elements['agent-empty-copy'].textContent = state.agentReady
+    ? `터미널에서는 toris --agent ${agent.id} 또는 /agent ${agent.id}로 엽니다.`
+    : (state.agentReason || '모델이 연결되면 대화를 시작할 수 있습니다.');
+  elements['agent-tui-hint'].textContent = state.agentTui || `toris --agent ${agent.id}\n/agent ${agent.id}`;
+  elements['agent-role-copy'].textContent = `${agent.title} · ${agent.summary}`;
+  elements['agent-status-copy'].textContent = state.agentReady
+    ? '로컬 채팅 준비됨. 보내기는 이 브라우저에서만 동작합니다.'
+    : (state.agentReason || '연결 대기');
+  elements['agent-send'].disabled = !state.agentReady;
+  elements['agent-input'].disabled = !state.agentReady;
+  renderAgentLog();
+}
+
+function renderAgentLog() {
+  elements['agent-log'].replaceChildren();
+  for (const turn of state.messages) {
+    const article = document.createElement('article');
+    article.className = `chat-turn${turn.role === 'user' ? ' is-user' : ''}`;
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = turn.role === 'user' ? 'YOU' : (turn.agent || 'TORIS').toUpperCase();
+    const body = document.createElement('p');
+    body.textContent = turn.content;
+    article.append(who, body);
+    if (turn.tools?.length) {
+      for (const tool of turn.tools) {
+        const meta = document.createElement('small');
+        meta.className = 'chat-tool';
+        meta.textContent = tool;
+        article.append(meta);
+      }
+    }
+    elements['agent-log'].append(article);
+  }
+  elements['agent-log'].scrollTop = elements['agent-log'].scrollHeight;
+}
+
+async function loadAgents() {
+  const status = await api(`/api/agent/status?agent=${encodeURIComponent(state.agentId)}`);
+  state.agents = status.agents || [];
+  state.agentReady = Boolean(status.ready);
+  state.agentReason = status.reason || '';
+  state.agentTui = status.tui || 'toris\n/agent';
+  if (status.agent?.id) state.agentId = status.agent.id;
+  renderAgents();
+  renderAgentWorkspace();
+}
+
+for (const link of [elements['nav-review'], elements['nav-agent']]) {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    showSurface(link.dataset.surface);
+  });
+}
+
+window.addEventListener('popstate', () => {
+  showSurface(readSurface(), { replace: true });
+});
+
+elements['agent-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const text = elements['agent-input'].value.trim();
+  if (!text || !state.agentReady) return;
+  elements['agent-input'].value = '';
+  state.messages.push({ role: 'user', content: text });
+  renderAgentWorkspace();
+  elements['agent-send'].disabled = true;
+  try {
+    const result = await api('/api/agent/turn', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        agent: state.agentId,
+        message: text,
+        history: state.messages.slice(0, -1).map((item) => ({ role: item.role, content: item.content })),
+      }),
+    });
+    const tools = (result.events || []).filter((evt) => evt.type === 'tool-start').map((evt) => evt.name);
+    state.messages.push({ role: 'assistant', agent: result.agent?.id, content: result.text, tools });
+    announce(`${result.agent?.title || '에이전트'}가 답했습니다.`);
+  } catch (error) {
+    state.messages.push({ role: 'assistant', agent: state.agentId, content: error.message });
+    announce(error.message);
+  }
+  renderAgentWorkspace();
+});
+
 try {
   const session = await api('/api/session'); state.token = session.token; await refresh(); document.getElementById('live-status').textContent = `${new URL(session.origin).host} · local`;
+  state.agentId = readAgentId();
+  await loadAgents();
+  showSurface(readSurface(), { replace: true, agentId: state.agentId });
 } catch (error) { document.getElementById('live-status').textContent = 'local service unavailable'; announce(error.message); }

@@ -2,19 +2,21 @@ import { createInterface } from 'node:readline/promises';
 import { createRequire } from 'node:module';
 import { stdin, stdout } from 'node:process';
 
-import { TorisError, EXIT } from '../../core/errors.js';
+import { EXIT, UsageError } from '../../core/errors.js';
 import { AUTONOMY_LEVELS, autoApprovesTools } from '../../core/autonomy.js';
 import {
-  resolveProfile,
-  resolveRole,
-  listProfiles,
-  apiKeyEnvVar,
-  readApiKey,
-  AUTO_MODEL,
-  API_PROVIDERS,
-  CLI_PROVIDERS,
-} from '../../core/models.js';
-import { detectBinary } from '../../core/providers.js';
+  listSurfaceAgents,
+  renderAgentCatalog,
+  resolveSurfaceAgent,
+} from '../../core/agents.js';
+import { renderStudioAccess, studioOrigin } from '../../core/access.js';
+import {
+  pickChatModel,
+  assertChatUsable,
+  cliBinFor,
+  chatSystemPrompt,
+} from '../../core/chat-setup.js';
+import { listProfiles, resolveProfile, CLI_PROVIDERS } from '../../core/models.js';
 import { createProvider } from '../../providers/index.js';
 import { createChatSession } from '../../core/chat.js';
 import { createDefaultTools } from '../../core/tools.js';
@@ -48,96 +50,6 @@ const require = createRequire(import.meta.url);
 
 /** An aborted request is a deliberate interrupt, not a failure to report. */
 const isAbort = (err) => err?.name === 'AbortError' || err?.code === 'ABORT_ERR';
-
-const SYSTEM_PROMPT = [
-  "You are toris, a coding agent working inside a solo developer's repository.",
-  'You have tools for reading, listing, writing files and running shell commands.',
-  '',
-  'Working rules:',
-  '- Read a file before you edit it. Never guess its contents.',
-  "- Verify your own work by running the project's tests or build.",
-  '- Prefer the smallest change that actually solves the problem.',
-  '- If a tool is denied, do not retry it. Explain the alternative.',
-  '- Be concrete and brief. The operator is one person, not a committee.',
-].join('\n');
-
-/**
- * Pick the model for this chat: explicit flag, then the `chat` role in routing,
- * then a lone configured profile. Anything else is ambiguous, so we say so.
- */
-function pickModel(config, flags) {
-  if (typeof flags.profile === 'string') return resolveProfile(flags.profile, config);
-
-  const profiles = listProfiles(config);
-  if (profiles.length === 0) {
-    throw new TorisError(
-      'No model profiles are configured, so there is nothing to chat with.\n' +
-        'Run `toris connect` to pick a backend (installed claude/codex CLI, or an API key),\n' +
-        'or add one to your config under models.profiles, for example:\n' +
-        '  "models": {\n' +
-        '    "profiles": { "main": { "provider": "claude-cli", "model": "auto" } },\n' +
-        '    "routing":  { "chat": "main" }\n' +
-        '  }\n' +
-        `Providers available for chat: ${[...API_PROVIDERS, ...CLI_PROVIDERS].join(', ')}.`,
-      'E_UNKNOWN_PROFILE',
-    );
-  }
-
-  try {
-    return resolveRole('chat', config);
-  } catch {
-    if (profiles.length === 1) return resolveProfile(profiles[0], config);
-    throw new TorisError(
-      `Several profiles exist (${profiles.join(', ')}) but none is routed to "chat".\n` +
-        'Set models.routing.chat, or pass --profile <name>.',
-      'E_UNKNOWN_PROFILE',
-    );
-  }
-}
-
-/** Map a CLI provider id onto its configured binary name. */
-function cliBinFor(provider, config) {
-  const key = provider === 'claude-cli' ? 'claude' : 'codex';
-  return config?.providers?.[key]?.bin ?? key;
-}
-
-/** Fail before the first token rather than after a confusing HTTP 401. */
-function assertUsable(resolved, config) {
-  if (CLI_PROVIDERS.includes(resolved.provider)) {
-    // CLI-backed chat reuses the agent CLI's own login; no API key involved.
-    const bin = cliBinFor(resolved.provider, config);
-    if (!detectBinary(bin)) {
-      throw new TorisError(
-        `Profile "${resolved.profile}" uses "${resolved.provider}", but the "${bin}" binary ` +
-          'is not on PATH. Install it (or fix providers.' +
-          `${resolved.provider === 'claude-cli' ? 'claude' : 'codex'}.bin) and log in first.`,
-        'E_PROVIDER_CLI',
-      );
-    }
-    return;
-  }
-  if (!API_PROVIDERS.includes(resolved.provider)) {
-    throw new TorisError(
-      `Profile "${resolved.profile}" uses provider "${resolved.provider}", which chat does not ` +
-        `support. Chat needs one of: ${[...API_PROVIDERS, ...CLI_PROVIDERS].join(', ')}.`,
-      'E_UNKNOWN_PROVIDER',
-    );
-  }
-  if (!readApiKey(resolved.provider)) {
-    throw new TorisError(
-      `${apiKeyEnvVar(resolved.provider)} is not set, so "${resolved.profile}" cannot be used.\n` +
-        `  export ${apiKeyEnvVar(resolved.provider)}=...`,
-      'E_PROVIDER_AUTH',
-    );
-  }
-  if (resolved.model === AUTO_MODEL) {
-    throw new TorisError(
-      `Profile "${resolved.profile}" has no model id ("auto" only works for CLI adapters).\n` +
-        `Set models.profiles.${resolved.profile}.model to a concrete model id.`,
-      'E_MODEL_REQUIRED',
-    );
-  }
-}
 
 /** Render a tool call compactly enough to judge it at a glance. */
 function describeCall(call) {
@@ -181,8 +93,13 @@ export async function cmdChat(ctx, args, flags) {
     config = connected.config;
   }
 
-  const resolved = pickModel(config, flags);
-  assertUsable(resolved, config);
+  if (flags.agent === true) {
+    throw new UsageError('--agent needs an agent id. Try `toris agents` or `/agent`.');
+  }
+  let activeAgent = resolveSurfaceAgent(typeof flags.agent === 'string' ? flags.agent : undefined);
+
+  const resolved = pickChatModel(config, typeof flags.profile === 'string' ? flags.profile : undefined);
+  assertChatUsable(resolved, config);
 
   // CLI-backed providers run their own agent loop (tools, skills, approvals)
   // inside the spawned CLI; driving a second tool loop from toris would run
@@ -239,11 +156,8 @@ export async function cmdChat(ctx, args, flags) {
           }),
         );
   const briefing = renderSkillBriefing(skills);
-  const system = isCliBacked
-    ? undefined
-    : briefing
-      ? `${SYSTEM_PROMPT}\n\n${briefing}`
-      : SYSTEM_PROMPT;
+  const systemFor = (agent = activeAgent) =>
+    chatSystemPrompt({ agent, briefing, cliBacked: isCliBacked });
   const autoApprove =
     Boolean(flags.yes) || autoApprovesTools(flags.autonomy ?? config.defaultAutonomy);
 
@@ -253,7 +167,7 @@ export async function cmdChat(ctx, args, flags) {
     const session = createChatSession({
       provider,
       model: resolved.model,
-      system,
+      system: systemFor(),
       tools,
       maxTokens: resolved.maxTokens ?? undefined,
       approve: async () => autoApprove,
@@ -262,6 +176,7 @@ export async function cmdChat(ctx, args, flags) {
     const settled = await foldIsolation();
     printJson({
       ok: true,
+      agent: activeAgent.id,
       profile: resolved.profile,
       provider: resolved.provider,
       model: resolved.model,
@@ -332,12 +247,12 @@ export async function cmdChat(ctx, args, flags) {
     else if (evt.type === 'tool-denied') log(c.yellow(`  ${SYM.cross} ${evt.name} denied`));
   };
 
-  /** Sessions are rebuilt rather than mutated, so /model can hand over cleanly. */
+  /** Sessions are rebuilt rather than mutated, so /model and /agent hand over cleanly. */
   const makeSession = (target, wire) =>
     createChatSession({
       provider: wire,
       model: target.model,
-      system,
+      system: systemFor(),
       tools,
       maxTokens: target.maxTokens ?? undefined,
       // The approval prompt is drawn by readline and arrives BEFORE the
@@ -414,6 +329,9 @@ export async function cmdChat(ctx, args, flags) {
 
   const showModel = () => log(c.dim(`${active.profile} → ${active.provider}/${active.model}`));
 
+  const showAgent = () =>
+    log(c.dim(`${activeAgent.id} · ${activeAgent.title} · GUI ${studioOrigin()}/agent`));
+
   const showAutonomy = () => {
     const level = AUTONOMY_LEVELS[autonomyLevel] ?? AUTONOMY_LEVELS.L2;
     log(
@@ -442,7 +360,7 @@ export async function cmdChat(ctx, args, flags) {
     let next;
     try {
       next = resolveProfile(name, config);
-      assertUsable(next, config);
+      assertChatUsable(next, config);
     } catch (err) {
       log(c.yellow(`  ${err.message}`));
       return;
@@ -467,11 +385,47 @@ export async function cmdChat(ctx, args, flags) {
     showModel();
   };
 
+  const switchAgent = (id) => {
+    let next;
+    try {
+      next = resolveSurfaceAgent(id);
+    } catch (err) {
+      log(c.yellow(`  ${err.message}`));
+      return;
+    }
+    const history = session.history;
+    carriedUsage = totalUsage();
+    activeAgent = next;
+    session = makeSession(active, transport);
+    session.reset(history);
+    showAgent();
+  };
+
+  const probeStudio = async () => {
+    try {
+      const response = await fetch(`${studioOrigin()}/api/health`, {
+        signal: AbortSignal.timeout(400),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
   const listLines = (items) => (items.length > 0 ? items.join('\n') : '  (none)');
 
   /** @type {Record<string, (args: string[]) => void>} */
   const slashHandlers = {
     help: () => log(renderSlashHelp()),
+    agent: (rest) => {
+      if (rest.length > 0) {
+        switchAgent(rest[0]);
+        return;
+      }
+      log(renderAgentCatalog(listSurfaceAgents(), activeAgent.id));
+      log(c.dim(`  GUI  ${studioOrigin()}/agent`));
+    },
+    studio: async () => log(renderStudioAccess({ running: await probeStudio() })),
     model: (rest) => (rest.length > 0 ? switchModel(rest[0]) : showModel()),
     autonomy: (rest) => (rest.length > 0 ? setAutonomy(rest[0]) : showAutonomy()),
     tools: () =>
@@ -602,6 +556,7 @@ export async function cmdChat(ctx, args, flags) {
     profile: active.profile,
     provider: active.provider,
     model: active.model,
+    agent: activeAgent.id,
     cwd: process.cwd(),
     autonomy: autonomyLevel,
     approvals: delegated(isAutoApproved ? 'auto' : 'ask'),

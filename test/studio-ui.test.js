@@ -8,9 +8,9 @@ import { createStudioServer } from '../src/studio/server.js';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test('product shell contains queue, editor, media review, quality, and guarded publish regions', async () => {
+test('product shell contains queue, editor, media review, quality, guarded publish, and agent regions', async () => {
   const html = await readFile(join(root, 'src/studio/ui/index.html'), 'utf8');
-  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status']) {
+  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /PUBLISH &lt;contentId&gt;/);
@@ -27,7 +27,7 @@ test('product assets use only local API paths and define all responsive shells',
   const js = await readFile(join(root, 'src/studio/ui/app.js'), 'utf8');
   const components = await readFile(join(root, 'src/studio/ui/components.css'), 'utf8');
   const css = await readFile(join(root, 'src/studio/ui/studio.css'), 'utf8');
-  for (const path of ['/api/session', '/api/contents', '/api/renders', '/api/jobs', '/review', '/release-check', '/upload', '/media']) assert.match(js, new RegExp(path.replaceAll('/', '\\/')));
+  for (const path of ['/api/session', '/api/contents', '/api/renders', '/api/jobs', '/review', '/release-check', '/upload', '/media', '/api/agent/']) assert.match(js, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(js, /event\.key !== 'Escape'/);
   assert.match(js, /setAttribute\('aria-pressed'/);
   assert.doesNotMatch(js, /https?:\/\//);
@@ -49,6 +49,8 @@ test('root app and fixed product assets are served with CSP', async () => {
     assert.equal(page.status, 200);
     assert.match(page.headers.get('content-security-policy'), /default-src 'self'/);
     assert.match(await page.text(), /Toris Studio/);
+    assert.equal((await fetch(`${base}/agent`)).status, 200);
+    assert.match(await (await fetch(`${base}/agent`)).text(), /id="agent-shell"/);
     assert.equal((await fetch(`${base}/assets/app.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/studio.css`)).status, 200);
     assert.equal((await fetch(`${base}/assets/favicon.svg`)).status, 200);

@@ -1,0 +1,146 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createStudioServer } from '../src/studio/server.js';
+import { SURFACE_AGENT } from '../src/core/agents.js';
+
+async function withServer(fn, extra = {}) {
+  const home = await mkdtemp(join(tmpdir(), 'toris-studio-agent-'));
+  const studio = await createStudioServer({
+    home,
+    host: '127.0.0.1',
+    port: 0,
+    token: 'test-token',
+    ...extra,
+  });
+  await studio.listen();
+  const address = studio.server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    await fn({ studio, home, base });
+  } finally {
+    await studio.close();
+    await rm(home, { recursive: true, force: true });
+  }
+}
+
+function mutation(base, body) {
+  return {
+    method: 'POST',
+    headers: {
+      origin: base,
+      'x-toris-studio-token': 'test-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  };
+}
+
+test('GET /api/agents lists the same catalogue the TUI picker uses', async () => {
+  await withServer(async ({ base }) => {
+    const response = await fetch(`${base}/api/agents`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.ready, false);
+    assert.equal(body.agent.id, SURFACE_AGENT.id);
+    assert.equal(body.agents[0].id, 'toris');
+    assert.ok(body.agents.some((agent) => agent.id === 'implementer'));
+    assert.match(body.tui, /toris/);
+    assert.match(body.gui, /\/agent$/);
+  });
+});
+
+test('GET /api/agent/status reflects a selected role and stays local', async () => {
+  await withServer(async ({ base }) => {
+    const response = await fetch(`${base}/api/agent/status?agent=implementer`);
+    const body = await response.json();
+    assert.equal(body.agent.id, 'implementer');
+    assert.match(body.tui, /\/agent implementer/);
+    assert.equal(response.headers.has('access-control-allow-origin'), false);
+  });
+});
+
+test('POST /api/agent/turn requires the studio origin and token', async () => {
+  await withServer(async ({ base }) => {
+    const denied = await fetch(`${base}/api/agent/turn`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'hi' }),
+    });
+    assert.equal(denied.status, 403);
+  });
+});
+
+test('POST /api/agent/turn rejects an empty message and an unknown agent', async () => {
+  await withServer(
+    async ({ base }) => {
+      const empty = await fetch(`${base}/api/agent/turn`, mutation(base, { message: '   ' }));
+      assert.equal(empty.status, 400);
+      const unknown = await fetch(
+        `${base}/api/agent/turn`,
+        mutation(base, { agent: 'wizard', message: 'hi' }),
+      );
+      assert.equal(unknown.status, 400);
+    },
+    {
+      runAgentTurn: async () => {
+        throw new Error('runner must not be called for invalid input');
+      },
+    },
+  );
+});
+
+test('POST /api/agent/turn runs the selected agent and returns text', async () => {
+  await withServer(
+    async ({ base }) => {
+      const response = await fetch(
+        `${base}/api/agent/turn`,
+        mutation(base, { agent: 'planner', message: 'split this goal', history: [] }),
+      );
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.ok, true);
+      assert.equal(body.text, 'echo:planner:split this goal');
+      assert.equal(body.agent.id, 'planner');
+    },
+    {
+      runAgentTurn: async ({ agent, message }) => {
+        const resolved = typeof agent === 'string' ? agent : agent?.id;
+        return {
+          ok: true,
+          agent: { id: resolved, title: 'Planner' },
+          text: `echo:${resolved}:${message}`,
+          usage: { inputTokens: 1, outputTokens: 1, turns: 1 },
+          events: [{ type: 'text', delta: message }],
+        };
+      },
+    },
+  );
+});
+
+test('a configured home reports the agent room as ready', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'toris-studio-ready-'));
+  await writeFile(
+    join(home, 'config.json'),
+    JSON.stringify({
+      version: 1,
+      models: {
+        profiles: { main: { provider: 'anthropic', model: 'model-id' } },
+        routing: { chat: 'main' },
+      },
+    }),
+  );
+  const studio = await createStudioServer({ home, host: '127.0.0.1', port: 0, token: 'test-token' });
+  await studio.listen();
+  const base = `http://127.0.0.1:${studio.server.address().port}`;
+  try {
+    const body = await (await fetch(`${base}/api/agent/status`)).json();
+    assert.equal(body.ready, true);
+    assert.equal(body.reason, null);
+  } finally {
+    await studio.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

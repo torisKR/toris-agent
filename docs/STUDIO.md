@@ -1,6 +1,6 @@
 # Toris Studio
 
-Toris Studio is a localhost-only workspace for reviewing post drafts and MP4 renders. It is available at `http://127.0.0.1:5824` and persists its state in `~/.toris` by default.
+Toris Studio is a localhost-only workspace for reviewing post drafts and MP4 renders, and for talking to the same coding agent the TUI exposes. It is available at `http://127.0.0.1:5824` and persists its state in `~/.toris` by default.
 
 ## Start and stop
 
@@ -20,6 +20,12 @@ toris studio service uninstall
 ```
 
 Install creates `~/.toris/runtime/auto-shorts` with `uv`, then writes `~/Library/LaunchAgents/kr.toris.agent.studio.plist`. Logs are written to `~/.toris/logs/studio.out.log` and `~/.toris/logs/studio.err.log`. Uninstall removes the LaunchAgent but preserves drafts, renders, logs, and the Python runtime.
+
+## Agent room
+
+The coding agent from `toris` chat is also on `http://127.0.0.1:5824/agent`. Pick a profile in the left rail and send a message; the inspector shows the matching TUI commands (`toris`, `/agent`, `/studio`). Sending a message auto-approves tools for that turn — the click is the confirmation.
+
+`GET /api/agents` and `GET /api/agent/status` are readable without a session token. `POST /api/agent/turn` is a mutation: it needs the current local `Origin` and the in-memory session token. Studio still binds only to `127.0.0.1`.
 
 ## Review flow
 

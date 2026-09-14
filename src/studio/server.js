@@ -10,10 +10,13 @@ import { JobQueue } from './job-queue.js';
 import { mediaResponse, saveMp4Upload } from './media-store.js';
 import { RenderService } from './render-service.js';
 import { checkRelease, contentHash } from './release-guard.js';
+import { inspectAgentRuntime, publicAgentStatus, runAgentTurn } from './agent-runtime.js';
+import { resolveSurfaceAgent } from '../core/agents.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
+  ['/agent', ['index.html', 'text/html; charset=utf-8']],
   ['/design-system', ['design-system.html', 'text/html; charset=utf-8']],
   ['/assets/tokens.css', ['tokens.css', 'text/css; charset=utf-8']],
   ['/assets/components.css', ['components.css', 'text/css; charset=utf-8']],
@@ -90,13 +93,62 @@ export async function createStudioServer(options) {
   };
 
   router.add('GET', '/api/health', async (_request, response) => {
-    sendJson(response, 200, { ok: true, name: 'Toris Studio', localOnly: true, status: 'ready' });
+    sendJson(response, 200, {
+      ok: true,
+      name: 'Toris Studio',
+      localOnly: true,
+      status: 'ready',
+      surfaces: ['review', 'agent'],
+    });
   });
   for (const pathname of STATIC_ASSETS.keys()) {
     router.add('GET', pathname, async (_request, response) => sendStatic(response, pathname));
   }
   router.add('GET', '/api/session', async (_request, response) => {
     sendJson(response, 200, { token, origin: origin() });
+  });
+  router.add('GET', '/api/agents', async (_request, response) => {
+    const status = await inspectAgentRuntime({ home: options.home });
+    sendJson(response, 200, publicAgentStatus(status));
+  });
+  router.add('GET', '/api/agent/status', async (request, response) => {
+    const url = new URL(request.url || '/', origin());
+    const status = await inspectAgentRuntime({ home: options.home });
+    sendJson(response, 200, publicAgentStatus(status, url.searchParams.get('agent')));
+  });
+  router.add('POST', '/api/agent/turn', async (request, response) => {
+    requireJson(request);
+    const body = await readJson(request);
+    const message = String(body.message ?? '').trim();
+    if (!message) throw new HttpError(400, 'message is required');
+    try {
+      resolveSurfaceAgent(body.agent);
+    } catch (error) {
+      throw new HttpError(400, error.message);
+    }
+    const abort = new AbortController();
+    request.on('close', () => abort.abort());
+    const turn = options.runAgentTurn || runAgentTurn;
+    try {
+      sendJson(
+        response,
+        200,
+        await turn({
+          home: options.home,
+          cwd: options.cwd,
+          agent: body.agent,
+          message,
+          history: body.history,
+          profile: body.profile,
+          signal: abort.signal,
+        }),
+      );
+    } catch (error) {
+      if (error.code === 'E_UNKNOWN_PROFILE' || error.code === 'E_PROVIDER_AUTH' || error.code === 'E_PROVIDER_CLI' || error.code === 'E_MODEL_REQUIRED' || error.code === 'E_UNKNOWN_PROVIDER') {
+        throw new HttpError(409, error.message);
+      }
+      throw error;
+    }
   });
   router.add('GET', '/api/contents', async (_request, response) => {
     sendJson(response, 200, { items: await contents.list() });

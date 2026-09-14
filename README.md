@@ -93,7 +93,25 @@ toris studio service install
 toris studio service status
 ```
 
-The service installer creates a dedicated Python environment at `~/.toris/runtime/auto-shorts`. The web server binds only to `127.0.0.1`, mutations require the current local origin plus an in-memory session token, and external publishing is disabled. See [docs/STUDIO.md](./docs/STUDIO.md) for the storage, render, recovery, and removal contracts.
+The service installer creates a dedicated Python environment at `~/.toris/runtime/auto-shorts`. The web server binds only to `127.0.0.1`, mutations require the current local origin plus an in-memory session token, and external publishing is disabled. The same coding agent is available at `http://127.0.0.1:5824/agent` and from the TUI via `toris` / `/agent` / `/studio`. See [docs/STUDIO.md](./docs/STUDIO.md) for the storage, render, recovery, and removal contracts.
+
+## Talk to the agent
+
+The chat agent is the same process whether you type in a terminal or a browser.
+
+**TUI** — at a terminal, a bare `toris` opens the chat. `/agent` lists roles, `/agent implementer` switches, `/studio` prints the GUI URL.
+
+```bash
+toris
+toris --agent planner
+```
+
+**GUI** — start Studio and open the agent room:
+
+```bash
+toris studio
+# http://127.0.0.1:5824/agent
+```
 
 ## Quickstart
 

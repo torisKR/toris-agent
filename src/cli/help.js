@@ -4,6 +4,7 @@ export const USAGE = `${'toris'} - local-first multi-agent development harness
 
 USAGE
   toris                     Open the interactive chat TUI (at a terminal)
+  toris --agent <id>        Open that agent in the TUI
   toris <command> [options]
 
 COMMANDS
@@ -11,6 +12,7 @@ COMMANDS
   doctor                    Check runtime, providers, git and store
   connect                   Connect a model backend (CLI login or API key)
   chat ["<message>"]        Talk to a model with tools (REPL if no message)
+      --agent <id>          Chat as a named agent (see toris agents)
   project add [path]        Register a project (defaults to cwd)
   project list              List registered projects
   project inspect <id>      Show one project
@@ -23,11 +25,11 @@ COMMANDS
   cancel <runId>            Mark a run cancelled
   approvals                 List approval requests
   approve <id> | reject <id>
-  agents [--category <c>]   Built-in agent profiles
+  agents [--category <c>]   Agent profiles for TUI /agent and Studio /agent
   skills                    Skill packages the model follows in chat
   autonomy                  Autonomy levels and what each permits
   daemon status             Background daemon (not in 0.1.0)
-  studio                    Local creator studio on 127.0.0.1:5824
+  studio                    Local GUI on 127.0.0.1:5824 (review + /agent)
   studio service <action>   Install, status, restart or uninstall autostart
   bot                       Listen for Slack and Telegram commands
   patches                   Isolated diffs waiting to be applied
@@ -57,6 +59,9 @@ EXIT CODES
   0 ok   1 failure   2 usage   3 verification failed   4 approval denied   5 daemon unavailable
 
 EXAMPLES
+  toris                     # TUI chat
+  toris --agent implementer
+  toris studio              # GUI; agent room at /agent
   toris init && toris doctor
   toris project add .
   toris run "add a health endpoint" --dry-run

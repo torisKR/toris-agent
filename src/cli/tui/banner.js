@@ -20,8 +20,8 @@ export const DEFAULT_TERMINAL_WIDTH = 80;
  */
 export const MIN_TERMINAL_WIDTH = 20;
 
-/** The three keys that get someone out of trouble on their first session. */
-const HINT = '/help for commands · ctrl-c interrupt · ctrl-d exit';
+/** The keys that get someone out of trouble — including the other surface. */
+const HINT = '/help · /agent · /studio · ctrl-c interrupt · ctrl-d exit';
 
 /**
  * Widest the welcome box is allowed to get.
@@ -109,6 +109,7 @@ const versionLabel = (version) => (version ? `v${version}` : '');
  *   profile: string,
  *   provider: string,
  *   model: string,
+ *   agent?: string,
  *   cwd: string,
  *   autonomy: string,
  *   approvals: string,
@@ -141,6 +142,7 @@ function bannerRows(info) {
   return [
     ['model', `${info.provider}/${info.model}`],
     ['profile', String(info.profile ?? '')],
+    ['agent', String(info.agent ?? 'toris')],
     ['cwd', shortenPath(info.cwd, info.home)],
     ['autonomy', `${info.autonomy} (${info.approvals})`],
     ['tools', String(info.tools ?? 0)],

@@ -15,6 +15,8 @@ import { c } from '../output.js';
 /** @type {ReadonlyArray<SlashCommandSpec>} */
 export const SLASH_COMMANDS = Object.freeze([
   Object.freeze({ name: 'help', args: '', summary: 'this list' }),
+  Object.freeze({ name: 'agent', args: '[id]', summary: 'show agents, or switch role' }),
+  Object.freeze({ name: 'studio', args: '', summary: 'GUI URL for this agent' }),
   Object.freeze({ name: 'model', args: '[profile]', summary: 'show the model, or switch profile' }),
   Object.freeze({ name: 'autonomy', args: '[L1-L5]', summary: 'show or set what runs unattended' }),
   Object.freeze({ name: 'skills', args: '', summary: 'skill packages in the system prompt' }),
@@ -32,8 +34,13 @@ export const SLASH_ALIASES = Object.freeze({
   '?': 'help',
   h: 'help',
   commands: 'help',
+  agents: 'agent',
+  role: 'agent',
+  roles: 'agent',
   profile: 'model',
   models: 'model',
+  gui: 'studio',
+  ui: 'studio',
   cls: 'clear',
   reset: 'clear',
   new: 'clear',

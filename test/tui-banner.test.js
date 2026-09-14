@@ -38,16 +38,19 @@ test('the banner answers what, where and how freely, in a few lines', () => {
   assert.match(text, /0\.1\.0/);
   assert.match(text, /anthropic\/some-model/);
   assert.match(text, /main/);
+  assert.match(text, /toris/);
   assert.match(text, /L2/);
   assert.match(text, /~\/projects\/toris-agent/);
   // The box costs two border rows and a spacer; past that it is one line per
-  // fact, and there are only six facts.
-  assert.ok(renderBanner(info).length <= 12, 'stays compact');
+  // fact, and the hint sits outside.
+  assert.ok(renderBanner(info).length <= 13, 'stays compact');
 });
 
 test('the banner names the keys that get an operator unstuck', () => {
   const text = stripAnsi(renderBanner(info).join('\n'));
   assert.match(text, /\/help/);
+  assert.match(text, /\/agent/);
+  assert.match(text, /\/studio/);
   assert.match(text, /ctrl-c/);
   assert.match(text, /ctrl-d/);
 });
@@ -301,9 +304,11 @@ test('a long cwd is clipped inside the box, never past its edge', () => {
   assert.ok(lines.some((l) => l.includes('…')), 'the overflow is marked, not silently cut');
 });
 
-test('the hint line names the three keys a newcomer needs', () => {
+test('the hint line names the keys a newcomer needs on both surfaces', () => {
   const text = stripAnsi(renderBanner({ ...info, width: 80 }).join('\n'));
   assert.match(text, /\/help/);
+  assert.match(text, /\/agent/);
+  assert.match(text, /\/studio/);
   assert.match(text, /ctrl-c/);
   assert.match(text, /ctrl-d/);
 });
