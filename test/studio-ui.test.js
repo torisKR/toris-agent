@@ -13,6 +13,8 @@ test('product shell contains queue, editor, media review, quality, guarded publi
   for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
+  assert.match(html, /id="agent-send"[^>]*disabled/);
+  assert.match(html, /id="agent-input"[^>]*disabled/);
   assert.match(html, /PUBLISH &lt;contentId&gt;/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /<meta name="description"/);

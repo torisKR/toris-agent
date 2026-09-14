@@ -273,6 +273,7 @@ function renderAgentWorkspace() {
     ? '로컬 채팅 준비됨. 보내기는 이 브라우저에서만 동작합니다.'
     : (state.agentReason || '연결 대기');
   elements['agent-send'].disabled = !state.agentReady;
+  elements['agent-send'].setAttribute('aria-disabled', String(!state.agentReady));
   elements['agent-input'].disabled = !state.agentReady;
   renderAgentLog();
 }
