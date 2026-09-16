@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" role="img" aria-labelledby="title desc">
+  <title id="title">Toris Agent architecture from the current implementation</title>
+  <desc id="desc">Operator surfaces (CLI/TUI and Studio on 127.0.0.1:5824) feed planner.js, orchestrator.js, isolated worktrees, verifier.js and receipt.js under ~/.toris. Design Mode captures flow through design-proxy.js and design-store.js into POST /api/agent/turn. Optional Android evidence uses android.js with adb argv and lands under ~/.toris/android.</desc>
+  <rect width="960" height="620" fill="#090b0f"/>
+  <text x="32" y="36" fill="#ff7657" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" letter-spacing="1.6">FROM THIS REPOSITORY</text>
+  <text x="32" y="64" fill="#f4efe6" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="600">How Toris turns a goal into evidence</text>
+  <text x="32" y="88" fill="#a8b0bc" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">Labeled from actual modules. Not a mock UI.</text>
+
+  <rect x="32" y="110" width="280" height="88" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="48" y="134" fill="#8c95a2" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">OPERATOR</text>
+  <text x="48" y="158" fill="#f4efe6" font-size="15" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">CLI / TUI · bin/toris.js</text>
+  <text x="48" y="178" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">toris · /agent · toris run</text>
+
+  <rect x="340" y="110" width="280" height="88" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="356" y="134" fill="#8c95a2" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">STUDIO · 127.0.0.1:5824</text>
+  <text x="356" y="158" fill="#f4efe6" font-size="15" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">src/studio/server.js</text>
+  <text x="356" y="178" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">/ review · /agent · /design</text>
+
+  <rect x="648" y="110" width="280" height="88" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="664" y="134" fill="#8c95a2" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">STATE</text>
+  <text x="664" y="158" fill="#f4efe6" font-size="15" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">store.js · ~/.toris</text>
+  <text x="664" y="178" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">runs, events, config, patches</text>
+
+  <path d="M172 198 v18" stroke="#2a3039" stroke-width="2"/>
+  <path d="M480 198 v18" stroke="#2a3039" stroke-width="2"/>
+  <path d="M172 216 H480" stroke="#2a3039" stroke-width="2"/>
+  <path d="M326 216 v16" stroke="#2a3039" stroke-width="2"/>
+
+  <rect x="32" y="236" width="200" height="72" rx="12" fill="#171c23" stroke="#2a3039"/>
+  <text x="48" y="262" fill="#f5bf68" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">PLAN</text>
+  <text x="48" y="284" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">planner.js</text>
+
+  <rect x="252" y="236" width="220" height="72" rx="12" fill="#171c23" stroke="#2a3039"/>
+  <text x="268" y="262" fill="#f5bf68" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">DISPATCH</text>
+  <text x="268" y="284" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">orchestrator.js</text>
+  <text x="268" y="302" fill="#a8b0bc" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">parallel 3 · retry 2 · fallback</text>
+
+  <rect x="492" y="236" width="220" height="72" rx="12" fill="#171c23" stroke="#2a3039"/>
+  <text x="508" y="262" fill="#f5bf68" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">ROLES</text>
+  <text x="508" y="284" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">agents.js · 12 profiles</text>
+  <text x="508" y="302" fill="#a8b0bc" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">toris + 11 task roles</text>
+
+  <rect x="732" y="236" width="196" height="72" rx="12" fill="#171c23" stroke="#2a3039"/>
+  <text x="748" y="262" fill="#f5bf68" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">THINK</text>
+  <text x="748" y="284" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">providers.js</text>
+  <text x="748" y="302" fill="#a8b0bc" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">claude · codex CLIs</text>
+
+  <path d="M232 272 H252" stroke="#ff7657" stroke-width="2"/>
+  <path d="M472 272 H492" stroke="#ff7657" stroke-width="2"/>
+  <path d="M712 272 H732" stroke="#ff7657" stroke-width="2"/>
+
+  <path d="M480 308 v20" stroke="#2a3039" stroke-width="2"/>
+
+  <rect x="32" y="336" width="280" height="72" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="48" y="362" fill="#72d6a0" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">ISOLATE</text>
+  <text x="48" y="384" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">worktree.js · patches.js</text>
+  <text x="48" y="402" fill="#a8b0bc" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">coding CLIs never write checkout</text>
+
+  <rect x="340" y="336" width="280" height="72" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="356" y="362" fill="#72d6a0" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">VERIFY</text>
+  <text x="356" y="384" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">verifier.js</text>
+  <text x="356" y="402" fill="#a8b0bc" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">real lint / test / build exit codes</text>
+
+  <rect x="648" y="336" width="280" height="72" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="664" y="362" fill="#72d6a0" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">EVIDENCE</text>
+  <text x="664" y="384" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">receipt.js</text>
+  <text x="664" y="402" fill="#a8b0bc" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">JSON + Markdown on disk</text>
+
+  <path d="M312 372 H340" stroke="#72d6a0" stroke-width="2"/>
+  <path d="M620 372 H648" stroke="#72d6a0" stroke-width="2"/>
+
+  <rect x="32" y="432" width="440" height="156" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="48" y="458" fill="#ff7657" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">DESIGN MODE</text>
+  <text x="48" y="482" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">Pick a live element, attach evidence</text>
+  <text x="48" y="506" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">sample · sandboxed iframe proxy · bookmarklet</text>
+  <text x="48" y="526" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">design.js + design-proxy.js + design-picker.js</text>
+  <text x="48" y="546" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">selector · computed styles · outerHTML · screenshot</text>
+  <text x="48" y="566" fill="#8c95a2" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">DesignStore ~/.toris/studio/design ’ POST /api/agent/turn</text>
+
+  <rect x="492" y="432" width="436" height="156" rx="12" fill="#11151b" stroke="#2a3039"/>
+  <text x="508" y="458" fill="#ff7657" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif">ANDROID VERIFY · OPTIONAL</text>
+  <text x="508" y="482" fill="#f4efe6" font-size="14" font-weight="600" font-family="ui-sans-serif, system-ui, sans-serif">adb evidence, never a required SDK</text>
+  <text x="508" y="506" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">src/core/android.js · argv spawn, not a shell</text>
+  <text x="508" y="526" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">CLI: status · devices · screenshot · logcat · install</text>
+  <text x="508" y="546" fill="#a8b0bc" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">chat tool: status · devices · screenshot · logcat</text>
+  <text x="508" y="566" fill="#8c95a2" font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">artifacts under ~/.toris/android/ · doctor WARN only</text>
+</svg>

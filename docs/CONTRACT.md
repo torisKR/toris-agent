@@ -398,6 +398,8 @@ toris daemon start|stop|status
 toris agents [--category <c>]    # agent profile catalog
 toris skills
 toris version
+toris studio                     # localhost GUI: review, /agent, /design
+toris android status|devices|screenshot|logcat|install   # optional adb evidence
 ```
 
 Exit codes: `0` success, `1` generic failure, `2` usage error, `3` verification failed, `4` approval denied/timeout, `5` daemon unavailable.

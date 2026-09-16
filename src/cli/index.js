@@ -20,6 +20,7 @@ import { cmdUpdate } from './commands/update.js';
 import { cmdStudio } from './commands/studio.js';
 import { cmdBot } from './commands/bot.js';
 import { cmdPatches, cmdDiff, cmdApply, cmdDiscard } from './commands/patches.js';
+import { cmdAndroid } from './commands/android.js';
 
 const COMMANDS = {
   init: cmdInit,
@@ -47,11 +48,12 @@ const COMMANDS = {
   apply: cmdApply,
   discard: cmdDiscard,
   update: cmdUpdate,
+  android: cmdAndroid,
   version: cmdVersion,
 };
 
 /** Commands that must not fail merely because config does not exist yet. */
-const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'studio', 'bot', 'version', 'update']);
+const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'studio', 'bot', 'version', 'update', 'android']);
 
 /** What a bare `toris` runs when a human is watching. */
 const DEFAULT_INTERACTIVE_COMMAND = 'chat';

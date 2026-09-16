@@ -14,7 +14,15 @@ body { overflow-x: hidden; }
 .chat-turn p { margin: 0; color: var(--text); font-size: 15px; line-height: 1.65; white-space: pre-wrap; }
 .chat-tool { color: var(--quiet); font-size: 11px; }
 .chat-composer { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--panel); }
-.access-code { margin: 12px 0 0; padding: 12px; border-radius: var(--radius-control); background: var(--raised); color: var(--muted); font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
+.access-code { margin: 12px 0 0; padding: 12px; border-radius: var(--radius-control); background: var(--raised); color: var(--muted); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow: auto; max-height: 220px; }
+.design-url-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: end; margin-bottom: 16px; }
+.design-frame-wrap { min-height: 480px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-media); background: var(--media-black); box-shadow: var(--shadow); }
+.design-frame-wrap iframe { display: block; width: 100%; height: min(70vh, 720px); min-height: 480px; border: 0; background: var(--text); }
+.design-meta { display: grid; gap: 10px; margin: 0; }
+.design-meta dt { color: var(--quiet); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.design-meta dd { margin: 4px 0 0; color: var(--text); font-size: 12px; word-break: break-all; }
+.design-shot { max-width: 100%; margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.bookmarklet-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 760; text-decoration: none; }
 .brand-mark { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; color: var(--accent-ink); background: var(--accent); }
 .local-state { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -92,5 +100,6 @@ dialog::backdrop { background: rgb(0 0 0 / .76); backdrop-filter: blur(4px); }
   .review-canvas { min-height: 420px; }
   .evidence-receipt { grid-template-columns: 1fr; }
   .inspector { display: block; } .inspector-section { border-right: 0; border-bottom: 1px solid var(--border); }
+  .design-url-bar { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .sr-toast { transition: none; } .empty-orbit { transform: none; } }

@@ -1,7 +1,9 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { resolve, dirname, relative, join } from 'node:path';
+import { homedir } from 'node:os';
 import { TorisError } from './errors.js';
 import { spawnCaptured } from '../native/index.js';
+import { runAndroidAction } from './android.js';
 
 /**
  * The default tool set given to a chat session.
@@ -55,11 +57,12 @@ async function runCommand(command, { cwd, timeout }) {
 }
 
 /**
- * @param {{cwd?:string}} [opts]
+ * @param {{cwd?:string, home?:string, android?:object}} [opts]
  * @returns {Array<object>} tools in the shape createChatSession expects
  */
-export function createDefaultTools({ cwd = process.cwd() } = {}) {
+export function createDefaultTools({ cwd = process.cwd(), home, android } = {}) {
   const root = resolve(cwd);
+  const torisHome = home || process.env.TORIS_HOME || join(homedir(), '.toris');
 
   return [
     {
@@ -153,6 +156,38 @@ export function createDefaultTools({ cwd = process.cwd() } = {}) {
         ]
           .filter(Boolean)
           .join('\n');
+      },
+    },
+
+    {
+      name: 'android',
+      description:
+        'Talk to a connected Android device or emulator via adb. Actions: status, devices, ' +
+        'screenshot, logcat. Take a screenshot or device list as evidence before claiming a ' +
+        'mobile UI fix is done. Optional — if adb is missing, report that instead of guessing.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            description: 'status | devices | screenshot | logcat',
+          },
+          serial: { type: 'string', description: 'adb device serial, optional' },
+          lines: { type: 'number', description: 'logcat line count, default 200' },
+        },
+        required: ['action'],
+      },
+      run: async ({ action, serial, lines }) => {
+        const name = String(action || '').trim();
+        if (name === 'install') {
+          return 'install is a CLI-only action (`toris android install <apk>`). It is not exposed to chat.';
+        }
+        try {
+          const result = await runAndroidAction(name, { home: torisHome, serial, lines, ...android });
+          return JSON.stringify(result, null, 2);
+        } catch (err) {
+          return err.message;
+        }
       },
     },
   ];

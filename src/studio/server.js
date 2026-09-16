@@ -12,19 +12,25 @@ import { RenderService } from './render-service.js';
 import { checkRelease, contentHash } from './release-guard.js';
 import { inspectAgentRuntime, publicAgentStatus, runAgentTurn } from './agent-runtime.js';
 import { resolveSurfaceAgent } from '../core/agents.js';
+import { DesignStore } from './design-store.js';
+import { buildBookmarklet } from './design.js';
+import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/agent', ['index.html', 'text/html; charset=utf-8']],
+  ['/design', ['index.html', 'text/html; charset=utf-8']],
   ['/design-system', ['design-system.html', 'text/html; charset=utf-8']],
+  ['/design/sample', ['design-sample.html', 'text/html; charset=utf-8', SAMPLE_CSP]],
   ['/assets/tokens.css', ['tokens.css', 'text/css; charset=utf-8']],
   ['/assets/components.css', ['components.css', 'text/css; charset=utf-8']],
   ['/assets/studio.css', ['studio.css', 'text/css; charset=utf-8']],
   ['/assets/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/assets/design-picker.js', ['design-picker.js', 'text/javascript; charset=utf-8']],
   ['/assets/favicon.svg', ['favicon.svg', 'image/svg+xml']],
 ]);
-const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
 function sendJson(response, status, value) {
   const body = Buffer.from(`${JSON.stringify(value)}\n`);
@@ -63,7 +69,7 @@ async function sendStatic(response, pathname) {
   response.writeHead(200, {
     'cache-control': 'no-cache',
     'content-length': String(body.length),
-    'content-security-policy': CONTENT_SECURITY_POLICY,
+    'content-security-policy': asset[2] || CONTENT_SECURITY_POLICY,
     'content-type': asset[1],
     'x-content-type-options': 'nosniff',
   });
@@ -76,6 +82,7 @@ export async function createStudioServer(options) {
   if (host !== '127.0.0.1') throw new Error('Toris Studio only binds to 127.0.0.1');
   const token = options.token || randomBytes(32).toString('base64url');
   const contents = await new ContentStore(options.home).init();
+  const designs = options.designs || (await new DesignStore(options.home).init());
   const renderService = options.renderService || new RenderService({
     home: options.home,
     contents,
@@ -98,7 +105,7 @@ export async function createStudioServer(options) {
       name: 'Toris Studio',
       localOnly: true,
       status: 'ready',
-      surfaces: ['review', 'agent'],
+      surfaces: ['review', 'agent', 'design'],
     });
   });
   for (const pathname of STATIC_ASSETS.keys()) {
@@ -118,9 +125,9 @@ export async function createStudioServer(options) {
   });
   router.add('POST', '/api/agent/turn', async (request, response) => {
     requireJson(request);
-    const body = await readJson(request);
+    const body = await readJson(request, { limitBytes: 1024 * 1024 });
     const message = String(body.message ?? '').trim();
-    if (!message) throw new HttpError(400, 'message is required');
+    if (!message && !body.design && !body.designId) throw new HttpError(400, 'message is required');
     try {
       resolveSurfaceAgent(body.agent);
     } catch (error) {
@@ -140,6 +147,10 @@ export async function createStudioServer(options) {
           message,
           history: body.history,
           profile: body.profile,
+          design: body.design,
+          designId: body.designId,
+          loadDesign: (id) => designs.get(id),
+          saveDesign: (capture) => designs.save(capture),
           signal: abort.signal,
         }),
       );
@@ -148,6 +159,43 @@ export async function createStudioServer(options) {
         throw new HttpError(409, error.message);
       }
       throw error;
+    }
+  });
+  router.add('GET', '/api/design/bookmarklet', async (_request, response) => {
+    sendJson(response, 200, { href: buildBookmarklet(origin()), origin: origin() });
+  });
+  router.add('GET', '/design/frame', async (request, response) => {
+    const url = new URL(request.url || '/', origin());
+    const target = url.searchParams.get('url');
+    if (!target) throw new HttpError(400, 'url is required');
+    const page = await loadProxiedPage(target, { fetch: options.fetchPage });
+    const body = Buffer.from(page.html);
+    response.writeHead(200, {
+      'cache-control': 'no-store',
+      'content-length': String(body.length),
+      'content-security-policy': FRAME_CSP,
+      'content-type': 'text/html; charset=utf-8',
+      'x-content-type-options': 'nosniff',
+      'x-toris-design-url': page.url,
+    });
+    response.end(body);
+  });
+  router.add('GET', '/api/design/captures', async (_request, response) => {
+    sendJson(response, 200, { items: await designs.list() });
+  });
+  router.add('GET', '/api/design/captures/:id', async (_request, response, params) => {
+    const capture = await designs.get(params.id);
+    if (!capture) throw new HttpError(404, 'design capture not found');
+    sendJson(response, 200, capture);
+  });
+  router.add('POST', '/api/design/captures', async (request, response) => {
+    requireJson(request);
+    try {
+      const capture = await designs.save(await readJson(request, { limitBytes: 1024 * 1024 }));
+      sendJson(response, 201, capture);
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(400, error.message);
     }
   });
   router.add('GET', '/api/contents', async (_request, response) => {
@@ -251,6 +299,7 @@ export async function createStudioServer(options) {
     server,
     token,
     contents,
+    designs,
     jobs,
     listen() {
       return new Promise((resolve, reject) => {

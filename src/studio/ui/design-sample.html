@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Toris Design Mode sample</title>
+  <style>
+    body { margin: 0; font: 16px/1.5 ui-sans-serif, system-ui, sans-serif; color: #1b0e0a; background: #f4efe6; }
+    header { padding: 24px 28px; background: #11151b; color: #f4efe6; }
+    header p { margin: 8px 0 0; color: #a8b0bc; }
+    main { padding: 28px; display: grid; gap: 16px; max-width: 720px; }
+    .hero { padding: 24px; border-radius: 12px; background: #fff; border: 1px solid #d9d2c8; }
+    .hero h2 { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.04em; }
+    .cta { min-height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: #ff7657; color: #1b0e0a; font-weight: 700; }
+    .ghost { min-height: 44px; padding: 0 16px; border: 1px solid #2a3039; border-radius: 8px; background: transparent; }
+    .card { padding: 16px; border-radius: 12px; background: #171c23; color: #f4efe6; }
+  </style>
+</head>
+<body>
+  <header>
+    <p>Sample surface</p>
+    <h1 id="sample-title">Local product, pick an element</h1>
+    <p>This page is served by Toris Studio so Design Mode can be exercised without a second origin.</p>
+  </header>
+  <main>
+    <section class="hero" id="sample-hero">
+      <h2>Primary checkout</h2>
+      <p id="sample-copy">Price $12 · coral CTA · 44px target.</p>
+      <button class="cta" id="sample-cta" type="button">Continue</button>
+    </section>
+    <section class="card" id="sample-card">
+      <p>Secondary panel with muted copy for contrast checks.</p>
+      <button class="ghost" id="sample-ghost" type="button">Skip</button>
+    </section>
+  </main>
+  <script src="/assets/design-picker.js" data-toris-design="1"></script>
+</body>
+</html>

@@ -9,12 +9,16 @@
 export const STUDIO_HOST = '127.0.0.1';
 export const STUDIO_PORT = 5824;
 export const STUDIO_AGENT_PATH = '/agent';
+export const STUDIO_DESIGN_PATH = '/design';
 
 /** @param {number} [port] */
 export const studioOrigin = (port = STUDIO_PORT) => `http://${STUDIO_HOST}:${port}`;
 
 /** @param {number} [port] */
 export const studioAgentUrl = (port = STUDIO_PORT) => `${studioOrigin(port)}${STUDIO_AGENT_PATH}`;
+
+/** @param {number} [port] */
+export const studioDesignUrl = (port = STUDIO_PORT) => `${studioOrigin(port)}${STUDIO_DESIGN_PATH}`;
 
 /**
  * One-screen directions for the `/studio` slash command and the GUI inspector.
@@ -24,6 +28,7 @@ export function renderStudioAccess({ running = false, port = STUDIO_PORT } = {})
   const gui = studioAgentUrl(port);
   return [
     `GUI  ${gui}`,
+    `     ${studioDesignUrl(port)}`,
     'TUI  toris',
     running ? '     already running' : '     toris studio    start the local GUI',
   ].join('\n');

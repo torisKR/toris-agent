@@ -203,6 +203,7 @@ test('the shipped skill packages all load', async () => {
     'reproduce-first',
     'seo-geo-optimizer',
     'ship-small',
+    'android-verify',
     'toris-flutter-play-store-release',
   ]) {
     assert.ok(names.includes(expected), `missing shipped skill ${expected}`);

@@ -148,3 +148,11 @@ test('telegram and slack tokens are optional warnings, not failures', async () =
     },
   );
 });
+
+test('missing adb is a warning, never a failed doctor run', async () => {
+  const checks = await runDoctor();
+  assert.ok(checks.has('adb'));
+  assert.ok(checks.has('emulator'));
+  assert.notEqual(checks.get('adb').status, 'FAIL');
+  assert.notEqual(checks.get('emulator').status, 'FAIL');
+});

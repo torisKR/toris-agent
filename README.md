@@ -1,11 +1,10 @@
 <div align="center">
 
-# toris-agent
+# Toris Agent
 
-**로컬 우선 멀티 에이전트 개발 하네스.**
+**A local-first ADE and agent harness for solo builders.**
 
-하나의 목표를 계획·실행·검증 가능한 작업으로 나누고, 프로젝트 검사 결과를 영수증으로 남깁니다.
-Turn a goal into planned, executed and verified work — with an evidence receipt for every run.
+Turn one goal into planned, executed, and verified work — on your machine, with a receipt you can read.
 
 [![CI](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/torisKR/toris-agent/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/toris-agent.svg)](https://www.npmjs.com/package/toris-agent)
@@ -15,46 +14,132 @@ Turn a goal into planned, executed and verified work — with an evidence receip
 
 </div>
 
----
+<p align="center">
+  <img src="docs/assets/readme/studio-design.png" alt="Toris Studio Design Mode on 127.0.0.1:5824: sample checkout page in a sandboxed frame, with Design Mode captures in the left rail" width="920">
+</p>
+
+Toris is a *harness*, not a model. Your [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex/cli) CLI does the thinking. Toris decides **what** gets thought about, **in what order**, **how much may happen without you**, and **whether it actually worked**.
 
 ```console
-$ toris run "add a health endpoint" --autonomy L3
+$ toris run "add a health endpoint" --dry-run
 
-Run run_kymt5ph09d7548
+Run (dry-run)
+  goal      add a health endpoint
+  autonomy  L3
+  mode      dry-run (plan only, nothing executes)
 
-  Tasks (3)
+  Tasks (2)
   #  AGENT        STATUS   TITLE
-  1  implementer  pending  Add GET /health endpoint returning service status JSON
-  2  test-author  pending  Add automated tests covering the health endpoint
-  3  doc-writer   pending  Document the health endpoint in README and API docs
+  1  implementer  pending  Implement: add a health endpoint
+  2  test-author  pending  Add tests covering the change
 ```
 
-`toris` decomposes a goal into tasks, assigns each one to a specialised agent profile, runs them
-through your existing **Claude Code** or **Codex** CLI, verifies the result with your project's own
-checks, and writes a receipt you can read, diff and archive.
+With a provider CLI the planner writes richer task titles. Without one, `--dry-run` still produces a deterministic fallback plan — that is the sample above.
 
-It is a *harness*, not a model. Your provider CLI does the thinking; toris decides **what** gets
-thought about, **in what order**, **how much may happen without you**, and **whether it actually worked**.
+Nothing leaves `~/.toris`. There is no Toris account, no hosted control plane, and no telemetry of its own.
 
-## Why
+---
 
-Agent tools are easy to start and hard to trust. toris is built around five opinions:
+## Design Mode in 36 seconds
 
-| Opinion | What it means in practice |
+Pick a live DOM element. Attach the selector, computed styles, bounded HTML, and a cropped screenshot to the same coding agent you already use in the terminal.
+
+<p align="center">
+  <a href="docs/assets/readme/design-mode-demo.mp4">
+    <img src="docs/assets/readme/design-mode-poster.webp" alt="Poster for the Design Mode demo: Continue button selected in Studio, inspector showing #sample-cta styles, instruction field reading Match this CTA to 44px height" width="920">
+  </a>
+</p>
+
+<p align="center">
+  <a href="docs/assets/readme/design-mode-demo.mp4">Play the Design Mode demo (H.264 MP4)</a>
+  ·
+  <a href="docs/assets/readme/design-mode-demo.mp4"><code>docs/assets/readme/design-mode-demo.mp4</code></a>
+</p>
+
+GitHub does not always inline a repository MP4 inside the README. The poster above links to the file; the plain path works in the blob viewer.
+
+Screenshots, the poster, and the demo were captured from a running Toris Studio at `http://127.0.0.1:5824`. Assets live in [`docs/assets/readme/`](docs/assets/readme/).
+
+---
+
+## Why solo builders use it
+
+| Principle | What it means |
 | --- | --- |
-| **Local-first** | Every run, event and receipt is a plain file under `~/.toris`. No account, no server, no telemetry, no network calls of its own. |
-| **Evidence over vibes** | A run is not "done" because an agent said so. It is done when the project's own `lint`/`test`/`build` pass — and the receipt shows the exit codes. |
-| **A model does not grade its own homework** | After `claude` (or `codex`) implements, the other CLI reviews the isolated diff. A fail verdict holds auto-apply. `--no-review` skips it. |
-| **Autonomy is a dial** | L1 plans and touches nothing. L5 commits and pushes. You choose per run, and anything above the line asks first. |
-| **Zero dependencies** | The entire runtime is Node's standard library. Nothing in your supply chain but you and your provider CLI. |
+| **Local-first** | Every run, event, patch, Design Mode capture, and Android screenshot is a plain file under `~/.toris`. |
+| **Evidence over vibes** | A run is not done because an agent said so. It is done when *your* `lint` / `test` / `build` pass — and the receipt shows the exit codes. |
+| **A model does not grade its own homework** | After `claude` or `codex` implements, the other CLI reviews the isolated diff. A fail verdict holds auto-apply. `--no-review` skips it. |
+| **Autonomy is a dial** | L1 plans and touches nothing. L5 commits and pushes, including the default branch. Default is **L3**. |
+| **Zero runtime dependencies** | The Node runtime is the standard library. Your supply chain is you, Node, and the provider CLI you already installed. |
+
+---
+
+## Features
+
+### Same agent in the terminal and in Studio
+
+<p align="center">
+  <img src="docs/assets/readme/studio-agent.png" alt="Toris Studio agent room listing twelve local profiles including Toris, Planner, Architect, Researcher, Implementer, Test Author, and Refactorer" width="920">
+</p>
+
+`toris` opens the chat TUI. `toris studio` opens the localhost GUI. `/agent` in either place is the same catalogue: the `toris` coding persona plus eleven task roles.
+
+```bash
+toris                     # TUI chat
+toris --agent implementer
+toris studio              # http://127.0.0.1:5824
+                          # agent room  /agent
+                          # Design Mode /design
+```
+
+### Design Mode — UI evidence on the agent turn
+
+<p align="center">
+  <img src="docs/assets/readme/studio-design-capture.webp" alt="Design Mode after picking the coral Continue button: left rail shows #sample-cta, inspector lists selector, computed color and padding, and the button outerHTML" width="920">
+</p>
+
+Open `http://127.0.0.1:5824/design`, load your localhost app (or the built-in sample), click an element, write a short instruction, send. Studio stores the capture under `~/.toris/studio/design/` and attaches it to `POST /api/agent/turn`.
+
+There is no bundled Chromium and no extra npm dependency. Studio proxies `http`/`https` pages into a sandboxed iframe (`sandbox="allow-scripts"`, no `allow-same-origin`), or you drag the **Toris pick** bookmarklet onto pages that cannot be framed. Details: [docs/STUDIO.md](docs/STUDIO.md).
+
+### Optional Android verification
+
+Shipping Expo or Flutter to a phone is optional for the rest of Toris. When you do, `adb` on `PATH` is enough:
+
+```bash
+toris doctor                 # WARN if adb/emulator are missing — does not fail the run
+toris android status         # adb + emulator presence, connected devices
+toris android devices
+toris android screenshot     # PNG under ~/.toris/android/screenshots/
+toris android logcat         # dump under ~/.toris/android/logs/
+toris android install app.apk
+```
+
+Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the model can attach device evidence before claiming a mobile UI fix. `install` stays CLI-only. No Android SDK is required for Studio, chat, or `toris run`.
+
+### Review room for local drafts
+
+<p align="center">
+  <img src="docs/assets/readme/studio-review.png" alt="Toris Studio review room empty state: Korean copy asking you to pick a local draft, with post and MP4 import controls in the inspector" width="920">
+</p>
+
+Studio also reviews Korean post drafts and vertical MP4s on loopback. External publishing is disabled. Mutations need the current local `Origin` plus an in-memory session token. The server binds only to `127.0.0.1`.
+
+---
 
 ## Requirements
 
 - **Node.js >= 22.6.0** (`node --version`)
-- At least one provider CLI on your `PATH`:
+- At least one provider CLI on `PATH` to *execute* runs:
   - [Claude Code](https://claude.com/claude-code) — `claude`
   - [Codex CLI](https://developers.openai.com/codex/cli) — `codex`
-- `git` (optional, but required for commit/push autonomy levels)
+- `git` (optional, but required for commit/push autonomy)
+- `adb` (optional; Android verify only)
+- Studio video render on macOS: `uv` and `ffmpeg` on `PATH`
+
+`toris doctor` names whatever is missing. Planning (`--dry-run`) still works without a provider CLI.
+
+---
 
 ## Install
 
@@ -69,84 +154,58 @@ npx toris-agent doctor
 # Latest unreleased code, straight from git
 npm install -g git+https://github.com/torisKR/toris-agent.git
 
-# From source, for development
+# From source — there is no install step; there are no dependencies
 git clone https://github.com/torisKR/toris-agent.git
 cd toris-agent
-npm link          # no `npm install` needed — there are no dependencies
+npm link
 toris doctor
 ```
 
 Uninstall with `npm uninstall -g toris-agent`.
 
-## Toris Studio
-
-Toris Studio is a local review room for Korean post drafts and vertical MP4s. It stores content under `~/.toris`, renders with the bundled `auto_shorts` engine, and records an evidence-based quality report before anything can leave review.
-
-Requirements on macOS: `uv` and `ffmpeg` available on `PATH`.
+### Update
 
 ```bash
-# foreground, then open http://127.0.0.1:5824
-toris studio
-
-# install a per-user LaunchAgent that starts at login and restarts on failure
-toris studio service install
-toris studio service status
+toris update            # fetch the latest published version and install it in place
+toris update --check    # only report whether a newer version exists
+toris update --json     # machine-readable result
 ```
 
-The service installer creates a dedicated Python environment at `~/.toris/runtime/auto-shorts`. The web server binds only to `127.0.0.1`, mutations require the current local origin plus an in-memory session token, and external publishing is disabled. The same coding agent is available at `http://127.0.0.1:5824/agent` and from the TUI via `toris` / `/agent` / `/studio`. See [docs/STUDIO.md](./docs/STUDIO.md) for the storage, render, recovery, and removal contracts.
+`update` detects how this copy was installed before it changes anything. A global npm install is upgraded with `npm install -g toris-agent@latest`; pnpm, yarn, and bun installs get their own manager's command. A git checkout or a local project dependency is never overwritten — Toris prints the command it would have run and leaves the decision to you.
 
-## Talk to the agent
-
-The chat agent is the same process whether you type in a terminal or a browser.
-
-**TUI** — at a terminal, a bare `toris` opens the chat. `/agent` lists roles, `/agent implementer` switches, `/studio` prints the GUI URL.
-
-```bash
-toris
-toris --agent planner
-```
-
-**GUI** — start Studio and open the agent room:
-
-```bash
-toris studio
-# http://127.0.0.1:5824/agent
-```
+---
 
 ## Quickstart
 
-**1. Check your environment.** `doctor` tells you exactly what is missing before you waste a run:
+**1. Check the environment.**
 
 ```console
 $ toris doctor
 toris doctor
 
-  PASS  node               v24.16.0 (requires >= 22.6.0)
+  PASS  node               v22.14.0 (requires >= 22.6.0)
   PASS  provider:claude    /usr/local/bin/claude
-  PASS  provider:codex     /usr/local/bin/codex
-  PASS  providers          at least one agent CLI available
   PASS  git                /usr/bin/git
   WARN  config             not created yet, run: toris init
-  PASS  store              /Users/you/.toris
-  PASS  cwd-git            /Users/you/projects/my-app
-
-All required checks passed.
+  PASS  store              ~/.toris
+  WARN  adb                adb not on PATH; Android verify is optional
+  WARN  emulator           emulator not on PATH; device or Expo Go is enough
 ```
 
-**2. Initialise and register a project.**
+**2. Initialise and register the repo you are standing in.**
 
 ```bash
-toris init                 # creates ~/.toris and a default config
-toris project add .        # register the repo you are standing in
+toris init
+toris project add .
 ```
 
-**3. Plan without touching anything.** `--dry-run` never writes a file:
+**3. Plan without touching anything.**
 
 ```bash
 toris run "add a health endpoint" --dry-run
 ```
 
-**4. Let it work.** Raise the dial when you trust the plan:
+**4. Raise the dial when you trust the plan.** Default autonomy is L3 (apply + local commit, ask before push):
 
 ```bash
 toris run "add a health endpoint" --autonomy L3 --budget 2.00
@@ -155,53 +214,46 @@ toris run "add a health endpoint" --autonomy L3 --budget 2.00
 **5. Read the evidence.**
 
 ```bash
-toris runs                            # every run, newest first
-toris inspect run_kymt5ph09d7548      # tasks, checks, timings
-toris receipt run_kymt5ph09d7548 --md > receipt.md
+toris runs
+toris inspect <runId>
+toris receipt <runId> --md > receipt.md
 ```
 
-## How a run works
+---
 
-```
-   goal
-     │
-     ▼
-┌──────────┐   plan     ┌──────────────┐  dispatch  ┌───────────────┐
-│ planner  │──────────▶ │ orchestrator │──────────▶ │ agent profile │
-└──────────┘  tasks +   └──────────────┘  parallel  │  implementer  │
-              agents +         │          (max 3)   │  test-author  │
-              order            │                    │  reviewer ... │
-                               │                    └───────┬───────┘
-                               │                            │ provider CLI
-                               │                            ▼
-                               │                    ┌───────────────┐
-                               │  retry / fallback  │ claude │ codex│
-                               │ ◀──────────────────└───────────────┘
-                               ▼
-                        ┌──────────────┐
-                        │   verifier   │  npm run lint / test / build
-                        └──────┬───────┘  → real exit codes
-                               ▼
-                        ┌──────────────┐
-                        │   receipt    │  JSON + Markdown, on disk
-                        └──────────────┘
-```
+## Design Mode workflow
 
-- **Planner** turns one sentence into ordered tasks, each bound to an agent profile.
-- **Orchestrator** runs independent tasks in parallel (default 3), retries failures
-  (default 2), and falls back to the *other* provider before giving up.
-- **Verifier** infers checks from your `package.json` scripts and runs them for real. It stops at
-  the first failure so a broken build does not burn the rest of your budget.
-- **Receipt** records goal, plan, per-task status, check exit codes, duration and cost.
-  Exit code `3` means verification failed — CI can gate on it.
+1. Start Studio: `toris studio` → open `http://127.0.0.1:5824/design`.
+2. Load a target URL, or click **샘플** for the built-in page at `/design/sample`.
+3. Click an element. Studio records CSS selector, bounded `outerHTML`, computed styles, page URL, and a cropped screenshot when the browser can rasterize it.
+4. Write the instruction (“match this CTA to 44px height”) and send. The payload is attached to the coding agent turn.
+5. For authenticated SPAs or strict CSP, drag **Toris pick** to the bookmark bar, pick in the app tab, and Studio opens `/design#ingest=...` on loopback.
+
+The proxy only fetches `http`/`https`, strips a target CSP, and frames the result with `frame-ancestors 'self'`. Untrusted scripts run without `allow-same-origin`, so they cannot read the Studio session token.
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="docs/assets/readme/architecture.svg" alt="Architecture diagram from the Toris repository: CLI and Studio feed planner.js, orchestrator.js, agents.js and providers.js; worktree isolation, verifier.js and receipt.js write ~/.toris; Design Mode flows through design-proxy.js into POST /api/agent/turn; optional android.js uses adb argv" width="920">
+</p>
+
+- **Planner** (`src/core/planner.js`) turns one sentence into ordered tasks, each bound to an agent profile.
+- **Orchestrator** (`src/core/orchestrator.js`) runs independent tasks in parallel (default 3), retries failures (default 2), and falls back to the *other* provider before giving up.
+- **Worktrees** (`src/core/worktree.js`) keep coding CLIs out of your checkout. Applying the diff is a separate gate (`toris patches` / `apply` / `discard`).
+- **Verifier** (`src/core/verifier.js`) infers checks from your `package.json` scripts and runs them for real. It stops at the first failure so a broken build does not burn the rest of your budget.
+- **Receipt** (`src/core/receipt.js`) records goal, plan, per-task status, check exit codes, duration, and cost. Exit code `3` means verification failed — CI can gate on it.
+
+The frozen v0.1.0 interface lives in [docs/CONTRACT.md](docs/CONTRACT.md). Studio behaviour is in [docs/STUDIO.md](docs/STUDIO.md). Module specs are under [docs/specs/](docs/specs/).
+
+---
 
 ## Chat
 
-`toris run` delegates to agent CLIs. `toris chat` is the other half: toris talks to
-the model itself, with tools, so you can work without a second CLI installed.
+`toris run` delegates to agent CLIs. `toris chat` talks to a model with tools, so you can work without a second CLI installed.
 
-Point a profile at a model and route `chat` to it. toris ships **no model IDs** —
-you own that mapping, so swapping models is a config edit, never an upgrade:
+Toris ships **no model IDs**. You own that mapping:
 
 ```jsonc
 // ~/.toris/config.json
@@ -211,46 +263,32 @@ you own that mapping, so swapping models is a config edit, never an upgrade:
 }
 ```
 
-Chat HTTP providers: `anthropic`, `openai`, `grok`. CLI-backed: `claude-cli`, `codex-cli`.
-Grok uses `XAI_API_KEY` (`GROK_API_KEY` also works). You still pick the model id:
+HTTP providers: `anthropic`, `openai`, `grok`. CLI-backed: `claude-cli`, `codex-cli`. Grok uses `XAI_API_KEY` (`GROK_API_KEY` also works):
 
 ```bash
 export XAI_API_KEY=...
 toris connect --provider grok --model <grok-model-id>
-```
-
-```bash
-export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY or XAI_API_KEY
+export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY
 toris chat                        # REPL
-toris chat "why does the build fail?"   # one-shot
+toris chat "why does the build fail?"
 ```
 
-The model gets `read_file`, `list_files`, `write_file` and `run_command`. Writes and
-commands are gated by your autonomy level — below **L3** every mutation asks first,
-and a denial is reported back to the model instead of silently failing.
-
-```console
-$ toris chat
-  /skills   list loaded skill packages
-  /model    show the active profile
-  /clear    reset the transcript
-  /exit
-```
+The model gets `read_file`, `list_files`, `write_file`, `run_command`, and `android`. Writes and commands are gated by autonomy — below **L3** every mutation asks first, and a denial is reported back to the model instead of silently failing.
 
 If chat is not usable yet, `toris doctor` names the exact key or variable to set.
 
+---
+
 ## Skills
 
-A skill is a directory with a `SKILL.md` — a short, durable instruction the model
-follows during chat. Discovery is **builtin → `~/.toris/skills` → `<project>/.toris/skills`**,
-later definitions overriding earlier ones by name, so a project can sharpen a rule
-without forking it.
+A skill is a directory with a `SKILL.md`. Discovery is **builtin → `~/.toris/skills` → `<project>/.toris/skills`**. Later definitions override earlier ones by name.
 
 ```console
 $ toris skills
-Skills (10)
+Skills (11)
 
   NAME                                SOURCE   DESCRIPTION
+  android-verify                      builtin  Capture Android device evidence before claiming a mobile UI fix.
   app-store-listing-creator           builtin  Create or improve Play Store and App Store listing packages.
   expo-android-performance            builtin  Diagnose and optimize Expo Android performance.
   expo-interactive-design             builtin  Design distinctive Expo interfaces and motion.
@@ -263,26 +301,13 @@ Skills (10)
   toris-flutter-play-store-release    builtin  Operate Flutter Android delivery through Fastlane and GitHub Actions.
 ```
 
-Three of the built-ins encode solo-developer habits that are easy to skip when you are
-the only reviewer: reproduce before fixing, ship the smallest change, and prove the
-package installs before tagging a release. The rest come from
-[product-growth-skills](https://github.com/torisKR/product-growth-skills): store listing,
-SEO/GEO, Flutter/Expo performance and interactive design, and Flutter Play Store delivery.
+Three built-ins encode habits that are easy to skip when you are the only reviewer: reproduce before fixing, ship the smallest change, and prove the package installs before tagging a release. The rest come from [product-growth-skills](https://github.com/torisKR/product-growth-skills).
 
-```markdown
----
-name: reproduce-first
-description: Reproduce a bug with a command before proposing any fix.
 ---
 
-Do not propose a fix until you have run a command that shows the failure.
-```
+## Autonomy
 
-Drop that in `.toris/skills/<name>/SKILL.md` and it applies to the next chat.
-
-## Autonomy levels
-
-Every run has a ceiling. Coding CLIs (`claude`, `codex`) write in a disposable git worktree, not your checkout. Applying that diff is a separate gate.
+Every run has a ceiling. Coding CLIs write in a disposable git worktree, not your checkout.
 
 ```console
 $ toris autonomy
@@ -296,63 +321,35 @@ Autonomy levels
   L5     yes    yes    yes     yes   fully autonomous, including the default branch
 ```
 
-Default is **L3**. At L2 a finished run exits `4` with status `awaiting-apply` until you decide:
+Default is **L3** (`defaultAutonomy` in `~/.toris/config.json`). At L2 a finished run exits `4` with status `awaiting-apply` until you decide:
 
 ```bash
-toris patches                # isolated diffs waiting on you
-toris apply pat_7x2k9d       # land the diff on the original repo
-toris discard pat_7x2k9d     # drop the worktree
+toris patches
+toris apply pat_7x2k9d
+toris discard pat_7x2k9d
 toris run "fix the parser" --apply   # L2, but apply without asking
 ```
 
 Push and other gated actions still queue as approvals:
 
 ```bash
-toris approvals              # what is waiting
-toris approve apr_7x2k9d     # let it through
-toris reject  apr_7x2k9d     # exit code 4, run stops
+toris approvals
+toris approve apr_7x2k9d
+toris reject  apr_7x2k9d
 ```
 
-## Slack and Telegram
-
-`toris bot` long-polls Telegram and opens Slack Socket Mode. Coding work from a messenger always goes through `/run` (isolated), never through free-form chat.
-
-```bash
-export TORIS_TELEGRAM_BOT_TOKEN=...
-export TORIS_SLACK_BOT_TOKEN=xoxb-...
-export TORIS_SLACK_APP_TOKEN=xapp-...   # Socket Mode
-# optional outbound-only: TORIS_SLACK_WEBHOOK_URL
-
-toris bot
-```
-
-From Slack or Telegram:
-
-```
-/run add a health endpoint
-/patches
-/apply pat_7x2k9d          # or /last for the newest pending patch
-/discard pat_7x2k9d
-/status
-/workspace                 # show the repo the bot will use
-/workspace prj_abc         # pin it (also: a path)
-/projects
-/runs
-/receipt
-/autonomy L2
-```
-
-Restrict senders with `channels.telegram.allowFrom` / `channels.slack.allowFrom` (user ids). Pin the repo with `channels.workspace` or `/workspace`. Pending patches also notify those channels when chatId / Slack channel is set.
+---
 
 ## Agent profiles
 
-Eleven built-in profiles across four categories. `WRITES` marks the ones allowed to modify files.
+`toris agents` lists **12** profiles: the `toris` chat persona (`core`) plus eleven task roles. `WRITES` marks the ones allowed to modify files.
 
 ```console
 $ toris agents
-Agent profiles (11)
+Agent profiles (12)
 
   ID                 CATEGORY  WRITES  SUMMARY
+  toris              core      yes     General coding agent for the repository you are standing in.
   planner            plan      no      Decomposes a goal into ordered, verifiable tasks.
   architect          plan      no      Chooses structure, boundaries and trade-offs before code exists.
   researcher         plan      no      Finds prior art, libraries and API facts before implementing.
@@ -368,30 +365,11 @@ Agent profiles (11)
 
 Filter with `toris agents --category build`.
 
+---
+
 ## Receipts
 
 Every run produces an auditable record. Markdown for humans, JSON for machines.
-
-```markdown
-# Run receipt `run_kymt9dy9c5017d`
-
-**Goal** — add a health endpoint
-
-| Field | Value |
-| --- | --- |
-| Status | `succeeded` |
-| Autonomy | L3 |
-| Provider | claude |
-| Duration | 25.4s |
-| Cost | $0.0000 |
-
-## Tasks (4/4 succeeded)
-
-- ✅ Add /health endpoint route handler _(implementer)_
-- ✅ Write unit tests for health payload builder _(test-author)_
-- ✅ Add integration test for the /health HTTP route _(test-author)_
-- ✅ Document the health endpoint in README _(doc-writer)_
-```
 
 ```bash
 toris receipt <runId>          # JSON on stdout
@@ -399,50 +377,51 @@ toris receipt <runId> --md     # Markdown, ready to paste into a PR
 toris logs <runId>             # raw JSONL event stream
 ```
 
+---
+
+## Slack and Telegram
+
+`toris bot` long-polls Telegram and opens Slack Socket Mode. Coding work from a messenger always goes through `/run` (isolated), never through free-form chat.
+
+```bash
+export TORIS_TELEGRAM_BOT_TOKEN=...
+export TORIS_SLACK_BOT_TOKEN=xoxb-...
+export TORIS_SLACK_APP_TOKEN=xapp-...   # Socket Mode
+# optional outbound-only: TORIS_SLACK_WEBHOOK_URL
+
+toris bot
+```
+
+From Slack or Telegram: `/run`, `/patches`, `/apply`, `/last`, `/discard`, `/status`, `/workspace`, `/projects`, `/runs`, `/receipt`, `/autonomy`.
+
+Restrict senders with `channels.telegram.allowFrom` / `channels.slack.allowFrom`. Pin the repo with `channels.workspace` or `/workspace`.
+
+---
+
 ## Command reference
 
 ```
 init                      Create ~/.toris and a default config
 doctor                    Check runtime, providers, git and store
+connect                   Connect a model backend (CLI login or API key)
 chat ["<message>"]        Talk to a model with tools (REPL if no message)
 project add [path]        Register a project (defaults to cwd)
-project list              List registered projects
-project inspect <id>      Show one project
-project remove <id>       Unregister a project
+project list | inspect <id> | remove <id>
 run "<goal>"              Plan and execute a goal
-runs                      List past runs
-inspect <runId>           Show a run in detail
-receipt <runId> [--md]    Evidence receipt for a run
-logs <runId>              Event log for a run
-cancel <runId>            Mark a run cancelled
-approvals                 List approval requests
-approve <id> | reject <id>
-agents [--category <c>]   Built-in agent profiles
+runs | inspect <runId> | receipt <runId> [--md] | logs <runId> | cancel <runId>
+approvals | approve <id> | reject <id>
+agents [--category <c>]   Profiles for TUI /agent and Studio /agent
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
-daemon status             Background daemon (not in 0.1.0)
-  studio                    Local creator studio on 127.0.0.1:5824
-  bot                       Listen for Slack and Telegram commands
-  patches                   Isolated diffs waiting to be applied
-  apply <patchId>           Apply a patch to the original repo
-  discard <patchId>         Drop a patch and its worktree
-  update [--check]          Update toris to the latest published version
+daemon status             Background daemon (not implemented in this release)
+studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design)
+studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
+android status|devices|screenshot|logcat|install
+bot                       Listen for Slack and Telegram commands
+patches | diff <patchId> | apply <patchId> | discard <patchId>
+update [--check]          Update toris to the latest published version
 version                   Print version
 ```
-
-**Updating**
-
-```bash
-toris update            # fetch the latest version and install it in place
-toris update --check    # only report whether a newer version exists
-toris update --json     # machine-readable result
-```
-
-`update` works out how this copy was installed before it changes anything. A global
-npm install is upgraded with `npm install -g toris-agent@latest`; pnpm, yarn and bun
-installs get their own manager's command. A git checkout or a local project
-dependency is never overwritten — toris prints the command it would have run and
-leaves the decision to you.
 
 **Run options**
 
@@ -453,6 +432,7 @@ leaves the decision to you.
 | `--budget <usd>` | Cost ceiling for this run |
 | `--dry-run` | Plan only; never edits files |
 | `--apply` | Apply an isolated L2 diff without asking |
+| `--no-review` | Skip the opposite-provider second pass |
 | `--provider <name>` | `claude` or `codex` |
 
 **Global options**
@@ -464,9 +444,7 @@ leaves the decision to you.
 | `--no-color` | Disable ANSI colour |
 | `--verbose` | Stream events as they happen |
 
-## Scripting
-
-`--json` makes every command pipeable, and exit codes are stable:
+**Exit codes**
 
 | Code | Meaning |
 | --- | --- |
@@ -478,31 +456,32 @@ leaves the decision to you.
 | `5` | daemon unavailable |
 
 ```bash
-# Fail a CI job if the agent's work does not pass the project checks
 toris run "$GOAL" --autonomy L3 --json > run.json || exit $?
-
-# Attach the receipt to a pull request
 toris receipt "$(jq -r .run.id run.json)" --md >> "$GITHUB_STEP_SUMMARY"
 ```
 
+---
+
 ## Configuration
 
-State lives under `$TORIS_HOME` (default `~/.toris`) and is all plain text:
+State lives under `$TORIS_HOME` (default `~/.toris`) as plain text:
 
 ```
 ~/.toris
-├── config.json                       # settings below
-├── projects.json                     # registered projects
-├── runs/run_kymt9dy9c5017d.json      # one file per run
-└── events/run_kymt9dy9c5017d.jsonl   # append-only event log
+├── config.json
+├── projects.json
+├── runs/
+├── events/
+├── studio/design/          # Design Mode captures
+└── android/                # optional adb screenshots and logcat
 ```
 
-`config.json` defaults:
+`toris init` writes:
 
 ```json
 {
   "version": 1,
-  "defaultAutonomy": "L2",
+  "defaultAutonomy": "L3",
   "maxParallelAgents": 3,
   "maxDailyCostUsd": 20,
   "maxRetriesPerTask": 2,
@@ -517,8 +496,6 @@ State lives under `$TORIS_HOME` (default `~/.toris`) and is all plain text:
 
 Unknown keys are preserved, so a newer config survives an older binary.
 
-**Environment variables**
-
 | Variable | Effect |
 | --- | --- |
 | `TORIS_HOME` | Override the state directory |
@@ -531,27 +508,7 @@ Unknown keys are preserved, so a newer config survives an older binary.
 | `TORIS_SLACK_WEBHOOK_URL` | Optional outbound-only Slack webhook |
 | `NO_COLOR` | Disable ANSI colour (respects the [standard](https://no-color.org)) |
 
-## Project layout
-
-```
-bin/toris.js         # executable entry point
-src/
-├── cli/             # arg parsing, help, output formatting, commands/
-└── core/
-    ├── planner.js       goal → tasks
-    ├── orchestrator.js  parallel execution, retries, fallback
-    ├── providers.js     claude / codex adapters
-    ├── verifier.js      runs project checks, collects exit codes
-    ├── receipt.js       JSON + Markdown evidence
-    ├── autonomy.js      L1..L5 gating
-    ├── agents.js        the 11 profiles
-    ├── store.js         local JSON persistence
-    └── config.js        defaults, merge, paths
-test/                # node:test, one file per module
-docs/
-├── CONTRACT.md      # frozen v0.1.0 interface contract
-└── specs/           # per-module specifications
-```
+---
 
 ## Development
 
@@ -560,18 +517,25 @@ No install step — there are no dependencies.
 ```bash
 git clone https://github.com/torisKR/toris-agent.git
 cd toris-agent
-npm test                          # node --test test/
+npm test                          # node --test
 npm run lint                      # syntax check
-node bin/toris.js doctor          # run the CLI from source
-node --test test/planner.test.js  # a single suite
+node bin/toris.js doctor
+node --test test/planner.test.js
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and the rules around
-[the frozen interface contract](./docs/CONTRACT.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md](./docs/CONTRACT.md) for the frozen interface. Studio visual language is in [DESIGN.md](./DESIGN.md).
+
+## Docs
+
+- [docs/STUDIO.md](docs/STUDIO.md) — Studio bind, agent room, Design Mode, review, security boundary
+- [docs/CONTRACT.md](docs/CONTRACT.md) — public CLI / programmatic contract
+- [docs/specs/](docs/specs/) — per-module specifications
+- [CHANGELOG.md](CHANGELOG.md)
+- [SECURITY.md](SECURITY.md)
 
 ## Roadmap
 
-`0.1.0` is the CLI foundation. Next up:
+`0.1.0` was the CLI foundation. Still open:
 
 - [ ] Background daemon (`toris daemon start`) for long-running and scheduled goals
 - [x] Git worktree isolation so coding CLIs never write the original checkout
@@ -583,9 +547,7 @@ Ideas and complaints both welcome in [issues](https://github.com/torisKR/toris-a
 
 ## Contributing
 
-Pull requests are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) and
-[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) first. For vulnerabilities, follow
-[SECURITY.md](./SECURITY.md) rather than opening a public issue.
+Pull requests are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) first. For vulnerabilities, follow [SECURITY.md](./SECURITY.md) rather than opening a public issue.
 
 ## License
 
