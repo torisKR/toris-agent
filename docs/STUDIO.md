@@ -51,7 +51,7 @@ After Design Mode or an agent run leaves an isolated diff, open `http://127.0.0.
 1. The left rail lists records from the same `toris patches` store (`~/.toris/patches.json` and `~/.toris/patches/*.diff`). Filter pending, applied, discarded, or all.
 2. The canvas shows metadata and a readable unified diff. Huge diffs are truncated in the GUI; `toris diff <id>` still prints the full file.
 3. **적용** and **폐기** call the same `applySavedPatch` / `discardSavedPatch` functions as the CLI. They are mutations: current local `Origin` plus the in-memory session token.
-4. Optionally select a hunk, write a short review note, and send it as `POST /api/agent/turn` (via `POST /api/patches/:id/review`) so the implementer can fix the patch before you apply.
+4. Optionally select a hunk, write a short review note, and send it as an implementer turn (`POST /api/patches/:id/review`). The turn runs inside the isolated worktree (`record.worktreePath`), not the Studio process directory. After the turn, Studio restages that worktree and replaces `~/.toris/patches/<id>.diff`, so **적용** applies the reviewed diff. If the worktree is gone, review is rejected rather than writing the original checkout.
 
 CLI `toris patches`, `toris apply`, and `toris discard` are unchanged.
 

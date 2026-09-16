@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { newPatchId } from './ids.js';
-import { applyPatchToOrigin, removeWorktree } from './worktree.js';
+import { applyPatchToOrigin, removeWorktree, worktreeDiff } from './worktree.js';
+import { isRepo } from './git.js';
 import { TorisError } from './errors.js';
 
 const COLLECTION = 'patches';
@@ -84,6 +85,31 @@ async function updatePatch(store, id, patch) {
     items.map((item) => (item.id === id ? patch : item)),
   );
   return patch;
+}
+
+export async function refreshSavedPatchDiff(store, id, { diffFn = worktreeDiff } = {}) {
+  const record = await getPatch(store, id);
+  if (!record) throw new TorisError(`No patch matching "${id}".`, 'E_UNKNOWN_PATCH');
+  if (record.status !== 'pending') {
+    throw new TorisError(`Patch ${record.id} is already ${record.status}.`, 'E_PATCH_STATE');
+  }
+  if (!record.worktreePath || !record.baseSha) {
+    throw new TorisError(`Patch ${record.id} has no isolated worktree to refresh.`, 'E_PATCH_WORKTREE');
+  }
+  if (!(await isRepo(record.worktreePath))) {
+    throw new TorisError(
+      `Isolated worktree for ${record.id} is gone; review would edit the original checkout.`,
+      'E_PATCH_WORKTREE',
+    );
+  }
+  const diff = await diffFn({ path: record.worktreePath, baseSha: record.baseSha });
+  await mkdir(patchesDir(store.home), { recursive: true });
+  await writeFile(record.diffPath, diff.patch ?? '', 'utf8');
+  return updatePatch(store, record.id, {
+    ...record,
+    files: diff.files ?? [],
+    stats: diff.stats ?? '',
+  });
 }
 
 export async function applySavedPatch(store, id, { applyFn = applyPatchToOrigin } = {}) {

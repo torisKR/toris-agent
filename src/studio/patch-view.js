@@ -8,6 +8,7 @@ export const PATCH_DIFF_CHAR_LIMIT = 80_000;
 export const PATCH_DIFF_LINE_LIMIT = 4_000;
 export const PATCH_REVIEW_NOTE_LIMIT = 2_000;
 export const PATCH_HUNK_LIMIT = 8_000;
+export const PATCH_REVIEW_DIFF_CHAR_LIMIT = 16_000;
 export const PATCH_STATUSES = Object.freeze(['pending', 'applied', 'discarded', 'failed']);
 
 function clip(value, limit) {
@@ -67,7 +68,13 @@ export function presentPatch(record, { diff } = {}) {
   return presented;
 }
 
-export function formatPatchReviewMessage({ patch, diff, note, hunk } = {}) {
+export function formatPatchReviewMessage({
+  patch,
+  diff,
+  note,
+  hunk,
+  maxDiffChars = PATCH_REVIEW_DIFF_CHAR_LIMIT,
+} = {}) {
   const record = patch && typeof patch === 'object' ? patch : {};
   const files = Array.isArray(record.files) ? record.files : [];
   const lines = [
@@ -83,8 +90,8 @@ export function formatPatchReviewMessage({ patch, diff, note, hunk } = {}) {
     String(hunk ?? '').trim()
       ? `Selected hunk:\n\`\`\`diff\n${clip(String(hunk).trim(), PATCH_HUNK_LIMIT)}\n\`\`\``
       : null,
-    diff ? `Unified diff:\n\`\`\`diff\n${clip(diff, 24_000)}\n\`\`\`` : null,
-    'This is operator intent on an isolated patch. Edit the work so the next apply is correct. Do not apply or discard unless asked.',
+    diff ? `Unified diff:\n\`\`\`diff\n${clip(diff, maxDiffChars)}\n\`\`\`` : null,
+    'This is operator intent on an isolated patch. Edit the work so the next apply is correct. Do not apply or discard unless asked. Stay inside this isolated worktree; do not write the original checkout.',
   ];
   return lines.filter((line) => line != null && line !== '').join('\n');
 }
