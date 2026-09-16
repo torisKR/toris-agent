@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`toris android`** (`status`, `devices`, `screenshot`, `logcat`, `install`) plus optional `adb`/`emulator` doctor warnings and a chat `android` tool for device evidence. Artifacts land under `~/.toris/android/`.
 - TUI `/agent` and `/studio` commands, plus `toris --agent <id>`, so a chat session can pick a role and jump to the local GUI.
 - Studio agent room at `http://127.0.0.1:5824/agent` with the same profile catalogue and a localhost chat turn API.
+- English, product-led root README with live Studio screenshots, a Design Mode demo, and an architecture diagram generated from this implementation.
+
+### Changed
+
+- `toris --help` now reports the real default autonomy (**L3**), matching `defaultAutonomy` in `src/core/config.js`.
 
 ## [0.4.0] - 2026-09-08
 
