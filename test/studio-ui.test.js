@@ -32,6 +32,8 @@ test('product assets use only local API paths and define all responsive shells',
   for (const path of ['/api/session', '/api/contents', '/api/renders', '/api/jobs', '/review', '/release-check', '/upload', '/media', '/api/agent/', '/api/design/', '/design/frame']) assert.match(js, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(js, /event\.key !== 'Escape'/);
   assert.match(js, /setAttribute\('aria-pressed'/);
+  assert.match(js, /function safeScreenshot/);
+  assert.match(js, /event\.origin !== location\.origin/);
   assert.doesNotMatch(js, /https?:\/\//);
   assert.match(css, /grid-template-columns:\s*248px/);
   assert.match(css, /max-width:\s*1279px/);

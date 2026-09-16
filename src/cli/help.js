@@ -43,7 +43,7 @@ COMMANDS
 
 RUN OPTIONS
   -p, --project <ref>       Project id, name or unique prefix
-      --autonomy <L1..L5>   How much may happen unattended (default L2)
+      --autonomy <L1..L5>   How much may happen unattended (default L3)
       --budget <usd>        Cost ceiling for this run
       --dry-run             Plan only; never edits files
       --apply               Apply an isolated L2 diff without asking

@@ -200,7 +200,7 @@ export function injectPickerMarkup(html, { pickerSrc = '/assets/design-picker.js
   const source = stripDocumentCsp(html);
   const tags = [
     baseHref
-      ? `<base href="${String(baseHref).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}">`
+      ? `<base href="${String(baseHref).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;')}">`
       : '',
     `<script src="${pickerSrc}" data-toris-design="1"></script>`,
   ]

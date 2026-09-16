@@ -61,6 +61,19 @@ test('normalizeDesignCapture rejects non-http URLs', () => {
   assert.throws(() => assertSafeHttpUrl('javascript:alert(1)'), /http/);
 });
 
+test('screenshot attachments only keep png or jpeg data URLs', () => {
+  const capture = normalizeDesignCapture({
+    url: 'http://127.0.0.1:3000/',
+    screenshotDataUrl: 'javascript:alert(1)',
+  });
+  assert.equal(capture.screenshotDataUrl, null);
+  const html = normalizeDesignCapture({
+    url: 'http://127.0.0.1:3000/',
+    screenshotDataUrl: 'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
+  });
+  assert.equal(html.screenshotDataUrl, null);
+});
+
 test('formatDesignContext is evidence the agent can act on', () => {
   const text = formatDesignContext({
     url: 'http://127.0.0.1:5173/',

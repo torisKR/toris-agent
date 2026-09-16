@@ -365,6 +365,12 @@ function renderDesignCaptures() {
   }
 }
 
+function safeScreenshot(value) {
+  return typeof value === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=\s]+$/.test(value)
+    ? value
+    : null;
+}
+
 function renderDesign() {
   const capture = state.design;
   const has = Boolean(capture);
@@ -372,7 +378,7 @@ function renderDesign() {
   elements['design-meta'].hidden = !has;
   elements['design-styles'].hidden = !has;
   elements['design-html'].hidden = !has;
-  const shot = capture?.screenshotDataUrl;
+  const shot = safeScreenshot(capture?.screenshotDataUrl);
   elements['design-shot'].hidden = !shot;
   if (shot) elements['design-shot'].src = shot;
   else elements['design-shot'].removeAttribute('src');
@@ -395,7 +401,7 @@ async function applyCapture(raw) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(raw),
   });
-  state.design = { ...saved, screenshotDataUrl: raw.screenshotDataUrl || null };
+  state.design = { ...saved, screenshotDataUrl: safeScreenshot(raw.screenshotDataUrl) };
   state.captures = [state.design, ...state.captures.filter((item) => item.id !== saved.id)];
   renderDesign();
   announce('요소를 캡처했습니다.');
@@ -405,13 +411,16 @@ function ingestFromHash() {
   const hash = location.hash || '';
   if (!hash.startsWith('#ingest=')) return null;
   try {
-    return JSON.parse(decodeURIComponent(hash.slice(8)));
+    const value = JSON.parse(decodeURIComponent(hash.slice(8)));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value;
   } catch {
     return null;
   }
 }
 
 window.addEventListener('message', (event) => {
+  if (event.origin !== location.origin && event.origin !== 'null') return;
   const data = event.data;
   if (!data || data.type !== 'toris:design-capture' || !data.capture) return;
   applyCapture(data.capture).catch((error) => announce(error.message));
