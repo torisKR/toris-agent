@@ -156,3 +156,10 @@ test('missing adb is a warning, never a failed doctor run', async () => {
   assert.notEqual(checks.get('adb').status, 'FAIL');
   assert.notEqual(checks.get('emulator').status, 'FAIL');
 });
+
+test('missing knowledge store is a warning, never a failed doctor run', async () => {
+  const checks = await runDoctor();
+  assert.ok(checks.has('knowledge'));
+  assert.equal(checks.get('knowledge').status, 'WARN');
+  assert.match(checks.get('knowledge').detail, /toris knowledge init/);
+});

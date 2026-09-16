@@ -16,6 +16,8 @@ import { EXIT } from '../../core/errors.js';
 import { isRepo } from '../../core/git.js';
 import { telegramToken, slackBotToken, slackAppToken } from '../../core/channels.js';
 import { androidDoctorChecks } from '../../core/android.js';
+import { knowledgeDoctorCheck } from '../../core/knowledge/index.js';
+import { KnowledgeStore } from '../../core/knowledge/store.js';
 import { printJson, line, keyValues, c, statusColor } from '../output.js';
 
 const require = createRequire(import.meta.url);
@@ -35,6 +37,7 @@ export async function cmdInit(ctx) {
   const config = existed ? ctx.config : { ...DEFAULT_CONFIG };
   await saveConfig(ctx.home, config);
   await ctx.store.init();
+  await new KnowledgeStore({ home: ctx.home, projectPath: ctx.cwd }).init({ seed: true });
   if (ctx.json) {
     printJson({ ok: true, home: ctx.home, config: configPath(ctx.home), created: !existed });
     return EXIT.OK;
@@ -113,6 +116,7 @@ export async function cmdDoctor(ctx) {
 
   for (const check of chatChecks(ctx)) checks.push(check);
   checks.push(await skillCheck(ctx));
+  checks.push(await knowledgeDoctorCheck({ home: ctx.home, projectPath: process.cwd() }));
   for (const check of channelChecks(ctx)) checks.push(check);
   for (const check of androidDoctorChecks()) checks.push(check);
 

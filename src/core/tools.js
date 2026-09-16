@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { TorisError } from './errors.js';
 import { spawnCaptured } from '../native/index.js';
 import { runAndroidAction } from './android.js';
+import { createKnowledgeTools } from './knowledge/tools.js';
 
 /**
  * The default tool set given to a chat session.
@@ -57,10 +58,10 @@ async function runCommand(command, { cwd, timeout }) {
 }
 
 /**
- * @param {{cwd?:string, home?:string, android?:object}} [opts]
+ * @param {{cwd?:string, home?:string, android?:object, knowledge?:object}} [opts]
  * @returns {Array<object>} tools in the shape createChatSession expects
  */
-export function createDefaultTools({ cwd = process.cwd(), home, android } = {}) {
+export function createDefaultTools({ cwd = process.cwd(), home, android, knowledge } = {}) {
   const root = resolve(cwd);
   const torisHome = home || process.env.TORIS_HOME || join(homedir(), '.toris');
 
@@ -190,5 +191,11 @@ export function createDefaultTools({ cwd = process.cwd(), home, android } = {}) 
         }
       },
     },
+
+    ...createKnowledgeTools({
+      home: torisHome,
+      projectPath: root,
+      session: knowledge,
+    }),
   ];
 }

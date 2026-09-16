@@ -31,13 +31,21 @@ test('mutating tools stay behind the approval gate', async () => {
       .map((t) => t.name)
       .sort();
     // If this drifts, the autonomy level silently stops gating side effects.
-    assert.deepEqual(gated, ['run_command', 'write_file']);
+    assert.deepEqual(gated, ['knowledge_write', 'run_command', 'write_file']);
 
     const readOnly = tools
       .filter((t) => !t.needsApproval)
       .map((t) => t.name)
       .sort();
-    assert.deepEqual(readOnly, ['android', 'list_files', 'read_file']);
+    assert.deepEqual(readOnly, [
+      'android',
+      'domain_activate',
+      'knowledge_reflect',
+      'knowledge_search',
+      'list_files',
+      'memory_get',
+      'read_file',
+    ]);
   } finally {
     await cleanup();
   }

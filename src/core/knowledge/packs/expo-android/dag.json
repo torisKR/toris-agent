@@ -1,0 +1,19 @@
+{
+  "edges": [
+    {
+      "from": "expo-perf-budget",
+      "to": "motion-and-3d",
+      "kind": "prerequisite"
+    },
+    {
+      "from": "expo-perf-budget",
+      "to": "android-verify-before-claim",
+      "kind": "prerequisite"
+    },
+    {
+      "from": "motion-and-3d",
+      "to": "android-verify-before-claim",
+      "kind": "supports"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "edges": [
+    {
+      "from": "performance-measurement",
+      "to": "device-evidence",
+      "kind": "prerequisite"
+    },
+    {
+      "from": "device-evidence",
+      "to": "play-release-checklist",
+      "kind": "supports"
+    },
+    {
+      "from": "performance-measurement",
+      "to": "play-release-checklist",
+      "kind": "supports"
+    }
+  ]
+}

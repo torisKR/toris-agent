@@ -45,6 +45,13 @@ import { createId } from '../../core/ids.js';
 import { abandonIsolation, openIsolation, settleIsolation } from '../../core/isolation.js';
 import { formatPatchNotice, notifyChannels } from '../../core/channels.js';
 import { applySavedPatch, discardSavedPatch, listPatches } from '../../core/patches.js';
+import {
+  KnowledgeStore,
+  briefingForQuery,
+  composeKnowledgeTurn,
+  proposeReflections,
+  renderReflection,
+} from '../../core/knowledge/index.js';
 
 const require = createRequire(import.meta.url);
 
@@ -143,7 +150,12 @@ export async function cmdChat(ctx, args, flags) {
       forceApply: forceApply || Boolean(flags.apply) || Boolean(flags.yes),
     });
   };
-  const tools = flags['no-tools'] || isCliBacked ? [] : createDefaultTools({ cwd: process.cwd() });
+  const knowledgeSession = { activeDomains: [] };
+  const knowledgeStore = new KnowledgeStore({ home: ctx.home, projectPath: ctx.cwd });
+  const tools =
+    flags['no-tools'] || isCliBacked
+      ? []
+      : createDefaultTools({ cwd: process.cwd(), home: ctx.home, knowledge: knowledgeSession });
 
   const { skills, problems } =
     flags['no-skills'] || isCliBacked
@@ -156,10 +168,21 @@ export async function cmdChat(ctx, args, flags) {
           }),
         );
   const briefing = renderSkillBriefing(skills);
+  const knowledgeBriefing = isCliBacked
+    ? ''
+    : await briefingForQuery(knowledgeStore, '', knowledgeSession, { includeProfile: true });
   const systemFor = (agent = activeAgent) =>
-    chatSystemPrompt({ agent, briefing, cliBacked: isCliBacked });
+    chatSystemPrompt({ agent, briefing, knowledgeBriefing, cliBacked: isCliBacked });
   const autoApprove =
     Boolean(flags.yes) || autoApprovesTools(flags.autonomy ?? config.defaultAutonomy);
+
+  const composeTurn = async (text) => {
+    if (isCliBacked) return text;
+    const extra = await briefingForQuery(knowledgeStore, text, knowledgeSession, {
+      includeProfile: false,
+    });
+    return extra ? composeKnowledgeTurn(text, extra) : text;
+  };
 
   const oneShot = args.length > 0;
   if (oneShot && json) {
@@ -172,7 +195,7 @@ export async function cmdChat(ctx, args, flags) {
       maxTokens: resolved.maxTokens ?? undefined,
       approve: async () => autoApprove,
     });
-    const result = await session.send(args.join(' '));
+    const result = await session.send(await composeTurn(args.join(' ')));
     const settled = await foldIsolation();
     printJson({
       ok: true,
@@ -287,7 +310,7 @@ export async function cmdChat(ctx, args, flags) {
     generation = new AbortController();
     spinner.start('thinking');
     try {
-      await session.send(text, { signal: generation.signal });
+      await session.send(await composeTurn(text), { signal: generation.signal });
     } catch (err) {
       // Stop the spinner before printing, or its line-erase would wipe the message.
       spinner.stop();
@@ -459,6 +482,53 @@ export async function cmdChat(ctx, args, flags) {
       }
       await foldIsolation({ abandon: true });
       log(c.dim('dropped the live isolated worktree without applying'));
+    },
+    knowledge: async (rest) => {
+      const query = rest.join(' ').trim();
+      if (!query) {
+        const status = await knowledgeStore.status();
+        log(
+          c.dim(
+            status.ok
+              ? `${status.domains} domains · ${status.root}`
+              : 'no knowledge store — toris knowledge init',
+          ),
+        );
+        return;
+      }
+      const { searchIndex } = await import('../../core/knowledge/index.js');
+      const hits = searchIndex(await knowledgeStore.loadIndex(), query, { limit: 8 });
+      log(
+        hits.length
+          ? hits.map((hit) => `  ${hit.score}  ${hit.domain ? `${hit.domain}/` : ''}${hit.id}  ${hit.title}`).join('\n')
+          : '  (none)',
+      );
+    },
+    reflect: async (rest) => {
+      const history = session.history.filter((item) => item.role === 'user' || item.role === 'assistant');
+      const result = proposeReflections({
+        history,
+        domain: rest.find((arg) => arg !== 'accept' && arg !== 'write') || undefined,
+      });
+      const accept = rest.includes('accept') || rest.includes('write');
+      if (!accept) {
+        log(renderReflection(result));
+        return;
+      }
+      if (!result.proposals.length) {
+        log(c.dim(result.reason));
+        return;
+      }
+      for (const proposal of result.proposals) {
+        const note = await knowledgeStore.addTacit(proposal.domain, {
+          id: proposal.id,
+          title: proposal.title,
+          tags: proposal.tags,
+          body: proposal.body,
+          inbox: !proposal.domain,
+        });
+        log(`${c.green('+')} ${note.path}`);
+      }
     },
   };
 

@@ -413,3 +413,15 @@ Exit codes: `0` success, `1` generic failure, `2` usage error, `3` verification 
 5. **Tests**: colocated `*.test.ts`, AAA pattern, descriptive names. Target 80%+ on your package's logic.
 6. **No network in tests.** Use `mockAdapter()`.
 7. Do not edit files outside your assigned package directory.
+
+## Additive: local knowledge store (post-0.1)
+
+Not a breaking change to the frozen signatures above. On-disk layout for the secretary layer:
+
+- `torisHome()/knowledge/USER.md`
+- `torisHome()/knowledge/MEMORY.md`
+- `torisHome()/knowledge/domains/<slug>/{DOMAIN.md,dag.json,nodes/*.md,tacit/*.md}`
+- optional project overlay: `<repo>/.toris/knowledge/`
+
+CLI: `toris knowledge` (alias `toris memory`). Chat tools: `knowledge_search`, `memory_get`, `knowledge_write`, `domain_activate`, `knowledge_reflect`. Studio: `GET /knowledge`. See `docs/KNOWLEDGE.md`.
+
