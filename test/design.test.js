@@ -7,6 +7,7 @@ import {
   composeDesignTurnMessage,
   formatDesignContext,
   injectPickerMarkup,
+  listDesignCaptures,
   normalizeDesignCapture,
 } from '../src/studio/design.js';
 
@@ -95,6 +96,18 @@ test('formatDesignContext is evidence the agent can act on', () => {
   });
   assert.match(composed, /Make this 44px/);
   assert.match(composed, /outerHTML/);
+  const bundle = composeDesignTurnMessage('Align both.', [
+    { url: 'http://127.0.0.1:5173/', selector: '#sample-cta', outerHTML: '<button>Continue</button>', computedStyle: {}, note: '44px' },
+    { url: 'http://127.0.0.1:5173/', selector: '.price', outerHTML: '<span>$12</span>', computedStyle: {}, note: 'tabular' },
+  ]);
+  assert.equal(listDesignCaptures([
+    { url: 'http://127.0.0.1:5173/', selector: '#sample-cta' },
+    { url: 'http://127.0.0.1:5173/', selector: '.price' },
+  ]).length, 2);
+  assert.match(bundle, /Design Mode attachments \(2\)/);
+  assert.match(bundle, /#sample-cta/);
+  assert.match(bundle, /\.price/);
+  assert.match(bundle, /Operator note: 44px/);
 });
 
 test('injectPickerMarkup strips CSP and inserts the picker plus base href', () => {

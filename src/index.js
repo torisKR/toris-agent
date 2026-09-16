@@ -9,7 +9,7 @@ export {
   getAgent,
   resolveSurfaceAgent,
 } from './core/agents.js';
-export { studioAgentUrl, studioDesignUrl, renderStudioAccess, tuiAgentHint } from './core/access.js';
+export { studioAgentUrl, studioDesignUrl, studioPatchesUrl, renderStudioAccess, tuiAgentHint } from './core/access.js';
 export { AUTONOMY_LEVELS, resolveAutonomy, gate, withinBudget } from './core/autonomy.js';
 export { ADAPTERS, detectBinary, invokeProvider, oppositeProvider } from './core/providers.js';
 export {
@@ -28,6 +28,7 @@ export {
   normalizeDesignCapture,
   formatDesignContext,
   composeDesignTurnMessage,
+  listDesignCaptures,
   buildCssPath,
   buildBookmarklet,
   injectPickerMarkup,

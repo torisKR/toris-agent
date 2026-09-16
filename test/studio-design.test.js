@@ -26,9 +26,9 @@ async function withServer(fn, extra = {}) {
   }
 }
 
-function mutation(base, body) {
+function mutation(base, body, method = 'POST') {
   return {
-    method: 'POST',
+    method,
     headers: {
       origin: base,
       'x-toris-studio-token': 'test-token',
@@ -107,6 +107,9 @@ test('POST /api/design/captures requires origin+token and persists evidence', as
 
     const listed = await (await fetch(`${base}/api/design/captures`)).json();
     assert.equal(listed.items.length, 1);
+    const tray = await (await fetch(`${base}/api/design/tray`)).json();
+    assert.equal(tray.items.length, 1);
+    assert.equal(tray.items[0].id, capture.id);
   });
 });
 
@@ -141,6 +144,65 @@ test('POST /api/agent/turn forwards a design capture into the agent message', as
       runAgentTurn: async (input) => {
         received = input;
         return { ok: true, text: 'will edit the button', agent: { id: 'implementer', title: 'Implementer' } };
+      },
+    },
+  );
+});
+
+test('annotation tray queues multiple captures and sends them in one turn', async () => {
+  let received;
+  await withServer(
+    async ({ base, home }) => {
+      const first = await (
+        await fetch(
+          `${base}/api/design/captures`,
+          mutation(base, {
+            url: 'http://127.0.0.1:3000/',
+            selector: '#sample-cta',
+            tagName: 'button',
+            outerHTML: '<button id="sample-cta">Continue</button>',
+          }),
+        )
+      ).json();
+      const second = await (
+        await fetch(
+          `${base}/api/design/captures`,
+          mutation(base, {
+            url: 'http://127.0.0.1:3000/',
+            selector: '.price',
+            tagName: 'span',
+            outerHTML: '<span class="price">$12</span>',
+            note: 'Keep tabular numerals.',
+          }),
+        )
+      ).json();
+      const noted = await fetch(
+        `${base}/api/design/captures/${first.id}`,
+        mutation(base, { note: '44px target.' }, 'PATCH'),
+      );
+      assert.equal(noted.status, 200);
+      const tray = await (await fetch(`${base}/api/design/tray`)).json();
+      assert.equal(tray.items.length, 2);
+      const onDisk = JSON.parse(await readFile(join(home, 'studio', 'design', 'tray.json'), 'utf8'));
+      assert.equal(onDisk.items.length, 2);
+
+      const sent = await fetch(
+        `${base}/api/agent/turn`,
+        mutation(base, { agent: 'implementer', message: 'Align these two.', tray: true }),
+      );
+      assert.equal(sent.status, 200);
+      assert.equal(received.tray, true);
+      const removed = await fetch(`${base}/api/design/tray/items/${second.id}`, {
+        method: 'DELETE',
+        headers: { origin: base, 'x-toris-studio-token': 'test-token' },
+      });
+      assert.equal(removed.status, 200);
+      assert.equal((await removed.json()).items.length, 1);
+    },
+    {
+      runAgentTurn: async (input) => {
+        received = input;
+        return { ok: true, text: 'will edit both', agent: { id: 'implementer', title: 'Implementer' } };
       },
     },
   );

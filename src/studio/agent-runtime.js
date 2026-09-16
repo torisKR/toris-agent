@@ -22,7 +22,7 @@ import {
   BUILTIN_SKILL_DIR,
 } from '../core/skills.js';
 import { HttpError } from './http.js';
-import { composeDesignTurnMessage, normalizeDesignCapture } from './design.js';
+import { composeDesignTurnMessage, listDesignCaptures, normalizeDesignCapture } from './design.js';
 
 const MAX_MESSAGE_CHARS = 8_000;
 const MAX_HISTORY = 40;
@@ -97,9 +97,55 @@ export function publicAgentStatus(status, agentId) {
  * One chat turn for the Studio GUI. Tools auto-approve: sending from the
  * local page is already an explicit action, matching a TUI `/yes` click.
  */
+async function resolveDesignCaptures(options) {
+  const captures = [];
+  const seen = new Set();
+  const remember = (record) => {
+    if (!record) return;
+    const key = record.id || `${record.url}|${record.selector}|${captures.length}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    captures.push(record);
+  };
+
+  if (options.tray) {
+    if (!options.loadTray) throw new HttpError(400, 'design tray is not available');
+    const tray = await options.loadTray();
+    for (const item of tray?.items || []) remember(item);
+  }
+
+  const ids = [
+    ...(options.designId ? [options.designId] : []),
+    ...(Array.isArray(options.designIds) ? options.designIds : []),
+  ];
+  for (const id of ids) {
+    if (!options.loadDesign) throw new HttpError(400, 'designId is not available');
+    const capture = await options.loadDesign(id);
+    if (!capture) throw new HttpError(404, 'design capture not found');
+    remember(capture);
+  }
+
+  const payloads = [
+    ...(options.design ? [options.design] : []),
+    ...(Array.isArray(options.designs) ? options.designs : []),
+  ];
+  for (const payload of payloads) {
+    let capture;
+    try {
+      capture = normalizeDesignCapture(payload);
+    } catch (error) {
+      throw new HttpError(400, error.message);
+    }
+    if (options.saveDesign) capture = await options.saveDesign(capture);
+    remember(capture);
+  }
+  return listDesignCaptures(captures);
+}
+
 export async function runAgentTurn(options) {
   const message = String(options.message ?? '').trim();
-  if (!message && !options.design && !options.designId) throw new HttpError(400, 'message is required');
+  const hasDesign = Boolean(options.design || options.designId || options.tray || options.designIds?.length || options.designs?.length);
+  if (!message && !hasDesign) throw new HttpError(400, 'message is required');
   if (message.length > MAX_MESSAGE_CHARS) throw new HttpError(400, 'message is too long');
 
   let agent;
@@ -112,20 +158,11 @@ export async function runAgentTurn(options) {
   const status = options.status || (await inspectAgentRuntime({ home: options.home }));
   if (!status.ready || !status.config) throw new HttpError(409, status.reason);
 
-  let capture = null;
-  if (options.designId) {
-    if (!options.loadDesign) throw new HttpError(400, 'designId is not available');
-    capture = await options.loadDesign(options.designId);
-    if (!capture) throw new HttpError(404, 'design capture not found');
-  } else if (options.design) {
-    try {
-      capture = normalizeDesignCapture(options.design);
-    } catch (error) {
-      throw new HttpError(400, error.message);
-    }
-    if (options.saveDesign) capture = await options.saveDesign(capture);
-  }
-  const composed = composeDesignTurnMessage(message || 'Inspect and fix the selected UI element.', capture);
+  const captures = await resolveDesignCaptures(options);
+  const fallback = captures.length > 1
+    ? 'Inspect and fix the selected UI elements.'
+    : 'Inspect and fix the selected UI element.';
+  const composed = composeDesignTurnMessage(message || fallback, captures);
   if (composed.length > MAX_TURN_CHARS) throw new HttpError(400, 'design attachment is too large');
 
   const config = status.config;
@@ -179,9 +216,15 @@ export async function runAgentTurn(options) {
       usage: result.usage,
       events,
       tui: tuiAgentHint(agent.id),
-      design: capture
-        ? { id: capture.id || null, url: capture.url, selector: capture.selector }
+      design: captures[0]
+        ? { id: captures[0].id || null, url: captures[0].url, selector: captures[0].selector }
         : null,
+      designs: captures.map((item) => ({
+        id: item.id || null,
+        url: item.url,
+        selector: item.selector,
+        note: item.note || '',
+      })),
     };
   } finally {
     provider.dispose?.();

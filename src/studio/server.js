@@ -12,15 +12,26 @@ import { RenderService } from './render-service.js';
 import { checkRelease, contentHash } from './release-guard.js';
 import { inspectAgentRuntime, publicAgentStatus, runAgentTurn } from './agent-runtime.js';
 import { resolveSurfaceAgent } from '../core/agents.js';
+import { Store } from '../core/store.js';
+import { applySavedPatch, discardSavedPatch, getPatch, listPatches, readPatchDiff } from '../core/patches.js';
+import { TorisError } from '../core/errors.js';
 import { DesignStore } from './design-store.js';
 import { buildBookmarklet } from './design.js';
 import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
+import {
+  PATCH_REVIEW_NOTE_LIMIT,
+  PATCH_STATUSES,
+  boundUnifiedDiff,
+  formatPatchReviewMessage,
+  presentPatch,
+} from './patch-view.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/agent', ['index.html', 'text/html; charset=utf-8']],
   ['/design', ['index.html', 'text/html; charset=utf-8']],
+  ['/patches', ['index.html', 'text/html; charset=utf-8']],
   ['/design-system', ['design-system.html', 'text/html; charset=utf-8']],
   ['/design/sample', ['design-sample.html', 'text/html; charset=utf-8', SAMPLE_CSP]],
   ['/assets/tokens.css', ['tokens.css', 'text/css; charset=utf-8']],
@@ -62,6 +73,15 @@ function createContentInput(input) {
   return Object.fromEntries(['kind', 'title', 'brief', 'channels'].filter((key) => Object.hasOwn(input, key)).map((key) => [key, input[key]]));
 }
 
+function patchHttpError(error) {
+  if (error instanceof HttpError) throw error;
+  if (error instanceof TorisError && error.code === 'E_UNKNOWN_PATCH') throw new HttpError(404, error.message);
+  if (error instanceof TorisError && (error.code === 'E_PATCH_STATE' || error.code === 'E_PATCH_APPLY')) {
+    throw new HttpError(409, error.message);
+  }
+  throw error;
+}
+
 async function sendStatic(response, pathname) {
   const asset = STATIC_ASSETS.get(pathname);
   if (!asset) throw new HttpError(404, 'asset not found');
@@ -82,6 +102,7 @@ export async function createStudioServer(options) {
   if (host !== '127.0.0.1') throw new Error('Toris Studio only binds to 127.0.0.1');
   const token = options.token || randomBytes(32).toString('base64url');
   const contents = await new ContentStore(options.home).init();
+  const store = options.store || await new Store(options.home).init();
   const designs = options.designs || (await new DesignStore(options.home).init());
   const renderService = options.renderService || new RenderService({
     home: options.home,
@@ -105,7 +126,7 @@ export async function createStudioServer(options) {
       name: 'Toris Studio',
       localOnly: true,
       status: 'ready',
-      surfaces: ['review', 'agent', 'design'],
+      surfaces: ['review', 'agent', 'design', 'patches'],
     });
   });
   for (const pathname of STATIC_ASSETS.keys()) {
@@ -127,7 +148,9 @@ export async function createStudioServer(options) {
     requireJson(request);
     const body = await readJson(request, { limitBytes: 1024 * 1024 });
     const message = String(body.message ?? '').trim();
-    if (!message && !body.design && !body.designId) throw new HttpError(400, 'message is required');
+    if (!message && !body.design && !body.designId && !body.tray && !body.designIds?.length && !body.designs?.length) {
+      throw new HttpError(400, 'message is required');
+    }
     try {
       resolveSurfaceAgent(body.agent);
     } catch (error) {
@@ -149,8 +172,12 @@ export async function createStudioServer(options) {
           profile: body.profile,
           design: body.design,
           designId: body.designId,
+          designIds: body.designIds,
+          designs: body.designs,
+          tray: body.tray,
           loadDesign: (id) => designs.get(id),
           saveDesign: (capture) => designs.save(capture),
+          loadTray: () => designs.getTray(),
           signal: abort.signal,
         }),
       );
@@ -192,10 +219,113 @@ export async function createStudioServer(options) {
     requireJson(request);
     try {
       const capture = await designs.save(await readJson(request, { limitBytes: 1024 * 1024 }));
-      sendJson(response, 201, capture);
+      const tray = await designs.addToTray(capture.id, capture.note);
+      sendJson(response, 201, { ...capture, tray });
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(400, error.message);
+    }
+  });
+  router.add('PATCH', '/api/design/captures/:id', async (request, response, params) => {
+    requireJson(request);
+    const capture = await designs.update(params.id, await readJson(request));
+    if (!capture) throw new HttpError(404, 'design capture not found');
+    const tray = await designs.getTray();
+    if (tray.items.some((item) => item.id === capture.id)) {
+      await designs.addToTray(capture.id, capture.note);
+    }
+    sendJson(response, 200, capture);
+  });
+  router.add('GET', '/api/design/tray', async (_request, response) => {
+    sendJson(response, 200, await designs.getTray());
+  });
+  router.add('PUT', '/api/design/tray', async (request, response) => {
+    requireJson(request);
+    sendJson(response, 200, await designs.saveTray(await readJson(request)));
+  });
+  router.add('POST', '/api/design/tray/items', async (request, response) => {
+    requireJson(request);
+    const body = await readJson(request);
+    const tray = await designs.addToTray(body.id, body.note);
+    if (!tray) throw new HttpError(404, 'design capture not found');
+    sendJson(response, 200, tray);
+  });
+  router.add('POST', '/api/design/tray/clear', async (request, response) => {
+    requireJson(request);
+    await readJson(request);
+    sendJson(response, 200, await designs.clearTray());
+  });
+  router.add('DELETE', '/api/design/tray/items/:id', async (_request, response, params) => {
+    sendJson(response, 200, await designs.removeFromTray(params.id));
+  });
+  router.add('GET', '/api/patches', async (request, response) => {
+    const url = new URL(request.url || '/', origin());
+    const status = url.searchParams.get('status') || undefined;
+    if (status && !PATCH_STATUSES.includes(status)) throw new HttpError(400, 'unknown patch status');
+    const items = await listPatches(store, { status });
+    sendJson(response, 200, { items: items.map((item) => presentPatch(item)) });
+  });
+  router.add('GET', '/api/patches/:id', async (_request, response, params) => {
+    const record = await getPatch(store, params.id);
+    if (!record) throw new HttpError(404, 'patch not found');
+    sendJson(response, 200, presentPatch(record, { diff: await readPatchDiff(record) }));
+  });
+  router.add('POST', '/api/patches/:id/apply', async (request, response, params) => {
+    requireJson(request);
+    await readJson(request);
+    try {
+      const applyOpts = options.applyPatchFn ? { applyFn: options.applyPatchFn } : {};
+      sendJson(response, 200, presentPatch(await applySavedPatch(store, params.id, applyOpts)));
+    } catch (error) {
+      patchHttpError(error);
+    }
+  });
+  router.add('POST', '/api/patches/:id/discard', async (request, response, params) => {
+    requireJson(request);
+    await readJson(request);
+    try {
+      sendJson(response, 200, presentPatch(await discardSavedPatch(store, params.id)));
+    } catch (error) {
+      patchHttpError(error);
+    }
+  });
+  router.add('POST', '/api/patches/:id/review', async (request, response, params) => {
+    requireJson(request);
+    const body = await readJson(request);
+    const record = await getPatch(store, params.id);
+    if (!record) throw new HttpError(404, 'patch not found');
+    const note = String(body.note ?? '').trim();
+    const hunk = String(body.hunk ?? '').trim();
+    if (!note && !hunk) throw new HttpError(400, 'review note or hunk is required');
+    if (note.length > PATCH_REVIEW_NOTE_LIMIT) throw new HttpError(400, 'review note is too long');
+    try {
+      resolveSurfaceAgent(body.agent);
+    } catch (error) {
+      throw new HttpError(400, error.message);
+    }
+    const bounded = boundUnifiedDiff(await readPatchDiff(record));
+    const message = formatPatchReviewMessage({ patch: record, diff: bounded.diff, note, hunk });
+    const abort = new AbortController();
+    request.on('close', () => abort.abort());
+    const turn = options.runAgentTurn || runAgentTurn;
+    try {
+      sendJson(
+        response,
+        200,
+        await turn({
+          home: options.home,
+          cwd: options.cwd,
+          agent: body.agent || 'implementer',
+          message,
+          history: [],
+          signal: abort.signal,
+        }),
+      );
+    } catch (error) {
+      if (error.code === 'E_UNKNOWN_PROFILE' || error.code === 'E_PROVIDER_AUTH' || error.code === 'E_PROVIDER_CLI' || error.code === 'E_MODEL_REQUIRED' || error.code === 'E_UNKNOWN_PROVIDER') {
+        throw new HttpError(409, error.message);
+      }
+      throw error;
     }
   });
   router.add('GET', '/api/contents', async (_request, response) => {
@@ -300,6 +430,7 @@ export async function createStudioServer(options) {
     token,
     contents,
     designs,
+    store,
     jobs,
     listen() {
       return new Promise((resolve, reject) => {

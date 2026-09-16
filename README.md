@@ -90,6 +90,7 @@ toris --agent implementer
 toris studio              # http://127.0.0.1:5824
                           # agent room  /agent
                           # Design Mode /design
+                          # Patch Review /patches
 ```
 
 ### Design Mode — UI evidence on the agent turn
@@ -98,9 +99,13 @@ toris studio              # http://127.0.0.1:5824
   <img src="docs/assets/readme/studio-design-capture.webp" alt="Design Mode after picking the coral Continue button: left rail shows #sample-cta, inspector lists selector, computed color and padding, and the button outerHTML" width="920">
 </p>
 
-Open `http://127.0.0.1:5824/design`, load your localhost app (or the built-in sample), click an element, write a short instruction, send. Studio stores the capture under `~/.toris/studio/design/` and attaches it to `POST /api/agent/turn`.
+Open `http://127.0.0.1:5824/design`, load your localhost app (or the built-in sample), click elements into the annotation tray, attach optional per-element notes, write one instruction, send. Studio stores captures under `~/.toris/studio/design/` (`des_*.json`, optional PNGs, and `tray.json`) and attaches the whole tray to a single `POST /api/agent/turn`.
 
 There is no bundled Chromium and no extra npm dependency. Studio proxies `http`/`https` pages into a sandboxed iframe (`sandbox="allow-scripts"`, no `allow-same-origin`), or you drag the **Toris pick** bookmarklet onto pages that cannot be framed. Details: [docs/STUDIO.md](docs/STUDIO.md).
+
+### Patch Review — isolated diffs without leaving Studio
+
+After Design Mode or an agent run, open `http://127.0.0.1:5824/patches`. Pending records from the existing `toris patches` store show metadata and a bounded unified diff. Apply, discard, or send a short review note (and an optional selected hunk) back as an implementer turn. Mutations use the same Origin + session token as the rest of Studio. `toris apply` / `toris discard` stay as they are.
 
 ### Optional Android verification
 
@@ -225,9 +230,10 @@ toris receipt <runId> --md > receipt.md
 
 1. Start Studio: `toris studio` → open `http://127.0.0.1:5824/design`.
 2. Load a target URL, or click **샘플** for the built-in page at `/design/sample`.
-3. Click an element. Studio records CSS selector, bounded `outerHTML`, computed styles, page URL, and a cropped screenshot when the browser can rasterize it.
-4. Write the instruction (“match this CTA to 44px height”) and send. The payload is attached to the coding agent turn.
-5. For authenticated SPAs or strict CSP, drag **Toris pick** to the bookmark bar, pick in the app tab, and Studio opens `/design#ingest=...` on loopback.
+3. Click elements into the tray. Studio records CSS selector, bounded `outerHTML`, computed styles, page URL, a cropped screenshot when the browser can rasterize it, and an optional per-element note.
+4. Write one instruction (“match these to 44px height”) and send the whole tray on a single coding-agent turn.
+5. Open `/patches` to read the isolated diff, leave a review note, then apply or discard. Re-check in Design Mode or with `toris android screenshot` if you ship to a device.
+6. For authenticated SPAs or strict CSP, drag **Toris pick** to the bookmark bar, pick in the app tab, and Studio opens `/design#ingest=...` on loopback.
 
 The proxy only fetches `http`/`https`, strips a target CSP, and frames the result with `frame-ancestors 'self'`. Untrusted scripts run without `allow-same-origin`, so they cannot read the Studio session token.
 
@@ -414,7 +420,7 @@ agents [--category <c>]   Profiles for TUI /agent and Studio /agent
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
 daemon status             Background daemon (not implemented in this release)
-studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design)
+studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches)
 studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
 android status|devices|screenshot|logcat|install
 bot                       Listen for Slack and Telegram commands
@@ -472,7 +478,9 @@ State lives under `$TORIS_HOME` (default `~/.toris`) as plain text:
 ├── projects.json
 ├── runs/
 ├── events/
-├── studio/design/          # Design Mode captures
+├── studio/design/          # Design Mode captures + tray.json
+├── patches.json            # isolated diffs waiting for apply/discard
+├── patches/                # pat_*.diff files
 └── android/                # optional adb screenshots and logcat
 ```
 

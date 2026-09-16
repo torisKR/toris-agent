@@ -18,6 +18,7 @@
         <a class="tab" id="nav-review" href="/" data-surface="review" aria-current="page">검토</a>
         <a class="tab" id="nav-agent" href="/agent" data-surface="agent">에이전트</a>
         <a class="tab" id="nav-design" href="/design" data-surface="design">디자인</a>
+        <a class="tab" id="nav-patches" href="/patches" data-surface="patches">패치</a>
       </nav>
       <div class="local-state"><span class="pulse" aria-hidden="true"></span><span id="live-status">127.0.0.1:5824 · local</span></div>
       <a class="system-link" href="/design-system">Design system</a>
@@ -125,8 +126,8 @@
     <div class="studio-shell is-design" id="design-shell" hidden>
       <aside class="queue-panel" aria-labelledby="design-title">
         <div class="panel-heading"><div><p class="kicker">Design mode</p><h1 id="design-title">디자인</h1></div><span class="queue-count" id="design-count">0</span></div>
-        <p class="agent-lead">페이지에서 요소를 고르면 선택자와 스타일이 에이전트 턴에 붙습니다.</p>
-        <div id="design-captures" class="review-queue"><div class="queue-empty">아직 캡처가 없습니다. 가운데에서 페이지를 열고 요소를 클릭하세요.</div></div>
+        <p class="agent-lead">요소를 고르면 트레이에 쌓입니다. 메모를 붙인 뒤 한 번의 지시로 보냅니다.</p>
+        <div id="design-captures" class="review-queue"><div class="queue-empty">아직 주석이 없습니다. 가운데에서 페이지를 열고 요소를 클릭하세요.</div></div>
       </aside>
       <main id="design-workspace" class="content-workspace" tabindex="-1">
         <form id="design-url-form" class="design-url-bar">
@@ -141,7 +142,7 @@
       <aside class="inspector" aria-label="선택한 요소">
         <section class="inspector-section">
           <div class="section-title"><span>01</span><h2>선택</h2></div>
-          <p id="design-empty-copy">요소를 클릭하면 선택자, 계산된 스타일, HTML이 여기에 모입니다.</p>
+          <p id="design-empty-copy">요소를 클릭하면 선택자, 계산된 스타일, HTML이 트레이에 모입니다.</p>
           <dl id="design-meta" class="design-meta" hidden>
             <div><dt>URL</dt><dd id="design-meta-url"></dd></div>
             <div><dt>Selector</dt><dd id="design-meta-selector"></dd></div>
@@ -150,12 +151,19 @@
           <pre id="design-styles" class="access-code" hidden></pre>
           <pre id="design-html" class="access-code" hidden></pre>
           <img id="design-shot" class="design-shot" alt="선택한 요소 스크린샷" hidden>
+          <form id="design-item-form" class="stack" hidden>
+            <label class="field" for="design-item-note">이 요소 메모<textarea id="design-item-note" maxlength="800" placeholder="이 버튼만 44px로."></textarea></label>
+            <div class="row">
+              <button class="button secondary" id="design-item-save" type="submit">메모 저장</button>
+              <button class="button quiet" id="design-item-remove" type="button">트레이에서 빼기</button>
+            </div>
+          </form>
         </section>
         <section class="inspector-section">
           <div class="section-title"><span>02</span><h2>에이전트</h2></div>
           <form id="design-agent-form" class="stack">
-            <label class="field" for="design-note">지시<textarea id="design-note" maxlength="8000" placeholder="이 버튼을 브랜드 코랄에 맞추고 44px 타깃을 유지하세요."></textarea></label>
-            <button class="button" id="design-send" type="submit" disabled>선택과 함께 보내기</button>
+            <label class="field" for="design-note">한 번의 지시<textarea id="design-note" maxlength="8000" placeholder="트레이의 요소를 브랜드 코랄과 44px 타깃에 맞추세요."></textarea></label>
+            <button class="button" id="design-send" type="submit" disabled>트레이와 함께 보내기</button>
           </form>
           <p id="design-agent-status">로컬 세션을 확인하는 중입니다.</p>
         </section>
@@ -163,6 +171,61 @@
           <div class="section-title"><span>03</span><h2>북마클릿</h2></div>
           <p>다른 탭의 앱은 이 링크를 북마크 바에 끌어다 놓으세요. 클릭하면 그 탭에서 고른 요소가 Studio로 돌아옵니다.</p>
           <a id="design-bookmarklet" class="button secondary bookmarklet-link" href="#">Toris pick</a>
+        </section>
+      </aside>
+    </div>
+
+    <div class="studio-shell is-patches" id="patches-shell" hidden>
+      <aside class="queue-panel" aria-labelledby="patch-title">
+        <div class="panel-heading"><div><p class="kicker">Patch review</p><h1 id="patch-title">패치</h1></div><span class="queue-count" id="patch-count">0</span></div>
+        <p class="agent-lead">에이전트가 남긴 격리 diff를 읽고, 메모를 남기거나 적용·폐기합니다. CLI의 <code>toris patches</code>와 같은 저장소입니다.</p>
+        <div class="queue-filters" role="group" aria-label="패치 필터">
+          <button class="filter is-active" data-patch-status="pending" aria-pressed="true" aria-controls="patch-queue">대기</button>
+          <button class="filter" data-patch-status="applied" aria-pressed="false" aria-controls="patch-queue">적용</button>
+          <button class="filter" data-patch-status="discarded" aria-pressed="false" aria-controls="patch-queue">폐기</button>
+          <button class="filter" data-patch-status="all" aria-pressed="false" aria-controls="patch-queue">전체</button>
+        </div>
+        <div id="patch-queue" class="review-queue"><div class="queue-empty">대기 중인 패치가 없습니다.</div></div>
+      </aside>
+      <main id="patch-workspace" class="content-workspace" tabindex="-1">
+        <section class="workspace-empty" id="patch-empty">
+          <span class="empty-orbit" aria-hidden="true"></span>
+          <p class="kicker">Isolated diff</p>
+          <h2>적용 전에<br>diff를 읽으세요.</h2>
+          <p>Design Mode와 에이전트 편집 다음 단계는 여기입니다. 적용은 이 브라우저의 Origin과 세션 토큰이 필요합니다.</p>
+        </section>
+        <section class="workspace-detail" id="patch-detail" hidden>
+          <div class="workspace-header"><div><p class="kicker" id="patch-kind">PATCH</p><h2 id="patch-heading"></h2></div><span class="badge" id="patch-status">pending</span></div>
+          <p id="patch-truncated" class="patch-truncated" hidden>큰 diff는 잘려서 표시됩니다. 전체가 필요하면 <code>toris diff</code>를 쓰세요.</p>
+          <pre id="patch-diff" class="patch-diff" aria-label="unified diff"></pre>
+        </section>
+      </main>
+      <aside class="inspector" aria-label="패치 적용과 리뷰">
+        <section class="inspector-section">
+          <div class="section-title"><span>01</span><h2>메타</h2></div>
+          <p id="patch-empty-copy">왼쪽에서 대기 중인 패치를 고르면 파일 목록과 근거가 여기에 모입니다.</p>
+          <dl id="patch-meta" class="design-meta" hidden>
+            <div><dt>Origin</dt><dd id="patch-meta-origin"></dd></div>
+            <div><dt>Files</dt><dd id="patch-meta-files"></dd></div>
+            <div><dt>Stats</dt><dd id="patch-meta-stats"></dd></div>
+            <div><dt>Autonomy</dt><dd id="patch-meta-autonomy"></dd></div>
+          </dl>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>02</span><h2>적용</h2></div>
+          <p>적용과 폐기는 <code>toris apply</code> / <code>toris discard</code>와 같습니다.</p>
+          <div class="row">
+            <button class="button" id="patch-apply" type="button" disabled>적용</button>
+            <button class="button danger" id="patch-discard" type="button" disabled>폐기</button>
+          </div>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>03</span><h2>리뷰 메모</h2></div>
+          <form id="patch-review-form" class="stack">
+            <label class="field" for="patch-note">의도<textarea id="patch-note" maxlength="2000" placeholder="이 hunk의 spacing을 8px 그리드에 맞추고 다시 올려 주세요."></textarea></label>
+            <button class="button secondary" id="patch-review-send" type="submit" disabled>에이전트에게 보내기</button>
+          </form>
+          <p id="patch-review-status">hunk를 고르면 메모와 함께 구현 에이전트에게 돌아갑니다.</p>
         </section>
       </aside>
     </div>
