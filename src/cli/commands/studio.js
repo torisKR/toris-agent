@@ -36,6 +36,7 @@ export async function cmdStudio(ctx, positionals, _flags, deps = {}) {
 
   output(`${c.green('READY')} Toris Studio http://127.0.0.1:5824`);
   output(c.dim('      agent GUI  http://127.0.0.1:5824/agent'));
+  output(c.dim('      design     http://127.0.0.1:5824/design'));
   output(c.dim('      agent TUI  toris   ·  /agent  ·  /studio'));
   return await new Promise((resolve, reject) => {
     let stopping = false;

@@ -126,6 +126,7 @@ test('help documents TUI and GUI doors onto the agent', async () => {
   assert.match(out, /toris\s+Open the interactive chat TUI/);
   assert.match(out, /toris --agent/);
   assert.match(out, /agent room at \/agent/);
+  assert.match(out, /Design Mode at \/design/);
 });
 
 // --- first-run onboarding ---------------------------------------------------

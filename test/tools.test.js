@@ -37,7 +37,7 @@ test('mutating tools stay behind the approval gate', async () => {
       .filter((t) => !t.needsApproval)
       .map((t) => t.name)
       .sort();
-    assert.deepEqual(readOnly, ['list_files', 'read_file']);
+    assert.deepEqual(readOnly, ['android', 'list_files', 'read_file']);
   } finally {
     await cleanup();
   }

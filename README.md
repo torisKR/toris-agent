@@ -93,7 +93,7 @@ toris studio service install
 toris studio service status
 ```
 
-The service installer creates a dedicated Python environment at `~/.toris/runtime/auto-shorts`. The web server binds only to `127.0.0.1`, mutations require the current local origin plus an in-memory session token, and external publishing is disabled. The same coding agent is available at `http://127.0.0.1:5824/agent` and from the TUI via `toris` / `/agent` / `/studio`. See [docs/STUDIO.md](./docs/STUDIO.md) for the storage, render, recovery, and removal contracts.
+The service installer creates a dedicated Python environment at `~/.toris/runtime/auto-shorts`. The web server binds only to `127.0.0.1`, mutations require the current local origin plus an in-memory session token, and external publishing is disabled. The same coding agent is available at `http://127.0.0.1:5824/agent` and from the TUI via `toris` / `/agent` / `/studio`. **Design Mode** at `http://127.0.0.1:5824/design` lets you open a local (or any http) page, pick a DOM element, and attach its selector, computed styles, bounded outerHTML, and a cropped screenshot to `POST /api/agent/turn` so the coding agent can edit source against live UI evidence. See [docs/STUDIO.md](./docs/STUDIO.md) for the storage, render, recovery, Design Mode, and removal contracts.
 
 ## Talk to the agent
 
@@ -106,11 +106,12 @@ toris
 toris --agent planner
 ```
 
-**GUI** — start Studio and open the agent room:
+**GUI** — start Studio and open the agent room or Design Mode:
 
 ```bash
 toris studio
 # http://127.0.0.1:5824/agent
+# http://127.0.0.1:5824/design
 ```
 
 ## Quickstart
@@ -225,9 +226,10 @@ toris chat                        # REPL
 toris chat "why does the build fail?"   # one-shot
 ```
 
-The model gets `read_file`, `list_files`, `write_file` and `run_command`. Writes and
-commands are gated by your autonomy level — below **L3** every mutation asks first,
-and a denial is reported back to the model instead of silently failing.
+The model gets `read_file`, `list_files`, `write_file`, `run_command`, and `android`
+(optional adb evidence). Writes and commands are gated by your autonomy level — below
+**L3** every mutation asks first, and a denial is reported back to the model instead of
+silently failing.
 
 ```console
 $ toris chat
@@ -248,9 +250,10 @@ without forking it.
 
 ```console
 $ toris skills
-Skills (10)
+Skills (11)
 
   NAME                                SOURCE   DESCRIPTION
+  android-verify                      builtin  Capture Android device evidence before claiming a mobile UI fix.
   app-store-listing-creator           builtin  Create or improve Play Store and App Store listing packages.
   expo-android-performance            builtin  Diagnose and optimize Expo Android performance.
   expo-interactive-design             builtin  Design distinctive Expo interfaces and motion.
@@ -279,6 +282,21 @@ Do not propose a fix until you have run a command that shows the failure.
 ```
 
 Drop that in `.toris/skills/<name>/SKILL.md` and it applies to the next chat.
+
+## Android verify
+
+Shipping Expo or Flutter to a phone is optional for the rest of toris. When you do, `adb` on `PATH` is enough:
+
+```bash
+toris doctor                 # WARN if adb/emulator are missing; does not fail the run
+toris android status         # adb + emulator presence, connected devices
+toris android devices
+toris android screenshot     # PNG under ~/.toris/android/screenshots/
+toris android logcat         # dump under ~/.toris/android/logs/
+toris android install app.apk
+```
+
+Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the agent can attach device evidence before claiming a mobile UI fix. No Android SDK is required to use Studio, chat, or `toris run`.
 
 ## Autonomy levels
 
@@ -421,12 +439,14 @@ agents [--category <c>]   Built-in agent profiles
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
 daemon status             Background daemon (not in 0.1.0)
-  studio                    Local creator studio on 127.0.0.1:5824
-  bot                       Listen for Slack and Telegram commands
-  patches                   Isolated diffs waiting to be applied
-  apply <patchId>           Apply a patch to the original repo
-  discard <patchId>         Drop a patch and its worktree
-  update [--check]          Update toris to the latest published version
+studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design)
+android status|devices|screenshot|logcat|install
+                          Optional adb helpers; artifacts under ~/.toris/android
+bot                       Listen for Slack and Telegram commands
+patches                   Isolated diffs waiting to be applied
+apply <patchId>           Apply a patch to the original repo
+discard <patchId>         Drop a patch and its worktree
+update [--check]          Update toris to the latest published version
 version                   Print version
 ```
 

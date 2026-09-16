@@ -68,6 +68,7 @@ export function getAgent(id: string): AgentProfile | null;
 export function resolveSurfaceAgent(id?: string | null): AgentProfile;
 
 export function studioAgentUrl(port?: number): string;
+export function studioDesignUrl(port?: number): string;
 export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
 export function tuiAgentHint(agentId?: string): string;
 
@@ -199,6 +200,42 @@ export function detectBinary(
   bin: string,
   options?: { env?: Record<string, string | undefined>; platform?: Platform },
 ): string | null;
+
+export interface AndroidDevice {
+  serial: string;
+  state: string;
+  [key: string]: string;
+}
+
+export interface AndroidTools {
+  adb: string | null;
+  emulator: string | null;
+  ready: boolean;
+}
+
+export interface DoctorCheck {
+  name: string;
+  status: 'PASS' | 'WARN' | 'FAIL';
+  detail: string;
+}
+
+/** Resolve adb/emulator on PATH without executing them. */
+export function inspectAndroidTools(options?: {
+  detect?: typeof detectBinary;
+  env?: Record<string, string | undefined>;
+}): AndroidTools;
+
+export function androidDoctorChecks(options?: {
+  detect?: typeof detectBinary;
+  env?: Record<string, string | undefined>;
+}): DoctorCheck[];
+
+export function parseAdbDevices(stdout: string): AndroidDevice[];
+
+export function runAndroidAction(
+  action: 'status' | 'devices' | 'screenshot' | 'logcat' | 'install',
+  options?: Record<string, unknown>,
+): Promise<Record<string, unknown>>;
 
 export interface ProviderResponse {
   text: string;
@@ -439,3 +476,35 @@ export class Orchestrator {
 
 /** CLI entry point. Resolves to the process exit code rather than exiting. */
 export function main(argv?: readonly string[], deps?: Record<string, unknown>): Promise<number>;
+
+export const DESIGN_STYLE_KEYS: readonly string[];
+
+export interface DesignCapture {
+  url: string;
+  selector: string;
+  outerHTML: string;
+  computedStyle: Record<string, string>;
+  text: string;
+  tagName: string;
+  rect: { x: number; y: number; width: number; height: number } | null;
+  screenshotDataUrl: string | null;
+  screenshotPath?: string | null;
+  id?: string;
+}
+
+export function assertSafeHttpUrl(value: string, label?: string): URL;
+export function buildCssPath(node: {
+  nodeType: number;
+  tagName?: string;
+  id?: string;
+  parentElement?: unknown;
+  children?: unknown[];
+}): string;
+export function normalizeDesignCapture(input?: Record<string, unknown>): DesignCapture;
+export function formatDesignContext(capture: DesignCapture | Record<string, unknown>): string;
+export function composeDesignTurnMessage(message: string, capture?: DesignCapture | null): string;
+export function buildBookmarklet(origin: string): string;
+export function injectPickerMarkup(
+  html: string,
+  options?: { pickerSrc?: string; baseHref?: string },
+): string;

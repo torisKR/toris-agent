@@ -22,9 +22,11 @@ import {
   BUILTIN_SKILL_DIR,
 } from '../core/skills.js';
 import { HttpError } from './http.js';
+import { composeDesignTurnMessage, normalizeDesignCapture } from './design.js';
 
 const MAX_MESSAGE_CHARS = 8_000;
 const MAX_HISTORY = 40;
+const MAX_TURN_CHARS = 40_000;
 
 function sanitizeHistory(history) {
   if (!Array.isArray(history)) return [];
@@ -97,7 +99,7 @@ export function publicAgentStatus(status, agentId) {
  */
 export async function runAgentTurn(options) {
   const message = String(options.message ?? '').trim();
-  if (!message) throw new HttpError(400, 'message is required');
+  if (!message && !options.design && !options.designId) throw new HttpError(400, 'message is required');
   if (message.length > MAX_MESSAGE_CHARS) throw new HttpError(400, 'message is too long');
 
   let agent;
@@ -110,12 +112,28 @@ export async function runAgentTurn(options) {
   const status = options.status || (await inspectAgentRuntime({ home: options.home }));
   if (!status.ready || !status.config) throw new HttpError(409, status.reason);
 
+  let capture = null;
+  if (options.designId) {
+    if (!options.loadDesign) throw new HttpError(400, 'designId is not available');
+    capture = await options.loadDesign(options.designId);
+    if (!capture) throw new HttpError(404, 'design capture not found');
+  } else if (options.design) {
+    try {
+      capture = normalizeDesignCapture(options.design);
+    } catch (error) {
+      throw new HttpError(400, error.message);
+    }
+    if (options.saveDesign) capture = await options.saveDesign(capture);
+  }
+  const composed = composeDesignTurnMessage(message || 'Inspect and fix the selected UI element.', capture);
+  if (composed.length > MAX_TURN_CHARS) throw new HttpError(400, 'design attachment is too large');
+
   const config = status.config;
   const resolved = pickChatModel(config, options.profile);
   assertChatUsable(resolved, config);
   const cliBacked = CLI_PROVIDERS.includes(resolved.provider);
   const cwd = options.cwd || process.cwd();
-  const tools = cliBacked ? [] : createDefaultTools({ cwd });
+  const tools = cliBacked ? [] : createDefaultTools({ cwd, home: options.home });
   const { skills } = cliBacked
     ? { skills: [] }
     : await discoverSkills(
@@ -150,7 +168,7 @@ export async function runAgentTurn(options) {
       onEvent,
     });
     session.reset(sanitizeHistory(options.history));
-    const result = await session.send(message, { signal: options.signal });
+    const result = await session.send(composed, { signal: options.signal });
     return {
       ok: true,
       agent,
@@ -161,6 +179,9 @@ export async function runAgentTurn(options) {
       usage: result.usage,
       events,
       tui: tuiAgentHint(agent.id),
+      design: capture
+        ? { id: capture.id || null, url: capture.url, selector: capture.selector }
+        : null,
     };
   } finally {
     provider.dispose?.();

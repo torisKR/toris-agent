@@ -10,8 +10,10 @@ const state = {
   agentReason: '',
   agentTui: 'toris\n/agent',
   messages: [],
+  design: null,
+  captures: [],
 };
-const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace'].map((id) => [id, document.getElementById(id)]));
+const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace'].map((id) => [id, document.getElementById(id)]));
 
 function announce(message) {
   elements.toast.textContent = message;
@@ -183,7 +185,9 @@ elements['publish-submit'].addEventListener('click', async () => {
 
 function readSurface() {
   if (location.pathname === '/agent' || location.pathname.startsWith('/agent/')) return 'agent';
+  if (location.pathname === '/design' || location.pathname.startsWith('/design/')) return 'design';
   if (location.hash === '#agent' || location.hash.startsWith('#agent/')) return 'agent';
+  if (location.hash === '#design' || location.hash.startsWith('#design') || location.hash.startsWith('#ingest=')) return 'design';
   return 'review';
 }
 
@@ -196,21 +200,30 @@ function readAgentId() {
 }
 
 function showSurface(name, options = {}) {
-  state.surface = name === 'agent' ? 'agent' : 'review';
+  state.surface = name === 'agent' || name === 'design' ? name : 'review';
   if (state.surface === 'agent') state.agentId = options.agentId || readAgentId();
   elements['review-shell'].hidden = state.surface !== 'review';
   elements['agent-shell'].hidden = state.surface !== 'agent';
+  elements['design-shell'].hidden = state.surface !== 'design';
   elements['nav-review'].setAttribute('aria-current', state.surface === 'review' ? 'page' : 'false');
   elements['nav-agent'].setAttribute('aria-current', state.surface === 'agent' ? 'page' : 'false');
-  const url = state.surface === 'agent'
-    ? (state.agentId && state.agentId !== 'toris' ? `/agent?id=${encodeURIComponent(state.agentId)}` : '/agent')
-    : '/';
+  elements['nav-design'].setAttribute('aria-current', state.surface === 'design' ? 'page' : 'false');
+  let url = '/';
+  if (state.surface === 'agent') {
+    url = state.agentId && state.agentId !== 'toris' ? `/agent?id=${encodeURIComponent(state.agentId)}` : '/agent';
+  } else if (state.surface === 'design') {
+    url = '/design';
+  }
   if (!options.replace) history.pushState({ surface: state.surface, agentId: state.agentId }, '', url);
   else history.replaceState({ surface: state.surface, agentId: state.agentId }, '', url);
   if (state.surface === 'agent') {
     renderAgents();
     renderAgentWorkspace();
     elements['agent-workspace'].focus();
+  }
+  if (state.surface === 'design') {
+    renderDesign();
+    elements['design-workspace'].focus();
   }
 }
 
@@ -275,6 +288,11 @@ function renderAgentWorkspace() {
   elements['agent-send'].disabled = !state.agentReady;
   elements['agent-send'].setAttribute('aria-disabled', String(!state.agentReady));
   elements['agent-input'].disabled = !state.agentReady;
+  elements['design-send'].disabled = !state.agentReady || !state.design;
+  elements['design-send'].setAttribute('aria-disabled', String(!state.agentReady || !state.design));
+  elements['design-agent-status'].textContent = state.agentReady
+    ? '선택한 요소가 있으면 같은 로컬 에이전트에게 보냅니다.'
+    : (state.agentReason || '연결 대기');
   renderAgentLog();
 }
 
@@ -313,16 +331,139 @@ async function loadAgents() {
   renderAgentWorkspace();
 }
 
-for (const link of [elements['nav-review'], elements['nav-agent']]) {
+function renderDesignCaptures() {
+  const items = state.captures;
+  elements['design-count'].textContent = String(items.length);
+  elements['design-captures'].replaceChildren();
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'queue-empty';
+    empty.textContent = '아직 캡처가 없습니다. 가운데에서 페이지를 열고 요소를 클릭하세요.';
+    elements['design-captures'].append(empty);
+    return;
+  }
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `queue-item${item.id && item.id === state.design?.id ? ' is-selected' : ''}`;
+    const top = document.createElement('span');
+    top.className = 'queue-item-top';
+    const kind = document.createElement('span');
+    kind.className = 'queue-kind';
+    kind.textContent = (item.tagName || 'EL').toUpperCase();
+    const title = document.createElement('strong');
+    title.textContent = item.selector || item.url;
+    const meta = document.createElement('small');
+    meta.textContent = item.url;
+    top.append(kind);
+    button.append(top, title, meta);
+    button.addEventListener('click', () => {
+      state.design = item;
+      renderDesign();
+    });
+    elements['design-captures'].append(button);
+  }
+}
+
+function renderDesign() {
+  const capture = state.design;
+  const has = Boolean(capture);
+  elements['design-empty-copy'].hidden = has;
+  elements['design-meta'].hidden = !has;
+  elements['design-styles'].hidden = !has;
+  elements['design-html'].hidden = !has;
+  const shot = capture?.screenshotDataUrl;
+  elements['design-shot'].hidden = !shot;
+  if (shot) elements['design-shot'].src = shot;
+  else elements['design-shot'].removeAttribute('src');
+  if (has) {
+    elements['design-meta-url'].textContent = capture.url || '';
+    elements['design-meta-selector'].textContent = capture.selector || '';
+    elements['design-meta-tag'].textContent = capture.tagName || '';
+    const styles = capture.computedStyle || {};
+    elements['design-styles'].textContent = Object.entries(styles).map(([key, value]) => `${key}: ${value}`).join('\n');
+    elements['design-html'].textContent = capture.outerHTML || '';
+  }
+  elements['design-send'].disabled = !state.agentReady || !has;
+  elements['design-send'].setAttribute('aria-disabled', String(!state.agentReady || !has));
+  renderDesignCaptures();
+}
+
+async function applyCapture(raw) {
+  const saved = await api('/api/design/captures', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(raw),
+  });
+  state.design = { ...saved, screenshotDataUrl: raw.screenshotDataUrl || null };
+  state.captures = [state.design, ...state.captures.filter((item) => item.id !== saved.id)];
+  renderDesign();
+  announce('요소를 캡처했습니다.');
+}
+
+function ingestFromHash() {
+  const hash = location.hash || '';
+  if (!hash.startsWith('#ingest=')) return null;
+  try {
+    return JSON.parse(decodeURIComponent(hash.slice(8)));
+  } catch {
+    return null;
+  }
+}
+
+window.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || data.type !== 'toris:design-capture' || !data.capture) return;
+  applyCapture(data.capture).catch((error) => announce(error.message));
+});
+
+elements['design-url-form'].addEventListener('submit', (event) => {
+  event.preventDefault();
+  const target = elements['design-url'].value.trim();
+  if (!target) return;
+  elements['design-frame'].src = `/design/frame?url=${encodeURIComponent(target)}`;
+});
+
+elements['design-sample'].addEventListener('click', () => {
+  elements['design-frame'].src = '/design/sample';
+});
+
+elements['design-agent-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.design || !state.agentReady) return;
+  const text = elements['design-note'].value.trim() || 'Inspect and fix the selected UI element.';
+  elements['design-send'].disabled = true;
+  try {
+    const payload = {
+      agent: state.agentId,
+      message: text,
+      history: [],
+    };
+    if (state.design.id) payload.designId = state.design.id;
+    else payload.design = state.design;
+    const result = await api('/api/agent/turn', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    announce(`${result.agent?.title || '에이전트'}가 디자인 컨텍스트를 받았습니다.`);
+    elements['design-note'].value = '';
+  } catch (error) {
+    announce(error.message);
+  }
+  renderDesign();
+});
+
+window.addEventListener('popstate', () => {
+  showSurface(readSurface(), { replace: true });
+});
+
+for (const link of [elements['nav-review'], elements['nav-agent'], elements['nav-design']]) {
   link.addEventListener('click', (event) => {
     event.preventDefault();
     showSurface(link.dataset.surface);
   });
 }
-
-window.addEventListener('popstate', () => {
-  showSurface(readSurface(), { replace: true });
-});
 
 elements['agent-form'].addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -356,5 +497,12 @@ try {
   const session = await api('/api/session'); state.token = session.token; await refresh(); document.getElementById('live-status').textContent = `${new URL(session.origin).host} · local`;
   state.agentId = readAgentId();
   await loadAgents();
+  const bookmarklet = await api('/api/design/bookmarklet');
+  elements['design-bookmarklet'].href = bookmarklet.href;
+  const listed = await api('/api/design/captures');
+  state.captures = listed.items || [];
+  const ingested = ingestFromHash();
   showSurface(readSurface(), { replace: true, agentId: state.agentId });
+  if (ingested) await applyCapture(ingested);
+  else renderDesign();
 } catch (error) { document.getElementById('live-status').textContent = 'local service unavailable'; announce(error.message); }

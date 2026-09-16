@@ -29,8 +29,10 @@ COMMANDS
   skills                    Skill packages the model follows in chat
   autonomy                  Autonomy levels and what each permits
   daemon status             Background daemon (not in 0.1.0)
-  studio                    Local GUI on 127.0.0.1:5824 (review + /agent)
+  studio                    Local GUI on 127.0.0.1:5824 (review + /agent + /design)
   studio service <action>   Install, status, restart or uninstall autostart
+  android status|devices|screenshot|logcat|install
+                            Optional adb helpers for Android verify evidence
   bot                       Listen for Slack and Telegram commands
   patches                   Isolated diffs waiting to be applied
   diff <patchId>            Show one stored patch
@@ -61,7 +63,8 @@ EXIT CODES
 EXAMPLES
   toris                     # TUI chat
   toris --agent implementer
-  toris studio              # GUI; agent room at /agent
+  toris studio              # GUI; agent room at /agent, Design Mode at /design
+  toris android status      # adb/emulator presence (optional)
   toris init && toris doctor
   toris project add .
   toris run "add a health endpoint" --dry-run

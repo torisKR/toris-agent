@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Design Mode** at `http://127.0.0.1:5824/design`: pick a DOM element (iframe proxy, sample page, or bookmarklet) and attach selector, computed styles, bounded outerHTML, and a screenshot to the Studio agent turn.
+- **`toris android`** (`status`, `devices`, `screenshot`, `logcat`, `install`) plus optional `adb`/`emulator` doctor warnings and a chat `android` tool for device evidence. Artifacts land under `~/.toris/android/`.
 - TUI `/agent` and `/studio` commands, plus `toris --agent <id>`, so a chat session can pick a role and jump to the local GUI.
 - Studio agent room at `http://127.0.0.1:5824/agent` with the same profile catalogue and a localhost chat turn API.
 

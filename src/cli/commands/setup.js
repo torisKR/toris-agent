@@ -15,6 +15,7 @@ import { discoverSkills, skillSearchPaths, BUILTIN_SKILL_DIR } from '../../core/
 import { EXIT } from '../../core/errors.js';
 import { isRepo } from '../../core/git.js';
 import { telegramToken, slackBotToken, slackAppToken } from '../../core/channels.js';
+import { androidDoctorChecks } from '../../core/android.js';
 import { printJson, line, keyValues, c, statusColor } from '../output.js';
 
 const require = createRequire(import.meta.url);
@@ -113,6 +114,7 @@ export async function cmdDoctor(ctx) {
   for (const check of chatChecks(ctx)) checks.push(check);
   checks.push(await skillCheck(ctx));
   for (const check of channelChecks(ctx)) checks.push(check);
+  for (const check of androidDoctorChecks()) checks.push(check);
 
   const failed = checks.filter((check) => check.status === 'FAIL');
   if (ctx.json) {
