@@ -238,6 +238,91 @@ export function runAndroidAction(
   options?: Record<string, unknown>,
 ): Promise<Record<string, unknown>>;
 
+// ---------------------------------------------------------------------------
+// Knowledge (local secretary store)
+// ---------------------------------------------------------------------------
+
+export type KnowledgeEdgeKind = 'prerequisite' | 'supports' | 'conflicts' | 'derived-from';
+
+export const EDGE_KINDS: readonly KnowledgeEdgeKind[];
+export const STARTER_DOMAIN_SLUGS: readonly string[];
+export const USER_MD_LIMIT: number;
+export const MEMORY_MD_LIMIT: number;
+
+export interface KnowledgeEdge {
+  from: string;
+  to: string;
+  kind: KnowledgeEdgeKind;
+}
+
+export interface KnowledgeSearchHit {
+  kind: string;
+  domain: string | null;
+  id: string;
+  title: string;
+  tags: string[];
+  path: string;
+  source?: string;
+  excerpt?: string;
+  score: number;
+}
+
+export interface KnowledgeStatus {
+  ok: boolean;
+  root: string;
+  projectRoot: string | null;
+  domains: number;
+  domainSlugs: string[];
+  inbox: number;
+  userBytes: number;
+  memoryBytes: number;
+  userLimit: number;
+  memoryLimit: number;
+}
+
+export class KnowledgeStore {
+  constructor(options: { home: string; projectPath?: string | null; now?: () => Date });
+  readonly home: string;
+  readonly root: string;
+  init(options?: { seed?: boolean }): Promise<KnowledgeStatus>;
+  status(): Promise<KnowledgeStatus>;
+  search?(query: string): Promise<KnowledgeSearchHit[]>;
+  listDomains(): Promise<Array<Record<string, unknown>>>;
+  addDomain(input: Record<string, unknown>): Promise<Record<string, unknown>>;
+  inspectDomain(slug: string, source?: string): Promise<Record<string, unknown>>;
+  addNode(slug: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+  getNode(slug: string, id: string, source?: string): Promise<Record<string, unknown>>;
+  listNodes(slug: string, source?: string): Promise<Array<Record<string, unknown>>>;
+  link(slug: string, input: { from: string; to: string; kind?: string; source?: string }): Promise<Record<string, unknown>>;
+  addTacit(slug: string | null, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+  promoteTacit(id: string, input: { domain: string; source?: string }): Promise<Record<string, unknown>>;
+  rebuildIndex(): Promise<{ version: number; updatedAt: string; entries: unknown[] }>;
+  loadIndex(): Promise<{ version: number; updatedAt: string; entries: unknown[] }>;
+}
+
+export function searchIndex(
+  index: { entries?: readonly unknown[] } | readonly unknown[],
+  query: string,
+  options?: { limit?: number; kind?: string; domain?: string },
+): KnowledgeSearchHit[];
+
+export function detectCycles(edges: readonly KnowledgeEdge[]): string[][];
+export function addDagEdge(
+  edges: readonly KnowledgeEdge[],
+  input: { from: string; to: string; kind?: string },
+): readonly KnowledgeEdge[];
+export function proposeReflections(input?: Record<string, unknown>): {
+  notable: boolean;
+  reason: string;
+  proposals: Array<Record<string, unknown>>;
+};
+export function knowledgeDoctorCheck(options?: { home?: string; projectPath?: string }): Promise<DoctorCheck>;
+export function createKnowledgeTools(options?: {
+  home?: string;
+  projectPath?: string;
+  session?: { activeDomains?: string[] };
+}): Array<Record<string, unknown>>;
+
 export interface ProviderResponse {
   text: string;
   costUsd: number;

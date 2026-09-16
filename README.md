@@ -91,6 +91,7 @@ toris studio              # http://127.0.0.1:5824
                           # agent room  /agent
                           # Design Mode /design
                           # Patch Review /patches
+                          # knowledge   /knowledge
 ```
 
 ### Design Mode — UI evidence on the agent turn
@@ -121,6 +122,12 @@ toris android install app.apk
 ```
 
 Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the model can attach device evidence before claiming a mobile UI fix. `install` stays CLI-only. No Android SDK is required for Studio, chat, or `toris run`.
+
+### Secretary knowledge — domains, DAG, tacit memory
+
+The agent should get better at *your* work over time. `toris knowledge init` seeds a local store at `~/.toris/knowledge/`: bounded `USER.md` / `MEMORY.md`, starter domain packs (product growth, Flutter/Expo Android, Toris ops, solo revenue), and a DAG between knowledge nodes. Search is keyword + tag. Writes are gated like other mutating chat tools (ask below L3). After a real win, `/reflect` or `toris knowledge reflect` proposes a tacit note — it does not write silently.
+
+Details: [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md). Studio browse/add is at `http://127.0.0.1:5824/knowledge`.
 
 ### Review room for local drafts
 
@@ -420,9 +427,10 @@ agents [--category <c>]   Profiles for TUI /agent and Studio /agent
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
 daemon status             Background daemon (not implemented in this release)
-studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches)
+studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge)
 studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
 android status|devices|screenshot|logcat|install
+knowledge                 Local secretary store: init, domains, node, tacit, search, reflect
 bot                       Listen for Slack and Telegram commands
 patches | diff <patchId> | apply <patchId> | discard <patchId>
 update [--check]          Update toris to the latest published version
@@ -476,6 +484,7 @@ State lives under `$TORIS_HOME` (default `~/.toris`) as plain text:
 ~/.toris
 ├── config.json
 ├── projects.json
+├── knowledge/              # USER.md, MEMORY.md, domain DAGs, tacit notes
 ├── runs/
 ├── events/
 ├── studio/design/          # Design Mode captures + tray.json

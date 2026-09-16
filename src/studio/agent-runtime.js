@@ -21,6 +21,7 @@ import {
   renderSkillBriefing,
   BUILTIN_SKILL_DIR,
 } from '../core/skills.js';
+import { KnowledgeStore, briefingForQuery } from '../core/knowledge/index.js';
 import { HttpError } from './http.js';
 import { composeDesignTurnMessage, listDesignCaptures, normalizeDesignCapture } from './design.js';
 import { formatPatchReviewMessage } from './patch-view.js';
@@ -179,12 +180,20 @@ export async function runAgentTurn(options) {
   assertChatUsable(resolved, config);
   const cliBacked = CLI_PROVIDERS.includes(resolved.provider);
   const cwd = options.cwd || process.cwd();
-  const tools = cliBacked ? [] : createDefaultTools({ cwd, home: options.home });
+  const knowledgeSession = { activeDomains: [] };
+  const tools = cliBacked
+    ? []
+    : createDefaultTools({ cwd, home: options.home, knowledge: knowledgeSession });
   const { skills } = cliBacked
     ? { skills: [] }
     : await discoverSkills(
         skillSearchPaths({ builtinDir: BUILTIN_SKILL_DIR, home: options.home, projectPath: cwd }),
       );
+  const knowledgeBriefing = cliBacked
+    ? ''
+    : await briefingForQuery(new KnowledgeStore({ home: options.home, projectPath: cwd }), composed, knowledgeSession, {
+        includeProfile: true,
+      });
   const events = [];
   const onEvent = (evt) => {
     events.push(evt);
@@ -206,6 +215,7 @@ export async function runAgentTurn(options) {
       system: chatSystemPrompt({
         agent,
         briefing: renderSkillBriefing(skills),
+        knowledgeBriefing,
         cliBacked,
       }),
       tools,

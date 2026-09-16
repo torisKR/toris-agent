@@ -55,6 +55,10 @@ After Design Mode or an agent run leaves an isolated diff, open `http://127.0.0.
 
 CLI `toris patches`, `toris apply`, and `toris discard` are unchanged.
 
+## Knowledge
+
+`http://127.0.0.1:5824/knowledge` browses the same local secretary store as `toris knowledge`: domains, nodes, and DAG edges, with simple add forms. It is a standalone page (`knowledge.html`) and does not share the review-room or patch-review client. Mutations still need the local `Origin` and session token. See [KNOWLEDGE.md](./KNOWLEDGE.md).
+
 ## Review flow
 
 1. Save a post draft or import an MP4. The item enters `awaiting_review`.

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local secretary knowledge: domains, DAG nodes, and tacit notes in Toris Studio.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <title>Toris Studio · Knowledge</title>
+  <link rel="stylesheet" href="/assets/tokens.css">
+  <link rel="stylesheet" href="/assets/components.css">
+  <link rel="stylesheet" href="/assets/studio.css">
+  <link rel="stylesheet" href="/assets/knowledge.css">
+</head>
+<body>
+  <div class="studio-frame">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">T</span><span>Toris Studio</span></a>
+      <nav class="surface-nav" aria-label="Workspace">
+        <a class="tab" href="/">Review</a>
+        <a class="tab" href="/agent">Agent</a>
+        <a class="tab" href="/design">Design</a>
+        <a class="tab" href="/patches">Patches</a>
+        <a class="tab" href="/knowledge" aria-current="page">Knowledge</a>
+      </nav>
+      <div class="local-state"><span class="pulse" aria-hidden="true"></span><span>127.0.0.1 · local files</span></div>
+      <a class="system-link" href="/design-system">Design system</a>
+    </header>
+
+    <div class="studio-shell is-knowledge">
+      <aside class="queue-panel" aria-labelledby="knowledge-title">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">Secretary</p>
+            <h1 id="knowledge-title">Knowledge</h1>
+          </div>
+          <span class="queue-count" id="domain-count">0</span>
+        </div>
+        <p class="agent-lead">Plain files under <code>~/.toris/knowledge</code>. Same store as <code>toris knowledge</code>.</p>
+        <div id="domain-list" class="review-queue" role="listbox" aria-label="Domains"></div>
+      </aside>
+
+      <main id="knowledge-workspace" class="content-workspace" tabindex="-1">
+        <section class="workspace-empty" id="knowledge-empty">
+          <span class="empty-orbit" aria-hidden="true"></span>
+          <p class="kicker">Local first</p>
+          <h2>Pick a domain<br>or seed the store.</h2>
+          <p>Starter packs cover growth, Flutter, Expo, Toris ops, and the solo revenue loop.</p>
+          <button class="button" id="seed-store" type="button">toris knowledge init</button>
+        </section>
+        <section class="workspace-detail" id="knowledge-detail" hidden>
+          <div class="workspace-header">
+            <div>
+              <p class="kicker" id="detail-slug">DOMAIN</p>
+              <h2 id="detail-title"></h2>
+            </div>
+            <span class="badge" id="detail-source">home</span>
+          </div>
+          <p id="detail-when" class="knowledge-when"></p>
+          <article id="node-body" class="knowledge-body"></article>
+        </section>
+      </main>
+
+      <aside class="inspector" aria-label="Nodes and DAG">
+        <section class="inspector-section">
+          <div class="section-title"><span>01</span><h2>Search</h2></div>
+          <form id="search-form" class="stack">
+            <label class="field" for="search-q">Query<input id="search-q" name="q" maxlength="120" placeholder="flutter, SEO, tacit"></label>
+            <button class="button secondary" type="submit">Search</button>
+          </form>
+          <div id="search-hits" class="knowledge-hits"></div>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>02</span><h2>Nodes</h2></div>
+          <div id="node-list" class="knowledge-hits"></div>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>03</span><h2>DAG</h2></div>
+          <div id="edge-list" class="knowledge-hits"></div>
+          <form id="add-node-form" class="stack knowledge-add">
+            <label class="field" for="new-title">Add node<input id="new-title" name="title" maxlength="80" required placeholder="Title"></label>
+            <label class="field" for="new-body">Body<textarea id="new-body" name="body" maxlength="4000" placeholder="What this node is."></textarea></label>
+            <button class="button" type="submit">Save node</button>
+          </form>
+          <form id="add-edge-form" class="stack">
+            <label class="field" for="edge-from">Link from<input id="edge-from" name="from" required placeholder="node-id"></label>
+            <label class="field" for="edge-to">to<input id="edge-to" name="to" required placeholder="node-id"></label>
+            <label class="field" for="edge-kind">kind
+              <select id="edge-kind" name="kind">
+                <option value="supports">supports</option>
+                <option value="prerequisite">prerequisite</option>
+                <option value="conflicts">conflicts</option>
+                <option value="derived-from">derived-from</option>
+              </select>
+            </label>
+            <button class="button secondary" type="submit">Add edge</button>
+          </form>
+        </section>
+      </aside>
+    </div>
+  </div>
+  <div id="toast" class="sr-toast" aria-live="polite"></div>
+  <script type="module" src="/assets/knowledge.js"></script>
+</body>
+</html>

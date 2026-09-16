@@ -18,6 +18,19 @@ export {
   parseAdbDevices,
   runAndroidAction,
 } from './core/android.js';
+export {
+  KnowledgeStore,
+  USER_MD_LIMIT,
+  MEMORY_MD_LIMIT,
+  EDGE_KINDS,
+  STARTER_DOMAIN_SLUGS,
+  searchIndex,
+  detectCycles,
+  addDagEdge,
+  proposeReflections,
+  knowledgeDoctorCheck,
+  createKnowledgeTools,
+} from './core/knowledge/index.js';
 export { verify, runCheck, inferChecks } from './core/verifier.js';
 export { buildReceipt, receiptToMarkdown } from './core/receipt.js';
 export { buildPlanPrompt, extractJsonArray, normalizeTasks, fallbackPlan } from './core/planner.js';

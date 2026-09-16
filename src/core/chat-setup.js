@@ -15,6 +15,7 @@ import {
 export const CHAT_SYSTEM_PROMPT = [
   "You are toris, a coding agent working inside a solo developer's repository.",
   'You have tools for reading, listing, writing files and running shell commands.',
+  'You are also their local secretary: USER.md, MEMORY.md, and domain packs under ~/.toris/knowledge.',
   '',
   'Working rules:',
   '- Read a file before you edit it. Never guess its contents.',
@@ -22,6 +23,9 @@ export const CHAT_SYSTEM_PROMPT = [
   '- Prefer the smallest change that actually solves the problem.',
   '- If a tool is denied, do not retry it. Explain the alternative.',
   '- Be concrete and brief. The operator is one person, not a committee.',
+  '- Search knowledge before inventing facts about this person, their stack, or how they ship.',
+  '- After successful non-trivial work, propose a tacit note (knowledge_reflect or /reflect). Never write knowledge silently.',
+  '- knowledge_write is gated: below autonomy L3 it asks first. Prefer inbox/tacit over dumping a transcript into MEMORY.md.',
 ].join('\n');
 
 /**
@@ -107,8 +111,10 @@ export function assertChatUsable(resolved, config) {
  * System prompt for a chat turn on either surface.
  * CLI-backed providers keep their own agent loop; we only inject a role.
  */
-export function chatSystemPrompt({ agent, briefing, cliBacked = false } = {}) {
+export function chatSystemPrompt({ agent, briefing, knowledgeBriefing, cliBacked = false } = {}) {
   if (cliBacked) return agentRolePrompt(agent) || undefined;
-  const base = briefing ? `${CHAT_SYSTEM_PROMPT}\n\n${briefing}` : CHAT_SYSTEM_PROMPT;
-  return withAgentPrompt(base, agent);
+  const parts = [CHAT_SYSTEM_PROMPT];
+  if (briefing) parts.push(briefing);
+  if (knowledgeBriefing) parts.push(knowledgeBriefing);
+  return withAgentPrompt(parts.join('\n\n'), agent);
 }

@@ -18,7 +18,6 @@ import { isRepo } from '../core/git.js';
 import { TorisError } from '../core/errors.js';
 import { DesignStore } from './design-store.js';
 import { buildBookmarklet } from './design.js';
-import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
 import {
   PATCH_REVIEW_DIFF_CHAR_LIMIT,
   PATCH_REVIEW_NOTE_LIMIT,
@@ -26,6 +25,8 @@ import {
   boundUnifiedDiff,
   presentPatch,
 } from './patch-view.js';
+import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
+import { registerKnowledgeRoutes } from './knowledge-api.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
@@ -33,12 +34,15 @@ const STATIC_ASSETS = new Map([
   ['/agent', ['index.html', 'text/html; charset=utf-8']],
   ['/design', ['index.html', 'text/html; charset=utf-8']],
   ['/patches', ['index.html', 'text/html; charset=utf-8']],
+  ['/knowledge', ['knowledge.html', 'text/html; charset=utf-8']],
   ['/design-system', ['design-system.html', 'text/html; charset=utf-8']],
   ['/design/sample', ['design-sample.html', 'text/html; charset=utf-8', SAMPLE_CSP]],
   ['/assets/tokens.css', ['tokens.css', 'text/css; charset=utf-8']],
   ['/assets/components.css', ['components.css', 'text/css; charset=utf-8']],
   ['/assets/studio.css', ['studio.css', 'text/css; charset=utf-8']],
   ['/assets/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/assets/knowledge.js', ['knowledge.js', 'text/javascript; charset=utf-8']],
+  ['/assets/knowledge.css', ['knowledge.css', 'text/css; charset=utf-8']],
   ['/assets/design-picker.js', ['design-picker.js', 'text/javascript; charset=utf-8']],
   ['/assets/favicon.svg', ['favicon.svg', 'image/svg+xml']],
 ]);
@@ -127,7 +131,7 @@ export async function createStudioServer(options) {
       name: 'Toris Studio',
       localOnly: true,
       status: 'ready',
-      surfaces: ['review', 'agent', 'design', 'patches'],
+      surfaces: ['review', 'agent', 'design', 'patches', 'knowledge'],
     });
   });
   for (const pathname of STATIC_ASSETS.keys()) {
@@ -410,6 +414,8 @@ export async function createStudioServer(options) {
     if (!job) throw new HttpError(404, 'job not found');
     sendJson(response, 200, job);
   });
+
+  registerKnowledgeRoutes(router, { sendJson, requireJson, options });
 
   server = createServer({ maxHeaderSize: 16 * 1024, requireHostHeader: true }, async (request, response) => {
     try {
