@@ -13,16 +13,17 @@ import { checkRelease, contentHash } from './release-guard.js';
 import { inspectAgentRuntime, publicAgentStatus, runAgentTurn } from './agent-runtime.js';
 import { resolveSurfaceAgent } from '../core/agents.js';
 import { Store } from '../core/store.js';
-import { applySavedPatch, discardSavedPatch, getPatch, listPatches, readPatchDiff } from '../core/patches.js';
+import { applySavedPatch, discardSavedPatch, getPatch, listPatches, readPatchDiff, refreshSavedPatchDiff } from '../core/patches.js';
+import { isRepo } from '../core/git.js';
 import { TorisError } from '../core/errors.js';
 import { DesignStore } from './design-store.js';
 import { buildBookmarklet } from './design.js';
 import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
 import {
+  PATCH_REVIEW_DIFF_CHAR_LIMIT,
   PATCH_REVIEW_NOTE_LIMIT,
   PATCH_STATUSES,
   boundUnifiedDiff,
-  formatPatchReviewMessage,
   presentPatch,
 } from './patch-view.js';
 
@@ -76,7 +77,7 @@ function createContentInput(input) {
 function patchHttpError(error) {
   if (error instanceof HttpError) throw error;
   if (error instanceof TorisError && error.code === 'E_UNKNOWN_PATCH') throw new HttpError(404, error.message);
-  if (error instanceof TorisError && (error.code === 'E_PATCH_STATE' || error.code === 'E_PATCH_APPLY')) {
+  if (error instanceof TorisError && (error.code === 'E_PATCH_STATE' || error.code === 'E_PATCH_APPLY' || error.code === 'E_PATCH_WORKTREE')) {
     throw new HttpError(409, error.message);
   }
   throw error;
@@ -294,6 +295,7 @@ export async function createStudioServer(options) {
     const body = await readJson(request);
     const record = await getPatch(store, params.id);
     if (!record) throw new HttpError(404, 'patch not found');
+    if (record.status !== 'pending') throw new HttpError(409, `Patch ${record.id} is already ${record.status}.`);
     const note = String(body.note ?? '').trim();
     const hunk = String(body.hunk ?? '').trim();
     if (!note && !hunk) throw new HttpError(400, 'review note or hunk is required');
@@ -303,29 +305,33 @@ export async function createStudioServer(options) {
     } catch (error) {
       throw new HttpError(400, error.message);
     }
-    const bounded = boundUnifiedDiff(await readPatchDiff(record));
-    const message = formatPatchReviewMessage({ patch: record, diff: bounded.diff, note, hunk });
+    if (!record.worktreePath || !(await isRepo(record.worktreePath))) {
+      throw new HttpError(409, `Isolated worktree for ${record.id} is gone; review would edit the original checkout.`);
+    }
+    const bounded = boundUnifiedDiff(await readPatchDiff(record), { maxChars: PATCH_REVIEW_DIFF_CHAR_LIMIT });
     const abort = new AbortController();
     request.on('close', () => abort.abort());
     const turn = options.runAgentTurn || runAgentTurn;
     try {
-      sendJson(
-        response,
-        200,
-        await turn({
-          home: options.home,
-          cwd: options.cwd,
-          agent: body.agent || 'implementer',
-          message,
-          history: [],
-          signal: abort.signal,
-        }),
-      );
+      const result = await turn({
+        home: options.home,
+        cwd: record.worktreePath,
+        agent: body.agent || 'implementer',
+        message: note || 'Fix the selected hunk on this isolated patch.',
+        patchReview: { patch: record, diff: bounded.diff, hunk },
+        history: [],
+        signal: abort.signal,
+      });
+      const refreshed = await refreshSavedPatchDiff(store, record.id);
+      sendJson(response, 200, {
+        ...result,
+        patch: presentPatch(refreshed, { diff: await readPatchDiff(refreshed) }),
+      });
     } catch (error) {
       if (error.code === 'E_UNKNOWN_PROFILE' || error.code === 'E_PROVIDER_AUTH' || error.code === 'E_PROVIDER_CLI' || error.code === 'E_MODEL_REQUIRED' || error.code === 'E_UNKNOWN_PROVIDER') {
         throw new HttpError(409, error.message);
       }
-      throw error;
+      patchHttpError(error);
     }
   });
   router.add('GET', '/api/contents', async (_request, response) => {

@@ -105,7 +105,7 @@ There is no bundled Chromium and no extra npm dependency. Studio proxies `http`/
 
 ### Patch Review — isolated diffs without leaving Studio
 
-After Design Mode or an agent run, open `http://127.0.0.1:5824/patches`. Pending records from the existing `toris patches` store show metadata and a bounded unified diff. Apply, discard, or send a short review note (and an optional selected hunk) back as an implementer turn. Mutations use the same Origin + session token as the rest of Studio. `toris apply` / `toris discard` stay as they are.
+After Design Mode or an agent run, open `http://127.0.0.1:5824/patches`. Pending records from the existing `toris patches` store show metadata and a bounded unified diff. Apply, discard, or send a short review note (and an optional selected hunk) back as an implementer turn — that turn runs in the isolated worktree and refreshes the stored diff before you apply. Mutations use the same Origin + session token as the rest of Studio. `toris apply` / `toris discard` stay as they are.
 
 ### Optional Android verification
 

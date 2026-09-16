@@ -23,6 +23,7 @@ import {
 } from '../core/skills.js';
 import { HttpError } from './http.js';
 import { composeDesignTurnMessage, listDesignCaptures, normalizeDesignCapture } from './design.js';
+import { formatPatchReviewMessage } from './patch-view.js';
 
 const MAX_MESSAGE_CHARS = 8_000;
 const MAX_HISTORY = 40;
@@ -145,7 +146,8 @@ async function resolveDesignCaptures(options) {
 export async function runAgentTurn(options) {
   const message = String(options.message ?? '').trim();
   const hasDesign = Boolean(options.design || options.designId || options.tray || options.designIds?.length || options.designs?.length);
-  if (!message && !hasDesign) throw new HttpError(400, 'message is required');
+  const hasPatchReview = Boolean(options.patchReview);
+  if (!message && !hasDesign && !hasPatchReview) throw new HttpError(400, 'message is required');
   if (message.length > MAX_MESSAGE_CHARS) throw new HttpError(400, 'message is too long');
 
   let agent;
@@ -162,7 +164,14 @@ export async function runAgentTurn(options) {
   const fallback = captures.length > 1
     ? 'Inspect and fix the selected UI elements.'
     : 'Inspect and fix the selected UI element.';
-  const composed = composeDesignTurnMessage(message || fallback, captures);
+  const composed = hasPatchReview
+    ? formatPatchReviewMessage({
+        patch: options.patchReview.patch,
+        diff: options.patchReview.diff,
+        note: message,
+        hunk: options.patchReview.hunk,
+      })
+    : composeDesignTurnMessage(message || fallback, captures);
   if (composed.length > MAX_TURN_CHARS) throw new HttpError(400, 'design attachment is too large');
 
   const config = status.config;

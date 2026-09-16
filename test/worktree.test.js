@@ -14,7 +14,7 @@ import {
   worktreeDiff,
 } from '../src/core/worktree.js';
 import { Store } from '../src/core/store.js';
-import { savePatch, applySavedPatch, listPatches } from '../src/core/patches.js';
+import { savePatch, applySavedPatch, listPatches, refreshSavedPatchDiff, readPatchDiff } from '../src/core/patches.js';
 
 async function gitRepo() {
   const root = await mkdtemp(join(tmpdir(), 'toris-wt-'));
@@ -70,6 +70,39 @@ test('a saved L2 patch applies later through the patch store', async () => {
     assert.equal((await listPatches(store, { status: 'pending' })).length, 1);
     await applySavedPatch(store, record.id);
     assert.equal(await readFile(join(origin, 'later.md'), 'utf8'), 'pending\n');
+  } finally {
+    await rm(origin, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('refreshSavedPatchDiff replaces the stored unified diff from the worktree', async () => {
+  const origin = await gitRepo();
+  const home = await mkdtemp(join(tmpdir(), 'toris-home-'));
+  try {
+    const store = await new Store(home).init();
+    const session = await createWorktree({ origin, home, id: 'iso3' });
+    await writeFile(join(session.path, 'first.md'), 'one\n');
+    const initial = await worktreeDiff(session);
+    const record = await savePatch(store, {
+      source: 'run',
+      originPath: origin,
+      worktreePath: session.path,
+      branch: session.branch,
+      baseSha: session.baseSha,
+      autonomy: 'L2',
+      files: initial.files,
+      stats: initial.stats,
+      patch: initial.patch,
+    });
+    await writeFile(join(session.path, 'second.md'), 'two\n');
+    const refreshed = await refreshSavedPatchDiff(store, record.id);
+    assert.ok(refreshed.files.includes('first.md'));
+    assert.ok(refreshed.files.includes('second.md'));
+    const stored = await readPatchDiff(refreshed);
+    assert.match(stored, /\+two/);
+    await applySavedPatch(store, record.id);
+    assert.equal(await readFile(join(origin, 'second.md'), 'utf8'), 'two\n');
   } finally {
     await rm(origin, { recursive: true, force: true });
     await rm(home, { recursive: true, force: true });

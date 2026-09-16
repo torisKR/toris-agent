@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PATCH_DIFF_CHAR_LIMIT,
+  PATCH_REVIEW_DIFF_CHAR_LIMIT,
   boundUnifiedDiff,
   formatPatchReviewMessage,
   presentPatch,
@@ -66,4 +67,12 @@ test('formatPatchReviewMessage is an implementer turn with operator intent', () 
   assert.match(message, /Selected hunk/);
   assert.match(message, /Unified diff/);
   assert.match(message, /Do not apply or discard unless asked/);
+  assert.match(message, /isolated worktree/);
+  const huge = formatPatchReviewMessage({
+    patch: { id: 'pat_1', status: 'pending', files: ['a.js'] },
+    diff: `+${'x'.repeat(40_000)}`,
+    note: 'Keep the CTA.',
+  });
+  assert.ok(huge.length < 8_000 + PATCH_REVIEW_DIFF_CHAR_LIMIT + 800);
+  assert.match(huge, /truncated/);
 });

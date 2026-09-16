@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
 import { Store } from '../src/core/store.js';
-import { savePatch } from '../src/core/patches.js';
+import { git } from '../src/core/git.js';
+import { createWorktree, worktreeDiff } from '../src/core/worktree.js';
+import { savePatch, readPatchDiff, getPatch } from '../src/core/patches.js';
 
 const DIFF = `diff --git a/README.md b/README.md
 --- a/README.md
@@ -22,7 +24,7 @@ async function withServer(fn, extra = {}) {
     host: '127.0.0.1',
     port: 0,
     token: 'test-token',
-    applyPatchFn: extra.applyPatchFn || (async () => ({ ok: true, stderr: '' })),
+    ...(Object.hasOwn(extra, 'applyPatchFn') ? {} : { applyPatchFn: async () => ({ ok: true, stderr: '' }) }),
     ...extra,
   });
   await studio.listen();
@@ -45,6 +47,37 @@ function mutation(base, body, method = 'POST') {
     },
     body: JSON.stringify(body),
   };
+}
+
+async function gitRepo() {
+  const root = await mkdtemp(join(tmpdir(), 'toris-patch-origin-'));
+  await git(['init'], root);
+  await git(['config', 'user.email', 'toris@example.test'], root);
+  await git(['config', 'user.name', 'toris'], root);
+  await writeFile(join(root, 'README.md'), 'hello\n');
+  await git(['add', '.'], root);
+  await git(['commit', '-m', 'init'], root);
+  return root;
+}
+
+async function seedIsolated(home) {
+  const origin = await gitRepo();
+  const store = await new Store(home).init();
+  const session = await createWorktree({ origin, home, id: 'iso-review' });
+  await writeFile(join(session.path, 'CTA.md'), 'keep this button at 44px\n');
+  const diff = await worktreeDiff(session);
+  const record = await savePatch(store, {
+    source: 'run',
+    originPath: origin,
+    worktreePath: session.path,
+    branch: session.branch,
+    baseSha: session.baseSha,
+    autonomy: 'L2',
+    files: diff.files,
+    stats: diff.stats,
+    patch: diff.patch,
+  });
+  return { origin, record, session };
 }
 
 async function seed(home, extra = {}) {
@@ -140,19 +173,57 @@ test('POST /api/patches/:id/review sends operator intent as an agent turn', asyn
       const empty = await fetch(`${base}/api/patches/${record.id}/review`, mutation(base, {}));
       assert.equal(empty.status, 400);
 
-      const response = await fetch(
+      const missingTree = await fetch(
         `${base}/api/patches/${record.id}/review`,
-        mutation(base, { note: 'Keep the CTA at 44px.', hunk: '@@ -1 +1,2 @@', agent: 'implementer' }),
+        mutation(base, { note: 'Keep the CTA at 44px.' }),
       );
-      assert.equal(response.status, 200);
-      assert.match(received.message, /Keep the CTA at 44px/);
-      assert.match(received.message, /Patch review/);
-      assert.equal(received.agent, 'implementer');
+      assert.equal(missingTree.status, 409);
     },
     {
       runAgentTurn: async (input) => {
         received = input;
         return { ok: true, text: 'will edit', agent: { id: 'implementer', title: 'Implementer' } };
+      },
+    },
+  );
+  assert.equal(received, undefined);
+});
+
+test('patch review runs in the isolated worktree and refreshes the stored diff', async () => {
+  let received;
+  await withServer(
+    async ({ home, base }) => {
+      const { origin, record } = await seedIsolated(home);
+      try {
+        const response = await fetch(
+          `${base}/api/patches/${record.id}/review`,
+          mutation(base, { note: 'Keep the CTA at 44px.', hunk: '@@ -0,0 +1 @@', agent: 'implementer' }),
+        );
+        assert.equal(response.status, 200);
+        const body = await response.json();
+        assert.equal(received.cwd, record.worktreePath);
+        assert.equal(received.message, 'Keep the CTA at 44px.');
+        assert.match(received.patchReview.diff, /keep this button at 44px/);
+        assert.ok(received.message.length < 200);
+        assert.match(body.patch.diff, /\+from review/);
+        assert.ok(body.patch.files.includes('REVIEW.md'));
+        const store = await new Store(home).init();
+        assert.match(await readPatchDiff(await getPatch(store, record.id)), /\+from review/);
+
+        const applied = await fetch(`${base}/api/patches/${record.id}/apply`, mutation(base, {}));
+        assert.equal(applied.status, 200);
+        assert.equal(await readFile(join(origin, 'REVIEW.md'), 'utf8'), 'from review\n');
+        assert.equal(await readFile(join(origin, 'CTA.md'), 'utf8'), 'keep this button at 44px\n');
+      } finally {
+        await rm(origin, { recursive: true, force: true });
+      }
+    },
+    {
+      applyPatchFn: null,
+      runAgentTurn: async (input) => {
+        received = input;
+        await writeFile(join(input.cwd, 'REVIEW.md'), 'from review\n');
+        return { ok: true, text: 'fixed in isolation', agent: { id: 'implementer', title: 'Implementer' } };
       },
     },
   );
