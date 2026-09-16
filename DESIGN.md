@@ -6,7 +6,7 @@ Toris Studio is a local creator operations room at `127.0.0.1:5824`. It keeps po
 
 ## Design read
 
-The product feels like a quiet edit bay: cinematic media focus, operational density around the edges, and restrained motion. The primary sequence is review queue → inspect → edit → render → verify → approve. Public publishing is visually and behaviorally isolated from ordinary creation.
+The product feels like a quiet edit bay: cinematic media focus, operational density around the edges, and restrained motion. The primary sequence is review queue → inspect → edit → render → verify → approve. Isolated coding diffs follow pick → annotate → agent turn → patch review → apply/discard. Public publishing is visually and behaviorally isolated from ordinary creation.
 
 ## Tokens
 
@@ -22,7 +22,7 @@ The product feels like a quiet edit bay: cinematic media focus, operational dens
 
 ## Layout
 
-- Desktop 1280+: 248px review rail, fluid center canvas, 340px inspector.
+- Desktop 1280+: 248px review rail, fluid center canvas, 340px inspector. Patch Review uses the same three columns with a monospace diff canvas.
 - Tablet 768–1279: 208px rail plus canvas; inspector becomes an in-flow panel.
 - Mobile 360–767: single column; queue becomes a horizontal filter strip; actions stay after evidence, never sticky over media.
 - The mobile review queue reserves 128px before async content arrives so the workspace never shifts when drafts load.
@@ -32,6 +32,7 @@ The product feels like a quiet edit bay: cinematic media focus, operational dens
 
 - Video: 9:16 frame, controls, duration/codec/resolution evidence, storyboard/timeline rows.
 - Design: contained image canvas with dimensions, source, and review state.
+- Patch: monospace unified diff, file list, apply/discard, optional hunk selection for a review note.
 - Post: readable Korean typography preview with separate Threads and X drafts.
 - Cards show kind, title, updated time, and status. They do not expose absolute paths, secrets, or credential state.
 
@@ -39,6 +40,8 @@ The product feels like a quiet edit bay: cinematic media focus, operational dens
 
 - `awaiting_review`: amber, reviewable local output.
 - `queued` and `rendering`: coral progress with plain time/status text.
+- `pending` (patches): amber, isolated diff waiting for apply or discard.
+- `applied` / `discarded`: green or quiet receipt; `failed` is red with the git apply error.
 - `quality_failed` and `failed`: red evidence row naming the failed rule; no publish action.
 - `submitted`: neutral outbound receipt, explicitly not proof of a live URL.
 - `live verified`: green only when an external post ID, status, and verified URL are present.

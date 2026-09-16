@@ -398,7 +398,7 @@ toris daemon start|stop|status
 toris agents [--category <c>]    # agent profile catalog
 toris skills
 toris version
-toris studio                     # localhost GUI: review, /agent, /design
+toris studio                     # localhost GUI: review, /agent, /design, /patches
 toris android status|devices|screenshot|logcat|install   # optional adb evidence
 ```
 

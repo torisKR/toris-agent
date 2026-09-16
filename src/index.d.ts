@@ -69,6 +69,7 @@ export function resolveSurfaceAgent(id?: string | null): AgentProfile;
 
 export function studioAgentUrl(port?: number): string;
 export function studioDesignUrl(port?: number): string;
+export function studioPatchesUrl(port?: number): string;
 export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
 export function tuiAgentHint(agentId?: string): string;
 
@@ -489,6 +490,7 @@ export interface DesignCapture {
   rect: { x: number; y: number; width: number; height: number } | null;
   screenshotDataUrl: string | null;
   screenshotPath?: string | null;
+  note?: string;
   id?: string;
 }
 
@@ -501,8 +503,17 @@ export function buildCssPath(node: {
   children?: unknown[];
 }): string;
 export function normalizeDesignCapture(input?: Record<string, unknown>): DesignCapture;
-export function formatDesignContext(capture: DesignCapture | Record<string, unknown>): string;
-export function composeDesignTurnMessage(message: string, capture?: DesignCapture | null): string;
+export function formatDesignContext(
+  capture: DesignCapture | Record<string, unknown>,
+  options?: { index?: number; total?: number },
+): string;
+export function listDesignCaptures(
+  capture?: DesignCapture | DesignCapture[] | null,
+): DesignCapture[];
+export function composeDesignTurnMessage(
+  message: string,
+  capture?: DesignCapture | DesignCapture[] | null,
+): string;
 export function buildBookmarklet(origin: string): string;
 export function injectPickerMarkup(
   html: string,

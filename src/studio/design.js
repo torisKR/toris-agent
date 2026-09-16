@@ -9,6 +9,8 @@ export const DESIGN_SELECTOR_LIMIT = 500;
 export const DESIGN_STYLE_VALUE_LIMIT = 240;
 export const DESIGN_SCREENSHOT_CHAR_LIMIT = 180_000;
 export const DESIGN_TEXT_LIMIT = 400;
+export const DESIGN_NOTE_LIMIT = 800;
+export const DESIGN_ANNOTATION_LIMIT = 12;
 
 export const DESIGN_STYLE_KEYS = Object.freeze([
   'color',
@@ -139,20 +141,33 @@ export function normalizeDesignCapture(input = {}) {
     outerHTML: clip(raw.outerHTML ?? '', DESIGN_HTML_LIMIT),
     computedStyle: boundStyleMap(raw.computedStyle || raw.styles),
     text: clip(raw.text ?? raw.textPreview ?? '', DESIGN_TEXT_LIMIT).trim(),
+    note: clip(raw.note ?? '', DESIGN_NOTE_LIMIT).trim(),
     tagName: String(raw.tagName ?? '').toLowerCase().slice(0, 32),
     rect: boundRect(raw.rect),
     screenshotDataUrl,
   };
 }
 
+export function clipDesignNote(value) {
+  return clip(value ?? '', DESIGN_NOTE_LIMIT).trim();
+}
+
+export function listDesignCaptures(capture) {
+  if (!capture) return [];
+  return (Array.isArray(capture) ? capture : [capture]).filter(Boolean).slice(0, DESIGN_ANNOTATION_LIMIT);
+}
+
 /** Markdown block prepended to a Studio agent turn. */
-export function formatDesignContext(capture) {
+export function formatDesignContext(capture, { index, total } = {}) {
   const record = capture?.url ? capture : normalizeDesignCapture(capture);
   const styles = Object.entries(record.computedStyle || {})
     .map(([key, value]) => `  ${key}: ${value}`)
     .join('\n');
+  const heading = index
+    ? `### ${index}${total ? `/${total}` : ''} ${record.selector || record.tagName || 'element'}`
+    : '## Design Mode attachment';
   const lines = [
-    '## Design Mode attachment',
+    heading,
     `Page: ${record.url}`,
     record.selector ? `Selector: ${record.selector}` : null,
     record.tagName ? `Tag: <${record.tagName}>` : null,
@@ -161,17 +176,27 @@ export function formatDesignContext(capture) {
       : null,
     record.screenshotPath ? `Screenshot: ${record.screenshotPath}` : null,
     record.text ? `Text: ${record.text}` : null,
+    record.note ? `Operator note: ${record.note}` : null,
     styles ? `Computed styles:\n${styles}` : null,
     record.outerHTML ? `outerHTML:\n\`\`\`html\n${record.outerHTML}\n\`\`\`` : null,
-    'Treat this as evidence of the live UI. Edit the source that produced this element. Do not claim a visual fix without matching these styles and structure.',
+    index
+      ? null
+      : 'Treat this as evidence of the live UI. Edit the source that produced this element. Do not claim a visual fix without matching these styles and structure.',
   ];
   return lines.filter((line) => line != null && line !== '').join('\n');
 }
 
 export function composeDesignTurnMessage(message, capture) {
   const text = String(message ?? '').trim();
-  if (!capture) return text;
-  const context = formatDesignContext(capture);
+  const captures = listDesignCaptures(capture);
+  if (captures.length === 0) return text;
+  const context = captures.length === 1
+    ? formatDesignContext(captures[0])
+    : [
+        `## Design Mode attachments (${captures.length})`,
+        ...captures.map((item, index) => formatDesignContext(item, { index: index + 1, total: captures.length })),
+        'Treat these as evidence of the live UI. Edit the source that produced each element. Do not claim a visual fix without matching these styles and structure.',
+      ].join('\n\n');
   return text ? `${text}\n\n${context}` : context;
 }
 

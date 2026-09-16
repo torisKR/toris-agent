@@ -10,7 +10,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('product shell contains queue, editor, media review, quality, guarded publish, and agent regions', async () => {
   const html = await readFile(join(root, 'src/studio/ui/index.html'), 'utf8');
-  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'nav-design', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'design-shell', 'design-frame', 'design-agent-form']) {
+  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'nav-design', 'nav-patches', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /id="agent-send"[^>]*disabled/);
@@ -21,15 +21,16 @@ test('product shell contains queue, editor, media review, quality, guarded publi
   assert.match(html, /<link rel="icon" href="\/assets\/favicon\.svg"/);
   assert.match(html, /class="brand-mark" aria-hidden="true"/);
   assert.match(html, /role="group" aria-label="콘텐츠 필터"/);
-  assert.equal((html.match(/aria-pressed="(?:true|false)"/g) || []).length, 3);
+  assert.equal((html.match(/aria-pressed="(?:true|false)"/g) || []).length, 7);
   assert.equal((html.match(/aria-controls="review-queue"/g) || []).length, 3);
+  assert.equal((html.match(/aria-controls="patch-queue"/g) || []).length, 4);
 });
 
 test('product assets use only local API paths and define all responsive shells', async () => {
   const js = await readFile(join(root, 'src/studio/ui/app.js'), 'utf8');
   const components = await readFile(join(root, 'src/studio/ui/components.css'), 'utf8');
   const css = await readFile(join(root, 'src/studio/ui/studio.css'), 'utf8');
-  for (const path of ['/api/session', '/api/contents', '/api/renders', '/api/jobs', '/review', '/release-check', '/upload', '/media', '/api/agent/', '/api/design/', '/design/frame']) assert.match(js, new RegExp(path.replaceAll('/', '\\/')));
+  for (const path of ['/api/session', '/api/contents', '/api/renders', '/api/jobs', '/review', '/release-check', '/upload', '/media', '/api/agent/', '/api/design/', '/design/frame', '/api/patches', '/api/design/tray']) assert.match(js, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(js, /event\.key !== 'Escape'/);
   assert.match(js, /setAttribute\('aria-pressed'/);
   assert.match(js, /function safeScreenshot/);
@@ -57,6 +58,8 @@ test('root app and fixed product assets are served with CSP', async () => {
     assert.match(await (await fetch(`${base}/agent`)).text(), /id="agent-shell"/);
     assert.equal((await fetch(`${base}/design`)).status, 200);
     assert.match(await (await fetch(`${base}/design`)).text(), /id="design-shell"/);
+    assert.equal((await fetch(`${base}/patches`)).status, 200);
+    assert.match(await (await fetch(`${base}/patches`)).text(), /id="patches-shell"/);
     assert.equal((await fetch(`${base}/assets/app.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/design-picker.js`)).status, 200);
     assert.equal((await fetch(`${base}/design/sample`)).status, 200);

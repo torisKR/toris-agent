@@ -12,8 +12,17 @@ const state = {
   messages: [],
   design: null,
   captures: [],
+  tray: [],
+  patches: [],
+  patchFilter: 'pending',
+  selectedPatchId: null,
+  patchDetail: null,
+  selectedHunk: '',
 };
-const elements = Object.fromEntries(['review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace'].map((id) => [id, document.getElementById(id)]));
+const elementIds = [
+  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
+];
+const elements = Object.fromEntries(elementIds.map((id) => [id, document.getElementById(id)]));
 
 function announce(message) {
   elements.toast.textContent = message;
@@ -186,8 +195,10 @@ elements['publish-submit'].addEventListener('click', async () => {
 function readSurface() {
   if (location.pathname === '/agent' || location.pathname.startsWith('/agent/')) return 'agent';
   if (location.pathname === '/design' || location.pathname.startsWith('/design/')) return 'design';
+  if (location.pathname === '/patches' || location.pathname.startsWith('/patches/')) return 'patches';
   if (location.hash === '#agent' || location.hash.startsWith('#agent/')) return 'agent';
   if (location.hash === '#design' || location.hash.startsWith('#design') || location.hash.startsWith('#ingest=')) return 'design';
+  if (location.hash === '#patches' || location.hash.startsWith('#patches')) return 'patches';
   return 'review';
 }
 
@@ -200,19 +211,23 @@ function readAgentId() {
 }
 
 function showSurface(name, options = {}) {
-  state.surface = name === 'agent' || name === 'design' ? name : 'review';
+  state.surface = name === 'agent' || name === 'design' || name === 'patches' ? name : 'review';
   if (state.surface === 'agent') state.agentId = options.agentId || readAgentId();
   elements['review-shell'].hidden = state.surface !== 'review';
   elements['agent-shell'].hidden = state.surface !== 'agent';
   elements['design-shell'].hidden = state.surface !== 'design';
+  elements['patches-shell'].hidden = state.surface !== 'patches';
   elements['nav-review'].setAttribute('aria-current', state.surface === 'review' ? 'page' : 'false');
   elements['nav-agent'].setAttribute('aria-current', state.surface === 'agent' ? 'page' : 'false');
   elements['nav-design'].setAttribute('aria-current', state.surface === 'design' ? 'page' : 'false');
+  elements['nav-patches'].setAttribute('aria-current', state.surface === 'patches' ? 'page' : 'false');
   let url = '/';
   if (state.surface === 'agent') {
     url = state.agentId && state.agentId !== 'toris' ? `/agent?id=${encodeURIComponent(state.agentId)}` : '/agent';
   } else if (state.surface === 'design') {
     url = '/design';
+  } else if (state.surface === 'patches') {
+    url = '/patches';
   }
   if (!options.replace) history.pushState({ surface: state.surface, agentId: state.agentId }, '', url);
   else history.replaceState({ surface: state.surface, agentId: state.agentId }, '', url);
@@ -224,6 +239,10 @@ function showSurface(name, options = {}) {
   if (state.surface === 'design') {
     renderDesign();
     elements['design-workspace'].focus();
+  }
+  if (state.surface === 'patches') {
+    refreshPatches().catch((error) => announce(error.message));
+    elements['patch-workspace'].focus();
   }
 }
 
@@ -288,12 +307,17 @@ function renderAgentWorkspace() {
   elements['agent-send'].disabled = !state.agentReady;
   elements['agent-send'].setAttribute('aria-disabled', String(!state.agentReady));
   elements['agent-input'].disabled = !state.agentReady;
-  elements['design-send'].disabled = !state.agentReady || !state.design;
-  elements['design-send'].setAttribute('aria-disabled', String(!state.agentReady || !state.design));
+  syncDesignSend();
   elements['design-agent-status'].textContent = state.agentReady
-    ? '선택한 요소가 있으면 같은 로컬 에이전트에게 보냅니다.'
+    ? (state.tray.length ? `트레이 ${state.tray.length}개를 같은 로컬 에이전트에게 보냅니다.` : '요소를 고르면 트레이에 쌓입니다.')
     : (state.agentReason || '연결 대기');
   renderAgentLog();
+}
+
+function syncDesignSend() {
+  const ready = state.agentReady && state.tray.length > 0;
+  elements['design-send'].disabled = !ready;
+  elements['design-send'].setAttribute('aria-disabled', String(!ready));
 }
 
 function renderAgentLog() {
@@ -332,20 +356,22 @@ async function loadAgents() {
 }
 
 function renderDesignCaptures() {
-  const items = state.captures;
+  const items = state.tray;
   elements['design-count'].textContent = String(items.length);
   elements['design-captures'].replaceChildren();
   if (items.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'queue-empty';
-    empty.textContent = '아직 캡처가 없습니다. 가운데에서 페이지를 열고 요소를 클릭하세요.';
+    empty.textContent = '아직 주석이 없습니다. 가운데에서 페이지를 열고 요소를 클릭하세요.';
     elements['design-captures'].append(empty);
     return;
   }
   for (const item of items) {
+    const row = document.createElement('div');
+    row.className = `tray-item${item.id && item.id === state.design?.id ? ' is-selected' : ''}`;
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `queue-item${item.id && item.id === state.design?.id ? ' is-selected' : ''}`;
+    button.className = 'queue-item';
     const top = document.createElement('span');
     top.className = 'queue-item-top';
     const kind = document.createElement('span');
@@ -354,14 +380,23 @@ function renderDesignCaptures() {
     const title = document.createElement('strong');
     title.textContent = item.selector || item.url;
     const meta = document.createElement('small');
-    meta.textContent = item.url;
+    meta.textContent = item.note || item.url;
     top.append(kind);
     button.append(top, title, meta);
     button.addEventListener('click', () => {
       state.design = item;
       renderDesign();
     });
-    elements['design-captures'].append(button);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'button quiet tray-remove';
+    remove.textContent = '빼기';
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      removeTrayItem(item.id).catch((error) => announce(error.message));
+    });
+    row.append(button, remove);
+    elements['design-captures'].append(row);
   }
 }
 
@@ -378,6 +413,7 @@ function renderDesign() {
   elements['design-meta'].hidden = !has;
   elements['design-styles'].hidden = !has;
   elements['design-html'].hidden = !has;
+  elements['design-item-form'].hidden = !has;
   const shot = safeScreenshot(capture?.screenshotDataUrl);
   elements['design-shot'].hidden = !shot;
   if (shot) elements['design-shot'].src = shot;
@@ -389,10 +425,23 @@ function renderDesign() {
     const styles = capture.computedStyle || {};
     elements['design-styles'].textContent = Object.entries(styles).map(([key, value]) => `${key}: ${value}`).join('\n');
     elements['design-html'].textContent = capture.outerHTML || '';
+    if (elements['design-item-note'] !== document.activeElement) {
+      elements['design-item-note'].value = capture.note || '';
+    }
   }
-  elements['design-send'].disabled = !state.agentReady || !has;
-  elements['design-send'].setAttribute('aria-disabled', String(!state.agentReady || !has));
+  syncDesignSend();
   renderDesignCaptures();
+}
+
+async function loadTray() {
+  const tray = await api('/api/design/tray');
+  state.tray = tray.items || [];
+  if (state.design?.id) {
+    state.design = state.tray.find((item) => item.id === state.design.id) || state.tray[0] || null;
+  } else if (!state.design) {
+    state.design = state.tray[0] || null;
+  }
+  renderDesign();
 }
 
 async function applyCapture(raw) {
@@ -401,10 +450,20 @@ async function applyCapture(raw) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(raw),
   });
-  state.design = { ...saved, screenshotDataUrl: safeScreenshot(raw.screenshotDataUrl) };
-  state.captures = [state.design, ...state.captures.filter((item) => item.id !== saved.id)];
+  const { tray, ...record } = saved;
+  state.design = { ...record, screenshotDataUrl: safeScreenshot(raw.screenshotDataUrl) };
+  state.tray = tray?.items || [state.design];
+  state.captures = [state.design, ...state.captures.filter((item) => item.id !== record.id)];
   renderDesign();
-  announce('요소를 캡처했습니다.');
+  announce('요소를 트레이에 넣었습니다.');
+}
+
+async function removeTrayItem(id) {
+  const tray = await api(`/api/design/tray/items/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  state.tray = tray.items || [];
+  if (state.design?.id === id) state.design = state.tray[0] || null;
+  renderDesign();
+  announce('트레이에서 뺐습니다.');
 }
 
 function ingestFromHash() {
@@ -437,26 +496,45 @@ elements['design-sample'].addEventListener('click', () => {
   elements['design-frame'].src = '/design/sample';
 });
 
+elements['design-item-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.design?.id) return;
+  const note = elements['design-item-note'].value.trim();
+  await api(`/api/design/captures/${encodeURIComponent(state.design.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ note }),
+  });
+  await loadTray();
+  announce('요소 메모를 저장했습니다.');
+});
+
+elements['design-item-remove'].addEventListener('click', () => {
+  if (!state.design?.id) return;
+  removeTrayItem(state.design.id).catch((error) => announce(error.message));
+});
+
 elements['design-agent-form'].addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!state.design || !state.agentReady) return;
-  const text = elements['design-note'].value.trim() || 'Inspect and fix the selected UI element.';
+  if (!state.tray.length || !state.agentReady) return;
+  const text = elements['design-note'].value.trim() || 'Inspect and fix the selected UI elements.';
   elements['design-send'].disabled = true;
   try {
-    const payload = {
-      agent: state.agentId,
-      message: text,
-      history: [],
-    };
-    if (state.design.id) payload.designId = state.design.id;
-    else payload.design = state.design;
     const result = await api('/api/agent/turn', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        agent: state.agentId,
+        message: text,
+        history: [],
+        tray: true,
+      }),
     });
-    announce(`${result.agent?.title || '에이전트'}가 디자인 컨텍스트를 받았습니다.`);
+    announce(`${result.agent?.title || '에이전트'}가 트레이 ${state.tray.length}개를 받았습니다.`);
     elements['design-note'].value = '';
+    await api('/api/design/tray/clear', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    state.tray = [];
+    state.design = null;
   } catch (error) {
     announce(error.message);
   }
@@ -467,7 +545,7 @@ window.addEventListener('popstate', () => {
   showSurface(readSurface(), { replace: true });
 });
 
-for (const link of [elements['nav-review'], elements['nav-agent'], elements['nav-design']]) {
+for (const link of [elements['nav-review'], elements['nav-agent'], elements['nav-design'], elements['nav-patches']]) {
   link.addEventListener('click', (event) => {
     event.preventDefault();
     showSurface(link.dataset.surface);
@@ -502,6 +580,202 @@ elements['agent-form'].addEventListener('submit', async (event) => {
   renderAgentWorkspace();
 });
 
+function patchById(id) {
+  return state.patches.find((item) => item.id === id) || (state.patchDetail?.id === id ? state.patchDetail : null);
+}
+
+function originLabel(path) {
+  const value = String(path || '');
+  const parts = value.split('/').filter(Boolean);
+  return parts.length ? parts.slice(-2).join('/') : value || '(no origin)';
+}
+
+function diffLineClass(line) {
+  if (line.startsWith('+++') || line.startsWith('---')) return 'diff-line is-file';
+  if (line.startsWith('@@')) return 'diff-line is-hunk';
+  if (line.startsWith('+')) return 'diff-line is-add';
+  if (line.startsWith('-')) return 'diff-line is-del';
+  return 'diff-line';
+}
+
+function hunkBlockAt(lines, index) {
+  let start = index;
+  while (start > 0 && !lines[start].startsWith('@@')) start -= 1;
+  if (!lines[start] || !lines[start].startsWith('@@')) return '';
+  let end = start + 1;
+  while (end < lines.length && !lines[end].startsWith('@@')) end += 1;
+  return lines.slice(start, end).join('\n');
+}
+
+function renderPatchDiff(text) {
+  const pre = elements['patch-diff'];
+  pre.replaceChildren();
+  const lines = String(text || '(empty diff)').split('\n');
+  lines.forEach((line, index) => {
+    const span = document.createElement('span');
+    span.className = diffLineClass(line);
+    span.textContent = line || ' ';
+    if (state.selectedHunk && hunkBlockAt(lines, index) === state.selectedHunk) span.classList.add('is-chosen');
+    span.addEventListener('click', () => {
+      state.selectedHunk = hunkBlockAt(lines, index);
+      renderPatchDiff(text);
+      renderPatchWorkspace();
+    });
+    pre.append(span);
+  });
+}
+
+function renderPatchQueue() {
+  const items = state.patchFilter === 'all' ? state.patches : state.patches.filter((item) => item.status === state.patchFilter);
+  elements['patch-count'].textContent = String(items.length);
+  elements['patch-queue'].replaceChildren();
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'queue-empty';
+    empty.textContent = state.patchFilter === 'pending' ? '대기 중인 패치가 없습니다.' : '이 필터에는 패치가 없습니다.';
+    elements['patch-queue'].append(empty);
+    return;
+  }
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `queue-item${item.id === state.selectedPatchId ? ' is-selected' : ''}`;
+    const top = document.createElement('span');
+    top.className = 'queue-item-top';
+    const kind = document.createElement('span');
+    kind.className = 'queue-kind';
+    kind.textContent = (item.autonomy || 'PATCH').toUpperCase();
+    const status = document.createElement('span');
+    status.className = 'badge';
+    status.textContent = item.status;
+    const title = document.createElement('strong');
+    title.textContent = item.id;
+    const meta = document.createElement('small');
+    meta.textContent = `${item.fileCount || item.files?.length || 0} files · ${originLabel(item.originPath)}`;
+    top.append(kind, status);
+    button.append(top, title, meta);
+    button.addEventListener('click', () => selectPatch(item.id).catch((error) => announce(error.message)));
+    elements['patch-queue'].append(button);
+  }
+}
+
+function renderPatchWorkspace() {
+  const item = state.patchDetail && state.patchDetail.id === state.selectedPatchId ? state.patchDetail : patchById(state.selectedPatchId);
+  const pending = item?.status === 'pending';
+  elements['patch-empty'].hidden = Boolean(item);
+  elements['patch-detail'].hidden = !item;
+  elements['patch-empty-copy'].hidden = Boolean(item);
+  elements['patch-meta'].hidden = !item;
+  elements['patch-apply'].disabled = !pending;
+  elements['patch-discard'].disabled = !pending;
+  elements['patch-review-send'].disabled = !item || !state.agentReady;
+  if (!item) {
+    elements['patch-review-status'].textContent = 'hunk를 고르면 메모와 함께 구현 에이전트에게 돌아갑니다.';
+    return;
+  }
+  elements['patch-kind'].textContent = (item.source || 'PATCH').toUpperCase();
+  elements['patch-heading'].textContent = item.id;
+  elements['patch-status'].textContent = item.status;
+  elements['patch-status'].className = `badge${item.status === 'applied' ? ' pass' : item.status === 'failed' || item.status === 'discarded' ? ' fail' : ''}`;
+  elements['patch-truncated'].hidden = !item.truncated;
+  elements['patch-meta-origin'].textContent = item.originPath || '';
+  elements['patch-meta-files'].textContent = (item.files || []).join(', ') || `${item.fileCount || 0} files`;
+  elements['patch-meta-stats'].textContent = item.stats || '—';
+  elements['patch-meta-autonomy'].textContent = [item.autonomy, item.originTouched ? 'origin also changed' : null].filter(Boolean).join(' · ') || '—';
+  if (item.diff != null) renderPatchDiff(item.diff);
+  elements['patch-review-status'].textContent = state.selectedHunk
+    ? '선택한 hunk가 메모와 함께 전달됩니다.'
+    : (state.agentReady ? '리뷰 메모는 같은 로컬 에이전트 턴으로 갑니다.' : (state.agentReason || '연결 대기'));
+}
+
+async function selectPatch(id) {
+  state.selectedPatchId = id;
+  state.selectedHunk = '';
+  renderPatchQueue();
+  if (!id) {
+    state.patchDetail = null;
+    renderPatchWorkspace();
+    return;
+  }
+  state.patchDetail = await api(`/api/patches/${encodeURIComponent(id)}`);
+  renderPatchQueue();
+  renderPatchWorkspace();
+}
+
+async function refreshPatches(preferredId) {
+  const query = state.patchFilter === 'all' ? '' : `?status=${encodeURIComponent(state.patchFilter)}`;
+  const listed = await api(`/api/patches${query}`);
+  state.patches = listed.items || [];
+  const preferred = preferredId || state.selectedPatchId;
+  state.selectedPatchId = (preferred && state.patches.some((item) => item.id === preferred)) ? preferred : (state.patches[0]?.id || null);
+  if (state.selectedPatchId) state.patchDetail = await api(`/api/patches/${encodeURIComponent(state.selectedPatchId)}`);
+  else state.patchDetail = null;
+  renderPatchQueue();
+  renderPatchWorkspace();
+}
+
+const patchFilters = [...document.querySelectorAll('[data-patch-status]')];
+for (const button of patchFilters) button.addEventListener('click', () => {
+  for (const candidate of patchFilters) {
+    const active = candidate === button;
+    candidate.classList.toggle('is-active', active);
+    candidate.setAttribute('aria-pressed', String(active));
+  }
+  state.patchFilter = button.dataset.patchStatus;
+  refreshPatches().catch((error) => announce(error.message));
+});
+
+elements['patch-apply'].addEventListener('click', async () => {
+  if (!state.selectedPatchId) return;
+  elements['patch-apply'].disabled = true;
+  try {
+    await api(`/api/patches/${encodeURIComponent(state.selectedPatchId)}/apply`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    announce('패치를 원본에 적용했습니다.');
+    await refreshPatches(state.selectedPatchId);
+  } catch (error) {
+    announce(error.message);
+    await refreshPatches(state.selectedPatchId);
+  }
+});
+
+elements['patch-discard'].addEventListener('click', async () => {
+  if (!state.selectedPatchId) return;
+  elements['patch-discard'].disabled = true;
+  try {
+    await api(`/api/patches/${encodeURIComponent(state.selectedPatchId)}/discard`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    announce('패치를 폐기했습니다.');
+    await refreshPatches();
+  } catch (error) {
+    announce(error.message);
+    await refreshPatches(state.selectedPatchId);
+  }
+});
+
+elements['patch-review-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.selectedPatchId || !state.agentReady) return;
+  const note = elements['patch-note'].value.trim();
+  if (!note && !state.selectedHunk) {
+    announce('리뷰 메모나 hunk를 남겨 주세요.');
+    return;
+  }
+  elements['patch-review-send'].disabled = true;
+  try {
+    const result = await api(`/api/patches/${encodeURIComponent(state.selectedPatchId)}/review`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agent: 'implementer', note, hunk: state.selectedHunk }),
+    });
+    announce(`${result.agent?.title || '에이전트'}가 패치 리뷰를 받았습니다.`);
+    elements['patch-note'].value = '';
+    state.selectedHunk = '';
+    renderPatchWorkspace();
+  } catch (error) {
+    announce(error.message);
+  }
+  renderPatchWorkspace();
+});
+
 try {
   const session = await api('/api/session'); state.token = session.token; await refresh(); document.getElementById('live-status').textContent = `${new URL(session.origin).host} · local`;
   state.agentId = readAgentId();
@@ -510,6 +784,7 @@ try {
   elements['design-bookmarklet'].href = bookmarklet.href;
   const listed = await api('/api/design/captures');
   state.captures = listed.items || [];
+  await loadTray();
   const ingested = ingestFromHash();
   showSurface(readSurface(), { replace: true, agentId: state.agentId });
   if (ingested) await applyCapture(ingested);

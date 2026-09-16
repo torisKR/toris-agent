@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Studio Patch Review** at `http://127.0.0.1:5824/patches`: list pending isolated diffs from the existing `toris patches` store, read a bounded unified diff, apply/discard with Origin + session token, or send a review note/hunk back as an implementer turn.
+- **Design Mode annotation tray**: queue multiple element captures with per-element notes, persist `tray.json` under `~/.toris/studio/design/`, and send the tray plus one instruction in a single agent turn.
+
 - **Design Mode** at `http://127.0.0.1:5824/design`: pick a DOM element (iframe proxy, sample page, or bookmarklet) and attach selector, computed styles, bounded outerHTML, and a screenshot to the Studio agent turn.
 - **`toris android`** (`status`, `devices`, `screenshot`, `logcat`, `install`) plus optional `adb`/`emulator` doctor warnings and a chat `android` tool for device evidence. Artifacts land under `~/.toris/android/`.
 - TUI `/agent` and `/studio` commands, plus `toris --agent <id>`, so a chat session can pick a role and jump to the local GUI.
