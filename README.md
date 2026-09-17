@@ -419,6 +419,24 @@ Restrict senders with `channels.telegram.allowFrom` / `channels.slack.allowFrom`
 
 ---
 
+## Background daemon
+
+A local worker so a queued `run` can outlive a TUI session. It is **not** a cloud service, not multi-machine, and it does not open a network port.
+
+```bash
+toris daemon start
+toris daemon status          # running/not, pid, uptime, ~/.toris
+toris daemon status --json
+toris daemon run "add a health endpoint" --dry-run
+toris daemon stop
+```
+
+`start` writes `~/.toris/daemon.lock` + `daemon.json` and refuses a second start while that pid is alive. `run` drops a job in `~/.toris/daemon/inbox/` for the worker to execute with the same orchestrator as `toris run`. If the daemon is down, `daemon run` exits `5`.
+
+`toris run` itself still executes in the foreground. Scheduled ticks, unix-socket RPC (`daemon.sock`), and remote supervisors are not in this release.
+
+---
+
 ## Command reference
 
 ```
@@ -434,7 +452,8 @@ approvals | approve <id> | reject <id>
 agents [--category <c>]   Profiles (builtins + .toris/agents/*.json)
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
-daemon status             Background daemon (not implemented in this release)
+daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
+daemon run "<goal>"       Queue a run while the daemon is up (exit 5 if down)
 studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge)
 studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
 android status|devices|screenshot|logcat|install
@@ -497,6 +516,11 @@ State lives under `$TORIS_HOME` (default `~/.toris`) as plain text:
 ├── runs/
 ├── events/
 ├── studio/design/          # Design Mode captures + tray.json
+├── daemon.json             # local daemon pid, heartbeat, job counts
+├── daemon.lock             # exclusive owner lock (refuses double-start)
+├── daemon/inbox/           # queued jobs dropped by `toris daemon run`
+├── daemon-jobs.json        # worker-owned job history
+├── logs/daemon.log         # detached worker stdout/stderr
 ├── patches.json            # isolated diffs waiting for apply/discard
 ├── patches/                # pat_*.diff files
 └── android/                # optional adb screenshots and logcat
@@ -564,7 +588,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md]
 
 `0.1.0` was the CLI foundation. Still open:
 
-- [ ] Background daemon (`toris daemon start`) for long-running and scheduled goals
+- [x] Background daemon (`toris daemon start|status|stop`) plus queued `daemon run` (local-only; no socket RPC, scheduler, or cloud yet)
 - [x] Git worktree isolation so coding CLIs never write the original checkout
 - [x] Cost tracking and budget enforcement across runs, not just within one
 - [ ] More provider adapters

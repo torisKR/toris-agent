@@ -650,6 +650,56 @@ export class Orchestrator {
 }
 
 // ---------------------------------------------------------------------------
+// Local daemon (pid/lock under $TORIS_HOME; no remote, no cloud)
+// ---------------------------------------------------------------------------
+
+export interface DaemonJobCounts {
+  queued: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+}
+
+export interface DaemonRecentJob {
+  id: string;
+  type: string;
+  status: string;
+  goal: string | null;
+  runId: string | null;
+  updatedAt: string;
+}
+
+export interface DaemonStatus {
+  running: boolean;
+  supported: true;
+  pid: number | null;
+  startedAt: string | null;
+  heartbeatAt: string | null;
+  uptimeMs: number;
+  home: string;
+  version: string;
+  socket: null;
+  jobs: DaemonJobCounts;
+  recentJobs: DaemonRecentJob[];
+}
+
+export function daemonPaths(home: string): {
+  home: string;
+  lock: string;
+  state: string;
+  inbox: string;
+  jobs: string;
+  log: string;
+};
+
+export function isPidAlive(pid: number, killer?: (pid: number, signal?: number | string) => boolean): boolean;
+export function isDaemonRunning(home: string): Promise<boolean>;
+export function readDaemonStatus(home: string, now?: number | (() => number)): Promise<DaemonStatus>;
+export function startDaemon(home: string, options?: Record<string, unknown>): Promise<DaemonStatus | void>;
+export function stopDaemon(home: string, options?: Record<string, unknown>): Promise<DaemonStatus & { stopped: boolean; reason?: string }>;
+export function submitDaemonJob(home: string, input: Record<string, unknown>, options?: Record<string, unknown>): Promise<Record<string, unknown>>;
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 

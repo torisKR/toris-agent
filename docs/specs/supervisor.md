@@ -12,3 +12,5 @@ export function connect(opts?: { socket?: string; autoStart?: boolean }): Promis
 export function isDaemonRunning(home?: string): Promise<boolean>;
 export function socketPath(home?: string): string;
 ```
+
+Implemented now: local process + `daemon.lock` / `daemon.json` + heartbeat + a file inbox that accepts `run` jobs. Not yet: unix socket RPC, scheduled ticks, multi-machine, cloud.

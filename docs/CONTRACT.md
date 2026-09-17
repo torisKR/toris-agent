@@ -378,6 +378,8 @@ export function isDaemonRunning(home?: string): Promise<boolean>;
 export function socketPath(home?: string): string;
 ```
 
+First usable slice (this tree): `toris daemon start|status|stop|run` is a **local** pid/lock worker under `$TORIS_HOME`. State file is `daemon.json` `{ pid, version, startedAt, heartbeatAt, home, socket, jobs }`. `socket` is `null` in this slice — there is no `daemon.sock` RPC, no remote multi-machine, and no cloud. Jobs are submitted by dropping JSON into `daemon/inbox/` (`toris daemon run`). Full `Supervisor` / `connect()` remains the later hook.
+
 ## `toris-agent` (apps/cli) — command surface
 
 Binary: `toris`. Global flags: `--json`, `--home <dir>`, `--no-color`, `--verbose`.
@@ -395,7 +397,8 @@ toris cost [today] [--json]      # cross-run spend vs maxDailyCostUsd
 toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id> [--reason]
 toris logs <runId> [-f]          # event tail
 toris cancel <runId>
-toris daemon start|stop|status
+toris daemon start|stop|status   # local pid/lock worker
+toris daemon run "<goal>"        # queue a run (exit 5 if down)
 toris agents [--category <c>]    # agent profile catalog
 toris skills
 toris version

@@ -131,6 +131,8 @@ test('help documents TUI and GUI doors onto the agent', async () => {
   assert.match(out, /knowledge at \/knowledge/);
   assert.match(out, /studio --open/);
   assert.match(out, /toris cost/);
+  assert.match(out, /daemon start\|stop\|status/);
+  assert.match(out, /daemon run/);
 });
 
 // --- first-run onboarding ---------------------------------------------------

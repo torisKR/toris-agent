@@ -22,6 +22,13 @@ test('studio --open is a boolean and does not consume the next token', () => {
   assert.deepEqual(positionals, ['studio', 'service']);
 });
 
+test('daemon --foreground is a boolean and does not consume the next token', () => {
+  const { positionals, flags } = parseArgs(['daemon', 'start', '--foreground', '--home', '/tmp/h']);
+  assert.equal(flags.foreground, true);
+  assert.deepEqual(positionals, ['daemon', 'start']);
+  assert.equal(flags.home, '/tmp/h');
+});
+
 test('supports --key=value form', () => {
   assert.equal(parseArgs(['run', '--budget=2.5']).flags.budget, '2.5');
 });

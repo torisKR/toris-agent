@@ -15,7 +15,8 @@ toris cost [today] [--json]      # cross-run spend vs maxDailyCostUsd
 toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id> [--reason]
 toris logs <runId> [-f]          # event tail
 toris cancel <runId>
-toris daemon start|stop|status
+toris daemon start|stop|status   # local pid/lock worker; --json status
+toris daemon run "<goal>"        # queue a run (exit 5 if the daemon is down)
 toris agents [--category <c>]    # agent profile catalog (builtins + .toris/agents/*.json)
 toris skills
 toris version
