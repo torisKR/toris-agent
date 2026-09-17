@@ -9,8 +9,9 @@ import {
   stopDaemon,
   submitDaemonJob,
 } from '../../daemon/index.js';
+import { cmdDaemonSchedule } from './daemon-schedule.js';
 
-const SUBCOMMANDS = new Set(['start', 'stop', 'status', 'run']);
+const SUBCOMMANDS = new Set(['start', 'stop', 'status', 'run', 'schedule']);
 
 function formatUptime(ms) {
   const seconds = Math.floor(Math.max(0, ms) / 1000);
@@ -26,6 +27,7 @@ function printStatus(status) {
     line(`${c.yellow('STOPPED')} daemon is not running`);
     line(c.dim(`      home  ${status.home}`));
     line(c.dim('      start with `toris daemon start` (local-only; no cloud)'));
+    printScheduleStatus(status);
     return;
   }
   line(`${c.green('RUNNING')} pid ${status.pid}  up ${formatUptime(status.uptimeMs)}`);
@@ -34,17 +36,38 @@ function printStatus(status) {
     ['started', status.startedAt],
     ['heartbeat', status.heartbeatAt ?? c.dim('n/a')],
     ['jobs', `${status.jobs.queued} queued  ${status.jobs.running} running  ${status.jobs.succeeded} done`],
+    ...scheduleStatusPairs(status),
   ]);
+}
+
+function scheduleStatusPairs(status) {
+  const schedules = status.schedules || {};
+  const count = Number(schedules.count) || 0;
+  const enabled = Number(schedules.enabled) || 0;
+  const next = schedules.nextDueAt
+    ? `${schedules.nextDueAt}${schedules.nextId ? `  ${schedules.nextId}` : ''}`
+    : c.dim('none');
+  return [
+    ['schedules', count === 0 ? '0' : `${enabled} enabled / ${count}`],
+    ['next due', next],
+  ];
+}
+
+function printScheduleStatus(status) {
+  keyValues(scheduleStatusPairs(status));
 }
 
 export async function cmdDaemon(ctx, positionals, flags = {}, deps = {}) {
   const sub = positionals[0] ?? 'status';
   if (!SUBCOMMANDS.has(sub)) {
-    throw new UsageError(`Unknown subcommand "daemon ${sub}". Try: start | stop | status | run`);
+    throw new UsageError(
+      `Unknown subcommand "daemon ${sub}". Try: start | stop | status | run | schedule`,
+    );
   }
   if (sub === 'status') return statusCommand(ctx, deps);
   if (sub === 'start') return startCommand(ctx, flags, deps);
   if (sub === 'stop') return stopCommand(ctx, flags, deps);
+  if (sub === 'schedule') return cmdDaemonSchedule(ctx, positionals.slice(1), flags);
   return runCommand(ctx, positionals.slice(1), flags, deps);
 }
 
@@ -92,7 +115,7 @@ async function startCommand(ctx, flags, deps) {
   }
   line(`${c.green('STARTED')} pid ${status.pid}`);
   line(c.dim(`      home  ${status.home}`));
-  line(c.dim('      queue a goal with `toris daemon run "<goal>"`'));
+  line(c.dim('      queue a goal with `toris daemon run "<goal>"` or `toris daemon schedule add`'));
   return EXIT.OK;
 }
 

@@ -11,6 +11,7 @@ export function daemonPaths(home) {
     lock: join(home, 'daemon.lock'),
     state: join(home, 'daemon.json'),
     inbox: join(home, 'daemon', 'inbox'),
+    schedules: join(home, 'daemon', 'schedules'),
     jobs: join(home, 'daemon-jobs.json'),
     log: join(home, 'logs', 'daemon.log'),
   };

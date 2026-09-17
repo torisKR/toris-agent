@@ -17,6 +17,7 @@ toris logs <runId> [-f]          # event tail
 toris cancel <runId>
 toris daemon start|stop|status   # local pid/lock worker; --json status
 toris daemon run "<goal>"        # queue a run (exit 5 if the daemon is down)
+toris daemon schedule list|add|remove|enable|disable   # local cron only
 toris agents [--category <c>]    # agent profile catalog (builtins + .toris/agents/*.json)
 toris skills
 toris version

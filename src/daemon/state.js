@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { open, readFile, rename, unlink, writeFile, mkdir } from 'node:fs/promises';
 
 import { daemonPaths } from './paths.js';
+import { emptyScheduleSummary, summarizeSchedules } from './schedule.js';
 
 const require = createRequire(import.meta.url);
 export const packageVersion = () => require('../../package.json').version;
@@ -63,11 +64,17 @@ export function buildStatus(home, state, now = Date.now) {
     socket: null,
     jobs: { ...emptyJobCounts(), ...(state?.jobs && typeof state.jobs === 'object' ? state.jobs : {}) },
     recentJobs: running && Array.isArray(state?.recentJobs) ? state.recentJobs : [],
+    schedules: {
+      ...emptyScheduleSummary(),
+      ...(state?.schedules && typeof state.schedules === 'object' ? state.schedules : {}),
+    },
   };
 }
 
 export async function readDaemonStatus(home, now = Date.now) {
-  return buildStatus(home, await readDaemonState(home), now);
+  const status = buildStatus(home, await readDaemonState(home), now);
+  status.schedules = await summarizeSchedules(home, now);
+  return status;
 }
 
 export async function isDaemonRunning(home) {

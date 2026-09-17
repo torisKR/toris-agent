@@ -61,7 +61,8 @@ cli       -> all
   - `torisHome()/cost.json` — daily spend ledger (local calendar date, upserted per run)
   - `torisHome()/worktrees/<runId>/<taskId>/` — writer worktrees
   - `torisHome()/daemon.sock` — supervisor unix socket (Windows: named pipe `\\.\pipe\toris`)
-  - `torisHome()/daemon.json` — `{ pid, socket, version, startedAt }`
+  - `torisHome()/daemon.json` — `{ pid, socket, version, startedAt, heartbeatAt, jobs, schedules }`
+  - `torisHome()/daemon/schedules/` — local cron schedule JSON files
 
 ## Rules every implementer must follow
 

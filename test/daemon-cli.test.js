@@ -65,7 +65,64 @@ test('status is json-scriptable when the daemon is down', async () => {
 
 test('unknown subcommand is a usage error', async () => {
   await withHome(async (home) => {
-    await assert.rejects(() => cmdDaemon(ctx(home), ['serve'], {}), /start \| stop \| status \| run/);
+    await assert.rejects(
+      () => cmdDaemon(ctx(home), ['serve'], {}),
+      /start \| stop \| status \| run \| schedule/,
+    );
+  });
+});
+
+test('schedule add/list/disable/enable/remove are json-scriptable without a worker', async () => {
+  await withHome(async (home) => {
+    const added = await captureJson(() =>
+      cmdDaemon(ctx(home), ['schedule', 'add', '@every 30m', 'lint the repo'], { 'dry-run': true }),
+    );
+    assert.equal(added.code, EXIT.OK);
+    assert.equal(added.body.created, true);
+    assert.equal(added.body.schedule.goal, 'lint the repo');
+    assert.equal(added.body.schedule.expr, '@every 30m');
+    assert.equal(added.body.schedule.dryRun, true);
+    assert.equal(added.body.schedule.enabled, true);
+    const id = added.body.schedule.id;
+    assert.match(id, /^sch_/);
+
+    const listed = await captureJson(() => cmdDaemon(ctx(home), ['schedule', 'list'], {}));
+    assert.equal(listed.body.count, 1);
+    assert.equal(listed.body.schedules[0].id, id);
+
+    const status = await captureJson(() => cmdDaemon(ctx(home), ['status'], {}));
+    assert.equal(status.body.schedules.count, 1);
+    assert.equal(status.body.schedules.enabled, 1);
+    assert.ok(status.body.schedules.nextDueAt);
+
+    const disabled = await captureJson(() => cmdDaemon(ctx(home), ['schedule', 'disable', id], {}));
+    assert.equal(disabled.body.schedule.enabled, false);
+
+    const enabled = await captureJson(() => cmdDaemon(ctx(home), ['schedule', 'enable', id], {}));
+    assert.equal(enabled.body.schedule.enabled, true);
+
+    const removed = await captureJson(() => cmdDaemon(ctx(home), ['schedule', 'remove', id], {}));
+    assert.equal(removed.body.removed, true);
+    const empty = await captureJson(() => cmdDaemon(ctx(home), ['schedule', 'list'], {}));
+    assert.equal(empty.body.count, 0);
+  });
+});
+
+test('schedule add rejects a bad expression as a usage error', async () => {
+  await withHome(async (home) => {
+    await assert.rejects(
+      () => cmdDaemon(ctx(home), ['schedule', 'add', '@reboot', 'nope'], {}),
+      /Unsupported schedule expression/,
+    );
+  });
+});
+
+test('unknown schedule action is a usage error', async () => {
+  await withHome(async (home) => {
+    await assert.rejects(
+      () => cmdDaemon(ctx(home), ['schedule', 'pause'], {}),
+      /list \| add \| remove \| enable \| disable/,
+    );
   });
 });
 
