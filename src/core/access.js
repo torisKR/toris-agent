@@ -42,7 +42,7 @@ export function renderStudioAccess({ running = false, port = STUDIO_PORT } = {})
 }
 
 /** Hostnames this opener will follow. Anything else stays in the terminal. */
-const LOOPBACK_HOSTS = new Set([STUDIO_HOST, 'localhost', '::1']);
+const LOOPBACK_HOSTS = new Set([STUDIO_HOST, 'localhost', '::1', '[::1]']);
 
 /** @param {unknown} value */
 export function isLoopbackHttpUrl(value) {
