@@ -29,6 +29,19 @@ test('daemon --foreground is a boolean and does not consume the next token', () 
   assert.equal(flags.home, '/tmp/h');
 });
 
+test('schedule --disabled is a boolean and does not consume the next token', () => {
+  const { positionals, flags } = parseArgs([
+    'daemon',
+    'schedule',
+    'add',
+    '--disabled',
+    '@daily',
+    'goal',
+  ]);
+  assert.equal(flags.disabled, true);
+  assert.deepEqual(positionals, ['daemon', 'schedule', 'add', '@daily', 'goal']);
+});
+
 test('supports --key=value form', () => {
   assert.equal(parseArgs(['run', '--budget=2.5']).flags.budget, '2.5');
 });

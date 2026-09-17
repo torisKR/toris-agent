@@ -4,6 +4,7 @@ import { Store } from '../core/store.js';
 import { resolveAutonomy } from '../core/autonomy.js';
 import { acquireDaemonLock, releaseDaemonLock, touchHeartbeat, packageVersion } from './state.js';
 import { DaemonQueue, DAEMON_JOB_TYPES } from './queue.js';
+import { summarizeSchedules, tickSchedules } from './schedule.js';
 
 function sleep(ms, timer = setTimeout) {
   return new Promise((resolve) => {
@@ -72,16 +73,22 @@ export async function runDaemonWorker(options) {
   try {
     while (!stopping) {
       await queue.drainInbox();
+      const now = Date.now();
+      if (now - lastBeat >= heartbeatMs) {
+        await tickSchedules(home, queue, { clock: () => new Date(now) });
+        await queue.drainInbox();
+        await touchHeartbeat(home, {
+          jobs: queue.counts(),
+          recentJobs: queue.recent(),
+          schedules: await summarizeSchedules(home, now),
+        });
+        lastBeat = now;
+      }
       if (!active) {
         active = queue.kick();
         active?.finally(() => {
           active = null;
         }).catch(() => undefined);
-      }
-      const now = Date.now();
-      if (now - lastBeat >= heartbeatMs) {
-        await touchHeartbeat(home, { jobs: queue.counts(), recentJobs: queue.recent() });
-        lastBeat = now;
       }
       if (stopping) break;
       await sleep(intervalMs, timer);

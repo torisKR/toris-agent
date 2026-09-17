@@ -13,4 +13,4 @@ export function isDaemonRunning(home?: string): Promise<boolean>;
 export function socketPath(home?: string): string;
 ```
 
-Implemented now: local process + `daemon.lock` / `daemon.json` + heartbeat + a file inbox that accepts `run` jobs. Not yet: unix socket RPC, scheduled ticks, multi-machine, cloud.
+Implemented now: local process + `daemon.lock` / `daemon.json` + heartbeat + a file inbox that accepts `run` jobs + local schedule ticks (`daemon/schedules/`, evaluated on heartbeat in the host timezone). Not yet: unix socket RPC, multi-machine, cloud calendars.

@@ -66,7 +66,8 @@ cli       -> all
   - `torisHome()/runs/<runId>/` — receipts, logs, artifacts
   - `torisHome()/worktrees/<runId>/<taskId>/` — writer worktrees
   - `torisHome()/daemon.sock` — supervisor unix socket (Windows: named pipe `\\.\pipe\toris`)
-  - `torisHome()/daemon.json` — `{ pid, socket, version, startedAt }`
+  - `torisHome()/daemon.json` — `{ pid, socket, version, startedAt, heartbeatAt, jobs, schedules }`
+  - `torisHome()/daemon/schedules/` — local cron schedule JSON files
 
 ## `@toris/schemas` — owns all domain types (Zod + inferred TS)
 
@@ -378,7 +379,7 @@ export function isDaemonRunning(home?: string): Promise<boolean>;
 export function socketPath(home?: string): string;
 ```
 
-First usable slice (this tree): `toris daemon start|status|stop|run` is a **local** pid/lock worker under `$TORIS_HOME`. State file is `daemon.json` `{ pid, version, startedAt, heartbeatAt, home, socket, jobs }`. `socket` is `null` in this slice — there is no `daemon.sock` RPC, no remote multi-machine, and no cloud. Jobs are submitted by dropping JSON into `daemon/inbox/` (`toris daemon run`). Full `Supervisor` / `connect()` remains the later hook.
+First usable slice (this tree): `toris daemon start|status|stop|run|schedule` is a **local** pid/lock worker under `$TORIS_HOME`. State file is `daemon.json` `{ pid, version, startedAt, heartbeatAt, home, socket, jobs, schedules }`. `socket` is `null` in this slice — there is no `daemon.sock` RPC, no remote multi-machine, and no cloud. Jobs are submitted by dropping JSON into `daemon/inbox/` (`toris daemon run` or a due local schedule). Schedules live in `daemon/schedules/*.json` and tick on the worker heartbeat in the host timezone (5-field cron, `@every`, `HH:MM` weekdays). Full `Supervisor` / `connect()` remains the later hook.
 
 ## `toris-agent` (apps/cli) — command surface
 
@@ -399,6 +400,7 @@ toris logs <runId> [-f]          # event tail
 toris cancel <runId>
 toris daemon start|stop|status   # local pid/lock worker
 toris daemon run "<goal>"        # queue a run (exit 5 if down)
+toris daemon schedule list|add|remove|enable|disable
 toris agents [--category <c>]    # agent profile catalog
 toris skills
 toris version

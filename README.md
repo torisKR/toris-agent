@@ -425,15 +425,19 @@ A local worker so a queued `run` can outlive a TUI session. It is **not** a clou
 
 ```bash
 toris daemon start
-toris daemon status          # running/not, pid, uptime, ~/.toris
+toris daemon status          # running/not, pid, uptime, next schedule, ~/.toris
 toris daemon status --json
 toris daemon run "add a health endpoint" --dry-run
+toris daemon schedule add "@daily" "add a health endpoint" --dry-run
+toris daemon schedule list
 toris daemon stop
 ```
 
 `start` writes `~/.toris/daemon.lock` + `daemon.json` and refuses a second start while that pid is alive. `run` drops a job in `~/.toris/daemon/inbox/` for the worker to execute with the same orchestrator as `toris run`. If the daemon is down, `daemon run` exits `5`.
 
-`toris run` itself still executes in the foreground. Scheduled ticks, unix-socket RPC (`daemon.sock`), and remote supervisors are not in this release.
+Schedules are **local cron only** (5-field cron, `@hourly`/`@daily`/`@weekly`/`@monthly`, `@every 15m`, or `09:00 mon-fri`). The worker evaluates due items on its heartbeat in the machine timezone and enqueues the same inbox jobs as `daemon run`. The same schedule does not double-fire while a prior job is still queued or running. There is no cloud calendar and no remote multi-machine clock. See [docs/DAEMON.md](docs/DAEMON.md).
+
+`toris run` itself still executes in the foreground. Unix-socket RPC (`daemon.sock`) and remote supervisors are not in this release.
 
 ---
 
@@ -454,6 +458,7 @@ skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
 daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
 daemon run "<goal>"       Queue a run while the daemon is up (exit 5 if down)
+daemon schedule           Local cron: list | add | remove | enable | disable
 studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge)
 studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
 android status|devices|screenshot|logcat|install
@@ -518,7 +523,8 @@ State lives under `$TORIS_HOME` (default `~/.toris`) as plain text:
 ├── studio/design/          # Design Mode captures + tray.json
 ├── daemon.json             # local daemon pid, heartbeat, job counts
 ├── daemon.lock             # exclusive owner lock (refuses double-start)
-├── daemon/inbox/           # queued jobs dropped by `toris daemon run`
+├── daemon/inbox/           # queued jobs from `toris daemon run` and schedule ticks
+├── daemon/schedules/       # one JSON file per local cron schedule
 ├── daemon-jobs.json        # worker-owned job history
 ├── logs/daemon.log         # detached worker stdout/stderr
 ├── patches.json            # isolated diffs waiting for apply/discard
@@ -577,6 +583,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md]
 
 ## Docs
 
+- [docs/DAEMON.md](docs/DAEMON.md) — local daemon start/stop/run and schedule expressions
 - [docs/STUDIO.md](docs/STUDIO.md) — Studio bind, agent room, Design Mode, review, security boundary
 - [docs/AGENTS.md](docs/AGENTS.md) — built-in profiles and `.toris/agents/*.json` overlays
 - [docs/CONTRACT.md](docs/CONTRACT.md) — public CLI / programmatic contract
@@ -588,7 +595,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md]
 
 `0.1.0` was the CLI foundation. Still open:
 
-- [x] Background daemon (`toris daemon start|status|stop`) plus queued `daemon run` (local-only; no socket RPC, scheduler, or cloud yet)
+- [x] Background daemon (`toris daemon start|status|stop`) plus queued `daemon run` and local schedule ticks (no socket RPC or cloud)
 - [x] Git worktree isolation so coding CLIs never write the original checkout
 - [x] Cost tracking and budget enforcement across runs, not just within one
 - [ ] More provider adapters

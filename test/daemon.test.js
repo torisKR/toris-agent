@@ -53,6 +53,8 @@ test('status is stopped when no lock exists', async () => {
     assert.equal(status.uptimeMs, 0);
     assert.equal(status.home, home);
     assert.equal(status.socket, null);
+    assert.equal(status.schedules.count, 0);
+    assert.equal(status.schedules.nextDueAt, null);
   });
 });
 

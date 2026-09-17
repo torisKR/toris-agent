@@ -68,6 +68,10 @@ export {
   startDaemon,
   stopDaemon,
   submitDaemonJob,
+  addSchedule,
+  listSchedules,
+  parseScheduleExpr,
+  tickSchedules,
 } from './daemon/index.js';
 export {
   normalizeDesignCapture,

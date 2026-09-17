@@ -81,6 +81,7 @@ export class DaemonQueue {
       status: job.status,
       goal: job.goal ?? null,
       runId: job.result?.runId ?? null,
+      scheduleId: job.scheduleId ?? null,
       updatedAt: job.updatedAt,
     }));
   }
@@ -107,6 +108,7 @@ export class DaemonQueue {
       provider: input.provider ?? null,
       apply: Boolean(input.apply),
       review: input.review !== false,
+      scheduleId: input.scheduleId ?? null,
       result: null,
       error: null,
       createdAt: now,

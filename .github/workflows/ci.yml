@@ -101,6 +101,17 @@ jobs:
           toris skills
           toris approvals
           toris daemon status --json
+          toris daemon schedule list --json
+          toris daemon schedule add "@every 1h" "add a health endpoint" --dry-run --json > /tmp/toris-schedule.json
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync("/tmp/toris-schedule.json","utf8"));
+            if (!s.ok || !s.schedule?.id) { console.error(s); process.exit(1); }
+            console.log("schedule", s.schedule.id, s.schedule.expr);
+          '
+          SCHEDULE_ID=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/toris-schedule.json','utf8')).schedule.id")
+          toris daemon schedule disable "$SCHEDULE_ID" --json
+          toris daemon schedule enable "$SCHEDULE_ID" --json
+          toris daemon schedule remove "$SCHEDULE_ID" --json
 
           echo "--- local daemon start / queue / stop ---"
           cleanup_daemon() { toris daemon stop >/dev/null 2>&1 || true; }

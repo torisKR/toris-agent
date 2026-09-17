@@ -666,7 +666,35 @@ export interface DaemonRecentJob {
   status: string;
   goal: string | null;
   runId: string | null;
+  scheduleId: string | null;
   updatedAt: string;
+}
+
+export interface DaemonScheduleSummary {
+  count: number;
+  enabled: number;
+  nextDueAt: string | null;
+  nextId: string | null;
+  overdue?: boolean;
+}
+
+export interface DaemonSchedule {
+  id: string;
+  expr: string;
+  goal: string;
+  enabled: boolean;
+  autonomy: string | null;
+  budgetUsd: number | null;
+  dryRun: boolean;
+  apply: boolean;
+  review: boolean;
+  provider: string | null;
+  cwd: string | null;
+  project: { id: string; name: string; path: string; checks?: string[] } | null;
+  createdAt: string;
+  updatedAt: string;
+  lastFiredAt: string | null;
+  nextDueAt: string | null;
 }
 
 export interface DaemonStatus {
@@ -681,6 +709,7 @@ export interface DaemonStatus {
   socket: null;
   jobs: DaemonJobCounts;
   recentJobs: DaemonRecentJob[];
+  schedules: DaemonScheduleSummary;
 }
 
 export function daemonPaths(home: string): {
@@ -688,9 +717,15 @@ export function daemonPaths(home: string): {
   lock: string;
   state: string;
   inbox: string;
+  schedules: string;
   jobs: string;
   log: string;
 };
+
+export function parseScheduleExpr(input: string): { kind: 'cron' | 'every'; source: string; everyMs?: number };
+export function addSchedule(home: string, input: Record<string, unknown>, options?: Record<string, unknown>): Promise<DaemonSchedule>;
+export function listSchedules(home: string): Promise<DaemonSchedule[]>;
+export function tickSchedules(home: string, queue: unknown, options?: Record<string, unknown>): Promise<Array<{ scheduleId: string; jobId: string }>>;
 
 export function isPidAlive(pid: number, killer?: (pid: number, signal?: number | string) => boolean): boolean;
 export function isDaemonRunning(home: string): Promise<boolean>;
