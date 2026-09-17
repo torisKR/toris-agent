@@ -1,3 +1,6 @@
+import { resolveAutonomy } from '../core/autonomy.js';
+import { Store } from '../core/store.js';
+import { findProject } from '../cli/commands/project.js';
 import { EXIT, TorisError, UsageError } from '../core/errors.js';
 import {
   addSchedule,
@@ -45,6 +48,51 @@ function optionalBudget(value) {
   return num;
 }
 
+function optionalAutonomy(value) {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') throw new HttpError(400, 'autonomy must be a string');
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    return resolveAutonomy(trimmed).level;
+  } catch {
+    throw new HttpError(400, `Unknown autonomy level "${value}". Use one of L1..L5.`);
+  }
+}
+
+function publicProjectRef(project) {
+  if (!project) return null;
+  return {
+    id: project.id,
+    name: project.name,
+    path: project.path,
+    checks: Array.isArray(project.checks) ? project.checks : [],
+  };
+}
+
+function projectRefFromBody(requested) {
+  if (requested == null || requested === '') return null;
+  if (typeof requested === 'string') return requested.trim() || null;
+  if (typeof requested === 'object' && !Array.isArray(requested)) {
+    const ref = String(requested.id || requested.name || '').trim();
+    if (!ref) throw new HttpError(400, 'project must include id or name');
+    return ref;
+  }
+  throw new HttpError(400, 'project must be a string id or {id|name}');
+}
+
+async function resolveEnqueueProject(store, cwd, requested) {
+  const ref = projectRefFromBody(requested);
+  const projects = await store.readCollection('projects');
+  if (ref) {
+    const found = findProject(projects, ref);
+    if (!found) throw new HttpError(400, `No project matching "${ref}"`);
+    return publicProjectRef(found);
+  }
+  if (!cwd) return null;
+  return publicProjectRef(projects.find((project) => project.path === cwd) ?? null);
+}
+
 async function requireSchedule(home, ref) {
   const found = findSchedule(await listSchedules(home), ref);
   if (!found) throw new HttpError(404, 'schedule not found');
@@ -81,7 +129,8 @@ export async function presentDaemonSnapshot(home, options = {}) {
  * store as `toris daemon run` / `toris daemon schedule`. Does not start or
  * stop the worker.
  */
-export function registerDaemonRoutes(router, { sendJson, requireJson, options }) {
+export function registerDaemonRoutes(router, { sendJson, requireJson, options, store }) {
+  const projectStore = store || new Store(options.home);
   router.add('GET', '/api/daemon', async (_request, response) => {
     sendJson(response, 200, await presentDaemonSnapshot(options.home));
   });
@@ -95,8 +144,8 @@ export function registerDaemonRoutes(router, { sendJson, requireJson, options })
       const job = await enqueueDaemonRun(options.home, {
         goal,
         cwd: options.cwd ?? null,
-        project: body.project ?? null,
-        autonomy: optionalString(body.autonomy, 'autonomy'),
+        project: await resolveEnqueueProject(projectStore, options.cwd, body.project),
+        autonomy: optionalAutonomy(body.autonomy),
         dryRun: Boolean(body.dryRun),
         budgetUsd: optionalBudget(body.budgetUsd ?? body.budget),
         provider: optionalString(body.provider, 'provider'),
@@ -139,7 +188,7 @@ export function registerDaemonRoutes(router, { sendJson, requireJson, options })
         review: body.review !== false,
         provider: typeof body.provider === 'string' ? body.provider : null,
         cwd: options.cwd ?? null,
-        project: body.project ?? null,
+        project: await resolveEnqueueProject(projectStore, options.cwd, body.project),
       });
       sendJson(response, 201, { ok: true, schedule: publicSchedule(schedule) });
     } catch (error) {

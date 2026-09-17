@@ -481,7 +481,7 @@ export async function createStudioServer(options) {
   });
 
   registerKnowledgeRoutes(router, { sendJson, requireJson, options });
-  registerDaemonRoutes(router, { sendJson, requireJson, options });
+  registerDaemonRoutes(router, { sendJson, requireJson, options, store });
   registerBriefRoutes(router, { sendJson, options, store });
 
   server = createServer({ maxHeaderSize: 16 * 1024, requireHostHeader: true }, async (request, response) => {

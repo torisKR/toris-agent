@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
+import { Store } from '../src/core/store.js';
 import { acquireDaemonLock, addSchedule, daemonPaths, releaseDaemonLock } from '../src/daemon/index.js';
 
 async function withServer(fn) {
@@ -271,6 +272,63 @@ test('POST /api/daemon/run refuses a brief-only goal', async () => {
       assert.equal(response.status, 400);
       const body = await response.json();
       assert.match(body.error.message, /foreground CLI digest/);
+    }
+  });
+});
+
+test('POST /api/daemon/run attaches the cwd project and ignores client checks', async () => {
+  await withServer(async ({ base, home }) => {
+    const store = await new Store(home).init();
+    await store.writeCollection('projects', [{
+      id: 'proj_studio',
+      name: 'demo',
+      path: home,
+      checks: ['npm test'],
+    }]);
+    await acquireDaemonLock(home, { pid: process.pid, startedAt: new Date().toISOString() });
+    try {
+      const implicit = await fetch(`${base}/api/daemon/run`, mutation(base, {
+        goal: 'lint the repo',
+        dryRun: true,
+      }));
+      assert.equal(implicit.status, 202);
+      const queued = await implicit.json();
+      assert.equal(queued.job.project.id, 'proj_studio');
+      assert.deepEqual(queued.job.project.checks, ['npm test']);
+
+      const spoofed = await fetch(`${base}/api/daemon/run`, mutation(base, {
+        goal: 'lint the repo',
+        dryRun: true,
+        project: { id: 'proj_studio', checks: [] },
+      }));
+      assert.equal(spoofed.status, 202);
+      assert.deepEqual((await spoofed.json()).job.project.checks, ['npm test']);
+    } finally {
+      await releaseDaemonLock(home);
+    }
+  });
+});
+
+test('POST /api/daemon/run rejects unknown autonomy before enqueue', async () => {
+  await withServer(async ({ base, home }) => {
+    await acquireDaemonLock(home, { pid: process.pid, startedAt: new Date().toISOString() });
+    try {
+      const invalid = await fetch(`${base}/api/daemon/run`, mutation(base, {
+        goal: 'lint the repo',
+        autonomy: 'L9',
+      }));
+      assert.equal(invalid.status, 400);
+      assert.match((await invalid.json()).error.message, /L1\.\.L5/);
+
+      const normalized = await fetch(`${base}/api/daemon/run`, mutation(base, {
+        goal: 'lint the repo',
+        dryRun: true,
+        autonomy: 'l2',
+      }));
+      assert.equal(normalized.status, 202);
+      assert.equal((await normalized.json()).job.autonomy, 'L2');
+    } finally {
+      await releaseDaemonLock(home);
     }
   });
 });
