@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cross-run cost tracking** under `~/.toris/cost.json` (local calendar day, no telemetry). `toris cost`, `toris cost today`, and `toris cost --json` list spend by day and recent runs. `maxDailyCostUsd` now refuses a new run when today's ceiling is already reached, and skips remaining tasks (plus the second-pass review) when the daily or `--budget` cap would be exceeded. Receipts carry additive `budgetUsd` / `budgetNote` / `dailyCostUsd`; Studio `GET /api/health` includes today's spend.
 - Studio agent turns stream over SSE when `POST /api/agent/turn` sends `Accept: text/event-stream` (`text` / `tool-start`, then `done`). JSON remains the default. The `/agent` room shows progressive text, Stop, Enter-to-send, and a per-agent `localStorage` transcript.
 - `toris studio --open` starts or attaches to the loopback GUI and opens it in the OS browser. TUI `/studio` jumps to the same URL.
 - **Studio Patch Review** at `http://127.0.0.1:5824/patches`: list pending isolated diffs from the existing `toris patches` store, read a bounded unified diff, apply/discard with Origin + session token, or send a review note/hunk back as an implementer turn.

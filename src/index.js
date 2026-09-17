@@ -44,7 +44,16 @@ export { verify, runCheck, inferChecks } from './core/verifier.js';
 export { buildReceipt, receiptToMarkdown } from './core/receipt.js';
 export { buildPlanPrompt, extractJsonArray, normalizeTasks, fallbackPlan } from './core/planner.js';
 export { buildReviewPrompt, parseReview } from './core/review.js';
-export { EXIT, TorisError, UsageError, VerificationError } from './core/errors.js';
+export { EXIT, TorisError, UsageError, VerificationError, BudgetExceededError } from './core/errors.js';
+export {
+  checkBudget,
+  summarizeCost,
+  recordRunCost,
+  loadCostLedger,
+  dayKey,
+  formatUsd,
+  budgetHeadroom,
+} from './core/cost.js';
 export { main } from './cli/index.js';
 export {
   normalizeDesignCapture,

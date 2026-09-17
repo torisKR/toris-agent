@@ -229,6 +229,7 @@ toris run "add a health endpoint" --autonomy L3 --budget 2.00
 toris runs
 toris inspect <runId>
 toris receipt <runId> --md > receipt.md
+toris cost                    # today vs maxDailyCostUsd, recent days
 ```
 
 ---
@@ -257,6 +258,7 @@ The proxy only fetches `http`/`https`, strips a target CSP, and frames the resul
 - **Worktrees** (`src/core/worktree.js`) keep coding CLIs out of your checkout. Applying the diff is a separate gate (`toris patches` / `apply` / `discard`).
 - **Verifier** (`src/core/verifier.js`) infers checks from your `package.json` scripts and runs them for real. It stops at the first failure so a broken build does not burn the rest of your budget.
 - **Receipt** (`src/core/receipt.js`) records goal, plan, per-task status, check exit codes, duration, and cost. Exit code `3` means verification failed — CI can gate on it.
+- **Cost ledger** (`src/core/cost.js`) aggregates those per-run totals under `~/.toris/cost.json` and enforces `maxDailyCostUsd` across runs (plus `--budget` on a single run).
 
 The frozen v0.1.0 interface lives in [docs/CONTRACT.md](docs/CONTRACT.md). Studio behaviour is in [docs/STUDIO.md](docs/STUDIO.md). Module specs are under [docs/specs/](docs/specs/).
 
@@ -388,7 +390,11 @@ Every run produces an auditable record. Markdown for humans, JSON for machines.
 toris receipt <runId>          # JSON on stdout
 toris receipt <runId> --md     # Markdown, ready to paste into a PR
 toris logs <runId>             # raw JSONL event stream
+toris cost                     # spend by day and recent runs
+toris cost today --json
 ```
+
+`maxDailyCostUsd` (default `20`) is a local daily ceiling. A new run is refused — with a CLI error and a receipt note — when today's spend is already at the cap. Mid-run, remaining tasks and the opposite-provider review stop cleanly instead of crossing the ceiling. `--budget` is still the per-run cap. Set either value to `0` for unlimited. Days follow the machine's local calendar, not UTC. Nothing is sent off-box.
 
 ---
 
@@ -421,7 +427,7 @@ chat ["<message>"]        Talk to a model with tools (REPL if no message)
 project add [path]        Register a project (defaults to cwd)
 project list | inspect <id> | remove <id>
 run "<goal>"              Plan and execute a goal
-runs | inspect <runId> | receipt <runId> [--md] | logs <runId> | cancel <runId>
+runs | inspect <runId> | receipt <runId> [--md] | cost [today] | logs <runId> | cancel <runId>
 approvals | approve <id> | reject <id>
 agents [--category <c>]   Profiles for TUI /agent and Studio /agent
 skills                    Skill packages the model follows in chat
@@ -484,6 +490,7 @@ State lives under `$TORIS_HOME` (default `~/.toris`) as plain text:
 ~/.toris
 ├── config.json
 ├── projects.json
+├── cost.json               # daily spend ledger (local calendar date)
 ├── knowledge/              # USER.md, MEMORY.md, domain DAGs, tacit notes
 ├── runs/
 ├── events/
@@ -556,7 +563,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md]
 
 - [ ] Background daemon (`toris daemon start`) for long-running and scheduled goals
 - [x] Git worktree isolation so coding CLIs never write the original checkout
-- [ ] Cost tracking and budget enforcement across runs, not just within one
+- [x] Cost tracking and budget enforcement across runs, not just within one
 - [ ] More provider adapters
 - [ ] Custom agent profiles from a project-local file
 

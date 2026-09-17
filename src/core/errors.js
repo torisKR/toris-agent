@@ -47,3 +47,11 @@ export class ProviderError extends TorisError {
     this.provider = provider;
   }
 }
+
+export class BudgetExceededError extends TorisError {
+  constructor(message, extras = {}) {
+    super(message, 'E_BUDGET', EXIT.FAILURE);
+    this.name = 'BudgetExceededError';
+    this.runId = extras.runId ?? null;
+  }
+}

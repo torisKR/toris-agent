@@ -91,6 +91,9 @@ export function buildReceipt(run, events = []) {
     review: run.review ?? null,
     failures: collectFailures(tasks, checks, run.review),
     costUsd,
+    budgetUsd: run.budgetUsd ?? null,
+    budgetNote: run.budgetNote ?? null,
+    dailyCostUsd: run.dailyCostUsd ?? null,
     eventCount: events.length,
     artifacts: run.artifacts ?? [],
   };
@@ -211,6 +214,8 @@ function detailLines(receipt) {
     `| Finished | ${receipt.finishedAt ?? '—'} |`,
     `| Duration | ${receipt.durationMs != null ? `${(receipt.durationMs / 1000).toFixed(1)}s` : '—'} |`,
     `| Cost | $${receipt.costUsd.toFixed(4)} |`,
+    ...(receipt.budgetUsd != null ? [`| Run budget | $${Number(receipt.budgetUsd).toFixed(4)} |`] : []),
+    ...(receipt.budgetNote ? [`| Budget | ${receipt.budgetNote} |`] : []),
     '',
   ];
 }

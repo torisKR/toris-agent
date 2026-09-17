@@ -73,6 +73,19 @@ test('the receipt carries a schema version so stored receipts stay readable', ()
   assert.equal(buildReceipt(run, []).schemaVersion, RECEIPT_SCHEMA_VERSION);
 });
 
+test('a receipt keeps the additive budget note for a stopped run', () => {
+  const receipt = buildReceipt(
+    { ...run, budgetUsd: 2, budgetNote: 'daily budget exhausted ($20.00 cap reached)', dailyCostUsd: 19.5 },
+    [],
+  );
+  assert.equal(receipt.budgetUsd, 2);
+  assert.match(receipt.budgetNote, /daily budget/);
+  assert.equal(receipt.dailyCostUsd, 19.5);
+  const md = receiptToMarkdown(receipt);
+  assert.match(md, /daily budget exhausted/);
+  assert.match(md, /Run budget/);
+});
+
 test('the verdict states outcome, task tally, verification and cost in one line', () => {
   // Arrange / Act
   const verdict = buildReceipt(run, []).verdict;

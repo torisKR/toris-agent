@@ -37,7 +37,15 @@ test('health and session are local-only and emit no CORS headers', async () => {
     const health = await fetch(`${base}/api/health`);
     assert.equal(health.status, 200);
     assert.equal(health.headers.has('access-control-allow-origin'), false);
-    assert.deepEqual(await health.json(), { ok: true, name: 'Toris Studio', localOnly: true, status: 'ready', surfaces: ['review', 'agent', 'design', 'patches', 'knowledge'] });
+    const healthBody = await health.json();
+    assert.equal(healthBody.ok, true);
+    assert.equal(healthBody.name, 'Toris Studio');
+    assert.equal(healthBody.localOnly, true);
+    assert.equal(healthBody.status, 'ready');
+    assert.deepEqual(healthBody.surfaces, ['review', 'agent', 'design', 'patches', 'knowledge']);
+    assert.equal(healthBody.cost.spentUsd, 0);
+    assert.equal(healthBody.cost.capUsd, 20);
+    assert.match(healthBody.cost.day, /^\d{4}-\d{2}-\d{2}$/);
 
     const session = await fetch(`${base}/api/session`);
     assert.deepEqual(await session.json(), { token: 'test-token', origin: base });

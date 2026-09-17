@@ -89,6 +89,7 @@ function printRun(run) {
     line();
     line(`  ${c.bold('Changed files')}: ${run.artifacts.length}`);
   }
+  if (run.budgetNote) line(c.yellow(`  budget: ${run.budgetNote}`));
   line();
   line(`  ${c.dim('cost')} $${(run.costUsd ?? 0).toFixed(4)}   ${c.dim('receipt')} toris receipt ${run.id}`);
 }
@@ -135,6 +136,7 @@ export async function cmdReceipt(ctx, positionals, flags) {
     ['tasks', `${receipt.tasks.succeeded}/${receipt.tasks.total} succeeded`],
     ['verified', receipt.verification.passed === null ? 'n/a' : String(receipt.verification.passed)],
     ['cost', `$${receipt.costUsd.toFixed(4)}`],
+    ...(receipt.budgetNote ? [['budget', receipt.budgetNote]] : []),
     ['events', String(receipt.eventCount)],
   ]);
   return EXIT.OK;

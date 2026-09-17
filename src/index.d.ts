@@ -37,6 +37,11 @@ export class VerificationError extends TorisError {
   failures: readonly CheckResult[];
 }
 
+export class BudgetExceededError extends TorisError {
+  constructor(message: string, extras?: { runId?: string | null });
+  runId: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Agents
 // ---------------------------------------------------------------------------
@@ -130,6 +135,47 @@ export function withinBudget(
   estimateUsd: number,
   budgetUsd: number,
 ): { ok: boolean; remaining: number };
+
+/**
+ * Cross-run / daily budget guard. A missing or non-positive cap is unlimited.
+ * Reaching a positive cap (`spent >= cap`) refuses more work.
+ */
+export function checkBudget(
+  spent: number,
+  budget: number | undefined,
+  config: Pick<TorisConfig, 'maxDailyCostUsd'> | TorisConfig,
+): { ok: boolean; reason?: string };
+
+export function dayKey(when?: Date | string | number): string;
+export function formatUsd(value: number, digits?: number): string;
+export function recordRunCost(home: string, run: Pick<Run, 'id' | 'costUsd' | 'goal' | 'status' | 'createdAt' | 'finishedAt'>): Promise<unknown>;
+export function loadCostLedger(home: string): Promise<{ version: number; days: Record<string, unknown> }>;
+export function summarizeCost(options: {
+  home?: string;
+  store?: Store;
+  config?: Pick<TorisConfig, 'maxDailyCostUsd'>;
+  now?: number | Date | (() => number);
+  limitDays?: number;
+  limitRuns?: number;
+}): Promise<{
+  timezone: 'local';
+  today: {
+    day: string;
+    spentUsd: number;
+    capUsd: number | null;
+    remainingUsd: number | null;
+    runCount: number;
+    entries: ReadonlyArray<{ runId: string; costUsd: number; goal: string; status: string; at: string }>;
+  };
+  days: ReadonlyArray<{ day: string; spentUsd: number; capUsd: number | null; remainingUsd: number | null; runCount: number }>;
+  runs: ReadonlyArray<{ id: string; runId: string; costUsd: number; status: string; goal: string; at: string | null }>;
+}>;
+export function budgetHeadroom(input: {
+  spentUsd?: number;
+  dailySpentUsd?: number;
+  budgetUsd?: number;
+  maxDailyCostUsd?: number;
+}): { runRemaining: number; dailyRemaining: number; remaining: number };
 
 // ---------------------------------------------------------------------------
 // Config
@@ -479,6 +525,9 @@ export interface Receipt {
   };
   failures: readonly string[];
   costUsd: number;
+  budgetUsd?: number | null;
+  budgetNote?: string | null;
+  dailyCostUsd?: number | null;
   eventCount: number;
   artifacts: readonly string[];
 }
@@ -502,6 +551,10 @@ export interface Run {
   tasks?: Task[];
   verification?: { passed: boolean | null; checks: CheckResult[] };
   costUsd?: number;
+  budgetUsd?: number;
+  budgetNote?: string | null;
+  budgetBlocked?: boolean;
+  dailyCostUsd?: number;
   artifacts?: string[];
 }
 
@@ -550,6 +603,7 @@ export interface RunOptions {
   project?: ProjectContext | null;
   cwd?: string;
   checks?: readonly string[];
+  budgetUsd?: number;
   signal?: AbortSignal;
 }
 

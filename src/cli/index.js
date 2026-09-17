@@ -11,6 +11,7 @@ import { needsOnboarding, renderOnboarding } from './tui/onboarding.js';
 import { cmdInit, cmdDoctor, cmdVersion } from './commands/setup.js';
 import { cmdProject } from './commands/project.js';
 import { cmdRun, cmdRuns, cmdInspect, cmdReceipt, cmdLogs, cmdCancel } from './commands/run.js';
+import { cmdCost } from './commands/cost.js';
 import { cmdAgents, cmdSkills, cmdAutonomy } from './commands/catalog.js';
 import { cmdApprovals, cmdApprove, cmdReject } from './commands/approvals.js';
 import { cmdDaemon } from './commands/daemon.js';
@@ -33,6 +34,7 @@ const COMMANDS = {
   runs: cmdRuns,
   inspect: cmdInspect,
   receipt: cmdReceipt,
+  cost: cmdCost,
   logs: cmdLogs,
   cancel: cmdCancel,
   approvals: cmdApprovals,

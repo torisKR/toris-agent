@@ -58,6 +58,7 @@ cli       -> all
   - `torisHome()/config.yaml` — user config
   - `torisHome()/toris.db` — SQLite
   - `torisHome()/runs/<runId>/` — receipts, logs, artifacts
+  - `torisHome()/cost.json` — daily spend ledger (local calendar date, upserted per run)
   - `torisHome()/worktrees/<runId>/<taskId>/` — writer worktrees
   - `torisHome()/daemon.sock` — supervisor unix socket (Windows: named pipe `\\.\pipe\toris`)
   - `torisHome()/daemon.json` — `{ pid, socket, version, startedAt }`

@@ -391,6 +391,7 @@ toris run "<goal>" [-p <project>] [--autonomy L1..L5] [--budget <usd>] [--dry-ru
 toris runs [--status <s>] [--project <id>] [--limit <n>]
 toris inspect <runId>            # run detail
 toris receipt <runId> [--md]     # evidence receipt
+toris cost [today] [--json]      # cross-run spend vs maxDailyCostUsd
 toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id> [--reason]
 toris logs <runId> [-f]          # event tail
 toris cancel <runId>
@@ -425,4 +426,15 @@ Not a breaking change to the frozen signatures above. On-disk layout for the sec
 - optional project overlay: `<repo>/.toris/knowledge/`
 
 CLI: `toris knowledge` (alias `toris memory`). Chat tools: `knowledge_search`, `memory_get`, `knowledge_write`, `domain_activate`, `knowledge_reflect`. Studio: `GET /knowledge`. See `docs/KNOWLEDGE.md`.
+
+## Additive: cross-run cost ledger (post-0.1)
+
+Not a breaking change to the frozen signatures above. Daily spend is local-only:
+
+- `torisHome()/cost.json` — `{ version: 1, days: { "YYYY-MM-DD": { spentUsd, entries[] } } }`, upserted per `runId`
+- Calendar day is the machine's local date (not UTC)
+- `checkBudget(spent, budget, config)` refuses when `spent` reaches the tighter of `--budget` / `config.maxDailyCostUsd` (non-positive = unlimited)
+- CLI: `toris cost` | `toris cost today` | `toris cost --json`
+- Receipt (additive): `budgetUsd`, `budgetNote`, `dailyCostUsd`
+- Studio health (additive): `GET /api/health` includes `{ cost: { day, spentUsd, capUsd, remainingUsd } }`
 
