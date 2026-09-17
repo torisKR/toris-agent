@@ -33,7 +33,7 @@ COMMANDS
   daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
   daemon run "<goal>"       Queue a run for the local daemon (exit 5 if down)
   daemon schedule           Local cron: list | add | remove | enable | disable
-  studio                    Local GUI on 127.0.0.1:5824 (review + /agent + /design + /patches + /knowledge)
+  studio                    Local GUI on 127.0.0.1:5824 (review + /agent + /design + /patches + /knowledge + /daemon)
   studio --open             Start or attach Studio and open the loopback URL
   studio service <action>   Install, status, restart or uninstall autostart
   android status|devices|screenshot|logcat|install
@@ -71,7 +71,7 @@ EXIT CODES
 EXAMPLES
   toris                     # TUI chat
   toris --agent implementer
-  toris studio              # GUI; agent room at /agent, Design Mode at /design, patches at /patches, knowledge at /knowledge
+  toris studio              # GUI; agent room at /agent, Design Mode at /design, patches at /patches, knowledge at /knowledge, daemon at /daemon
   toris studio --open       # same, then open the loopback URL in the browser
   toris android status      # adb/emulator presence (optional)
   toris knowledge init      # USER.md, MEMORY.md, starter domain packs

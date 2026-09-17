@@ -13,7 +13,14 @@ export {
   touchHeartbeat,
   writeDaemonState,
 } from './state.js';
-export { DAEMON_JOB_STATUS, DAEMON_JOB_TYPES, DaemonQueue, submitDaemonJob } from './queue.js';
+export {
+  DAEMON_JOB_STATUS,
+  DAEMON_JOB_TYPES,
+  DaemonQueue,
+  listRecentDaemonJobs,
+  publicDaemonJob,
+  submitDaemonJob,
+} from './queue.js';
 export { executeRunJob, runDaemonWorker } from './worker.js';
 export { startDaemon, stopDaemon, waitUntil } from './supervisor.js';
 export {

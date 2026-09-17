@@ -62,6 +62,14 @@ CLI `toris patches`, `toris apply`, and `toris discard` are unchanged.
 
 `http://127.0.0.1:5824/knowledge` browses the same local secretary store as `toris knowledge`: domains, nodes, and DAG edges, with simple add forms. It is a standalone page (`knowledge.html`) and does not share the review-room or patch-review client. Mutations still need the local `Origin` and session token. See [KNOWLEDGE.md](./KNOWLEDGE.md).
 
+## Daemon
+
+`http://127.0.0.1:5824/daemon` is a standalone page over the same local worker store as `toris daemon status` and `toris daemon schedule`. It shows whether the worker is running (pid, uptime, heartbeat, next due schedule), the schedule list, and a bounded recent-job history from `daemon-jobs.json`.
+
+Enable, disable, remove, and the optional add-schedule form call the existing schedule helpers (`addSchedule`, `setScheduleEnabled`, `removeSchedule`). They are mutations: current local `Origin` plus the in-memory session token. Reads are same-origin GET. Studio still binds only to `127.0.0.1`.
+
+The page does **not** start or stop the worker — that stays on `toris daemon start` / `stop` so a browser tab cannot take the lock. See [DAEMON.md](./DAEMON.md).
+
 ## Review flow
 
 1. Save a post draft or import an MP4. The item enters `awaiting_review`.

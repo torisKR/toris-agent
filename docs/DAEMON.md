@@ -22,6 +22,8 @@ State lives under `$TORIS_HOME` (default `~/.toris`):
 
 `toris run` itself still executes in the foreground. Only `toris daemon run` and due schedules enqueue work.
 
+Studio `/daemon` at `http://127.0.0.1:5824/daemon` reads the same status, schedules, and job history. Schedule enable/disable/remove/add use the same store mutations (Origin + session token). It does not start or stop the worker.
+
 ## Schedules
 
 Schedules are local cron. The running daemon evaluates them on its heartbeat (default 2s) in the **machine local timezone**, then enqueues a `run` job through the same inbox as `toris daemon run`. Adding a schedule does not require the daemon to be up; the next tick after `start` picks it up.
