@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ContentStore } from './content-store.js';
 import { CONTENT_STATUS } from './content.js';
-import { HttpError, Router, assertStudioMutation, readJson } from './http.js';
+import { HttpError, Router, assertStudioMutation, readJson, startSse, wantsEventStream, writeSse } from './http.js';
 import { JobQueue } from './job-queue.js';
 import { mediaResponse, saveMp4Upload } from './media-store.js';
 import { RenderService } from './render-service.js';
@@ -62,6 +62,27 @@ function sendJson(response, status, value) {
 function requireJson(request) {
   const type = String(request.headers['content-type'] || '').split(';', 1)[0];
   if (type !== 'application/json') throw new HttpError(415, 'request must use application/json');
+}
+
+function turnHttpStatus(error) {
+  if (error instanceof HttpError) return error.status;
+  if (
+    error.code === 'E_UNKNOWN_PROFILE'
+    || error.code === 'E_PROVIDER_AUTH'
+    || error.code === 'E_PROVIDER_CLI'
+    || error.code === 'E_MODEL_REQUIRED'
+    || error.code === 'E_UNKNOWN_PROVIDER'
+  ) {
+    return 409;
+  }
+  return 500;
+}
+
+function turnHttpError(error) {
+  if (error instanceof HttpError) throw error;
+  const status = turnHttpStatus(error);
+  if (status === 500) throw error;
+  throw new HttpError(status, error.message);
 }
 
 function editableContentPatch(input) {
@@ -164,34 +185,47 @@ export async function createStudioServer(options) {
     const abort = new AbortController();
     request.on('close', () => abort.abort());
     const turn = options.runAgentTurn || runAgentTurn;
-    try {
-      sendJson(
-        response,
-        200,
-        await turn({
-          home: options.home,
-          cwd: options.cwd,
-          agent: body.agent,
-          message,
-          history: body.history,
-          profile: body.profile,
-          design: body.design,
-          designId: body.designId,
-          designIds: body.designIds,
-          designs: body.designs,
-          tray: body.tray,
-          loadDesign: (id) => designs.get(id),
-          saveDesign: (capture) => designs.save(capture),
-          loadTray: () => designs.getTray(),
-          signal: abort.signal,
-        }),
-      );
-    } catch (error) {
-      if (error.code === 'E_UNKNOWN_PROFILE' || error.code === 'E_PROVIDER_AUTH' || error.code === 'E_PROVIDER_CLI' || error.code === 'E_MODEL_REQUIRED' || error.code === 'E_UNKNOWN_PROVIDER') {
-        throw new HttpError(409, error.message);
+    const payload = {
+      home: options.home,
+      cwd: options.cwd,
+      agent: body.agent,
+      message,
+      history: body.history,
+      profile: body.profile,
+      design: body.design,
+      designId: body.designId,
+      designIds: body.designIds,
+      designs: body.designs,
+      tray: body.tray,
+      loadDesign: (id) => designs.get(id),
+      saveDesign: (capture) => designs.save(capture),
+      loadTray: () => designs.getTray(),
+      signal: abort.signal,
+    };
+    if (!wantsEventStream(request)) {
+      try {
+        sendJson(response, 200, await turn(payload));
+      } catch (error) {
+        turnHttpError(error);
       }
-      throw error;
+      return;
     }
+    startSse(response);
+    try {
+      const result = await turn({
+        ...payload,
+        onEvent: (evt) => writeSse(response, evt.type || 'message', evt),
+      });
+      writeSse(response, 'done', result);
+    } catch (error) {
+      if (abort.signal.aborted) writeSse(response, 'abort', { ok: false });
+      else {
+        const status = turnHttpStatus(error);
+        const detail = status === 500 && !(error instanceof HttpError) ? 'internal server error' : error.message;
+        writeSse(response, 'error', { message: detail, status });
+      }
+    }
+    if (!response.writableEnded) response.end();
   });
   router.add('GET', '/api/design/bookmarklet', async (_request, response) => {
     sendJson(response, 200, { href: buildBookmarklet(origin()), origin: origin() });

@@ -399,6 +399,7 @@ toris agents [--category <c>]    # agent profile catalog
 toris skills
 toris version
 toris studio                     # localhost GUI: review, /agent, /design, /patches
+toris studio --open              # start or attach, then open the loopback URL
 toris android status|devices|screenshot|logcat|install   # optional adb evidence
 ```
 

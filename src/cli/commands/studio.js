@@ -1,6 +1,7 @@
 import { EXIT, TorisError, UsageError } from '../../core/errors.js';
 import { createStudioServer } from '../../studio/server.js';
 import { StudioServiceManager } from '../../studio/service/manager.js';
+import { openLocalUrl, studioOrigin } from '../../core/access.js';
 import { line, c, printJson } from '../output.js';
 
 const SERVICE_COMMANDS = new Set(['install', 'status', 'restart', 'uninstall']);
@@ -17,7 +18,23 @@ async function runServiceCommand(ctx, positionals, deps) {
   return EXIT.OK;
 }
 
-export async function cmdStudio(ctx, positionals, _flags, deps = {}) {
+async function openStudio(url, deps, output) {
+  const opened = await (deps.openLocalUrl || openLocalUrl)(url);
+  output(c.dim(opened.ok ? '      opened in browser' : `      browser: ${opened.error || 'unavailable'}`));
+  return opened;
+}
+
+function printReady(output, label = 'READY') {
+  const origin = studioOrigin();
+  output(`${label === 'ATTACHED' ? c.yellow('ATTACHED') : c.green('READY')} Toris Studio ${origin}`);
+  output(c.dim(`      agent GUI  ${origin}/agent`));
+  output(c.dim('      design     http://127.0.0.1:5824/design'));
+  output(c.dim('      patches    http://127.0.0.1:5824/patches'));
+  output(c.dim('      knowledge  http://127.0.0.1:5824/knowledge'));
+  output(c.dim('      agent TUI  toris   ·  /agent  ·  /studio'));
+}
+
+export async function cmdStudio(ctx, positionals, flags = {}, deps = {}) {
   if (positionals[0] === 'service') return await runServiceCommand(ctx, positionals, deps);
   if (positionals.length > 0) throw new UsageError(`Unknown studio subcommand "${positionals.join(' ')}"`);
   const create = deps.createStudioServer || createStudioServer;
@@ -29,17 +46,18 @@ export async function cmdStudio(ctx, positionals, _flags, deps = {}) {
   } catch (error) {
     await studio.close().catch(() => undefined);
     if (error.code === 'EADDRINUSE') {
+      if (flags.open) {
+        printReady(output, 'ATTACHED');
+        await openStudio(studioOrigin(), deps, output);
+        return EXIT.OK;
+      }
       throw new TorisError('Toris Studio cannot start because 127.0.0.1:5824 is already in use.', 'E_STUDIO_IN_USE');
     }
     throw error;
   }
 
-  output(`${c.green('READY')} Toris Studio http://127.0.0.1:5824`);
-  output(c.dim('      agent GUI  http://127.0.0.1:5824/agent'));
-  output(c.dim('      design     http://127.0.0.1:5824/design'));
-  output(c.dim('      patches    http://127.0.0.1:5824/patches'));
-  output(c.dim('      knowledge  http://127.0.0.1:5824/knowledge'));
-  output(c.dim('      agent TUI  toris   ·  /agent  ·  /studio'));
+  printReady(output);
+  if (flags.open) await openStudio(studioOrigin(), deps, output);
   return await new Promise((resolve, reject) => {
     let stopping = false;
     const cleanup = () => {

@@ -9,7 +9,7 @@ import {
   renderAgentCatalog,
   resolveSurfaceAgent,
 } from '../../core/agents.js';
-import { renderStudioAccess, studioOrigin } from '../../core/access.js';
+import { openLocalUrl, renderStudioAccess, studioAgentUrl, studioOrigin } from '../../core/access.js';
 import {
   pickChatModel,
   assertChatUsable,
@@ -352,8 +352,14 @@ export async function cmdChat(ctx, args, flags) {
 
   const showModel = () => log(c.dim(`${active.profile} → ${active.provider}/${active.model}`));
 
+  const guiFor = (agentId) => {
+    const base = studioAgentUrl();
+    const id = String(agentId || 'toris');
+    return id === 'toris' ? base : `${base}?id=${encodeURIComponent(id)}`;
+  };
+
   const showAgent = () =>
-    log(c.dim(`${activeAgent.id} · ${activeAgent.title} · GUI ${studioOrigin()}/agent`));
+    log(c.dim(`${activeAgent.id} · ${activeAgent.title} · GUI ${guiFor(activeAgent.id)}`));
 
   const showAutonomy = () => {
     const level = AUTONOMY_LEVELS[autonomyLevel] ?? AUTONOMY_LEVELS.L2;
@@ -446,9 +452,19 @@ export async function cmdChat(ctx, args, flags) {
         return;
       }
       log(renderAgentCatalog(listSurfaceAgents(), activeAgent.id));
-      log(c.dim(`  GUI  ${studioOrigin()}/agent`));
+      log(c.dim(`  GUI  ${guiFor(activeAgent.id)}`));
     },
-    studio: async () => log(renderStudioAccess({ running: await probeStudio() })),
+    studio: async () => {
+      const running = await probeStudio();
+      log(renderStudioAccess({ running }));
+      if (!running) {
+        log(c.dim('  start with toris studio --open'));
+        return;
+      }
+      const url = guiFor(activeAgent.id);
+      const opened = await openLocalUrl(url);
+      log(c.dim(opened.ok ? `  opened ${url}` : `  ${opened.error || 'could not open browser'} — try toris studio --open`));
+    },
     model: (rest) => (rest.length > 0 ? switchModel(rest[0]) : showModel()),
     autonomy: (rest) => (rest.length > 0 ? setAutonomy(rest[0]) : showAutonomy()),
     tools: () =>

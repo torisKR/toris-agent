@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { join } from 'node:path';
-import { HttpError, Router, assertStudioMutation, readJson, resolveStaticFile } from '../src/studio/http.js';
+import { HttpError, Router, assertStudioMutation, readJson, resolveStaticFile, startSse, wantsEventStream, writeSse } from '../src/studio/http.js';
 
 function request(body, headers = {}) {
   const stream = Readable.from(body == null ? [] : [body]);
@@ -39,6 +39,35 @@ test('Router matches fixed and named routes without accepting extra path segment
   assert.deepEqual(router.match('GET', '/api/contents/cnt_1'), { handler, params: { id: 'cnt_1' } });
   assert.equal(router.match('GET', '/api/contents/cnt_1/more'), null);
   assert.equal(router.match('POST', '/api/contents/cnt_1'), null);
+});
+
+test('wantsEventStream reads Accept without starting a response', () => {
+  assert.equal(wantsEventStream({ headers: { accept: 'text/event-stream' } }), true);
+  assert.equal(wantsEventStream({ headers: { accept: 'application/json, text/event-stream;q=0.9' } }), true);
+  assert.equal(wantsEventStream({ headers: { accept: 'application/json' } }), false);
+  assert.equal(wantsEventStream({ headers: {} }), false);
+});
+
+test('writeSse emits one named event block', () => {
+  const chunks = [];
+  const response = {
+    writableEnded: false,
+    write(chunk) { chunks.push(chunk); },
+  };
+  writeSse(response, 'text', { delta: 'hi' });
+  assert.equal(chunks.join(''), 'event: text\ndata: {"delta":"hi"}\n\n');
+});
+
+test('startSse writes event-stream headers before any data', () => {
+  let headers;
+  const response = {
+    writeHead(status, value) { headers = { status, value }; },
+    flushHeaders() { headers.flushed = true; },
+  };
+  startSse(response);
+  assert.equal(headers.status, 200);
+  assert.equal(headers.value['content-type'], 'text/event-stream; charset=utf-8');
+  assert.equal(headers.flushed, true);
 });
 
 test('static file resolution stays inside the configured public directory', () => {

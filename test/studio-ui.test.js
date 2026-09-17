@@ -10,7 +10,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('product shell contains queue, editor, media review, quality, guarded publish, and agent regions', async () => {
   const html = await readFile(join(root, 'src/studio/ui/index.html'), 'utf8');
-  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'nav-design', 'nav-patches', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
+  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'nav-design', 'nav-patches', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /id="agent-send"[^>]*disabled/);
@@ -35,12 +35,18 @@ test('product assets use only local API paths and define all responsive shells',
   assert.match(js, /setAttribute\('aria-pressed'/);
   assert.match(js, /function safeScreenshot/);
   assert.match(js, /event\.origin !== location\.origin/);
+  assert.match(js, /text\/event-stream/);
+  assert.match(js, /AbortController/);
+  assert.match(js, /localStorage/);
+  assert.match(js, /requestSubmit/);
+  assert.match(js, /TRANSCRIPT_KEY/);
   assert.doesNotMatch(js, /https?:\/\//);
   assert.match(css, /grid-template-columns:\s*248px/);
   assert.match(css, /max-width:\s*1279px/);
   assert.match(css, /max-width:\s*767px/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /min-height:\s*var\(--queue-reserve\)/);
+  assert.match(css, /chat-actions/);
   assert.doesNotMatch(`${components}\n${css}`, /#(?:[0-9a-f]{3}|[0-9a-f]{6})\b/i);
 });
 
