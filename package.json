@@ -44,7 +44,11 @@
     "toris": "node bin/toris.js",
     "build:native": "cargo build --release --manifest-path crates/toris-native/Cargo.toml",
     "pack:native": "node scripts/pack-native.js",
-    "bench": "node scripts/bench.js"
+    "bench": "node scripts/bench.js",
+    "desktop:install": "npm --prefix desktop install",
+    "desktop:dev": "npm --prefix desktop install && npx --yes @tauri-apps/cli@^2 dev",
+    "desktop:build": "npm --prefix desktop install && npx --yes @tauri-apps/cli@^2 build",
+    "desktop:bridge": "node src/desktop/bridge.js"
   },
   "repository": {
     "type": "git",

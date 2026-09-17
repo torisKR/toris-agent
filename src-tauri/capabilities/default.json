@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core permissions for the toris desktop window: invoke commands and listen for bridge events.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
