@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/pro
 import { join } from 'node:path';
 
 import { createId } from '../core/ids.js';
+import { BRIEF_SCHEDULE_HINT, looksLikeBriefGoal } from '../core/brief.js';
 import { daemonPaths } from './paths.js';
 import { describeExpr, nextDueAfter, parseScheduleExpr, ScheduleExprError } from './cron.js';
 
@@ -139,6 +140,7 @@ export async function addSchedule(home, input, options = {}) {
   const goal = String(input.goal || '').trim();
   parseScheduleExpr(expr);
   if (!goal) throw new ScheduleExprError('Schedule requires a goal.');
+  if (looksLikeBriefGoal(goal)) throw new ScheduleExprError(BRIEF_SCHEDULE_HINT);
   const record = {
     id: input.id || (options.idFactory || (() => createId('sch')))(),
     expr,

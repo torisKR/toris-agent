@@ -86,6 +86,8 @@ toris knowledge user append --text "- Timezone: KST"
 
 `toris memory` is an alias for `toris knowledge`. `toris doctor` reports a **WARN** until the store exists, then **PASS** with the domain count. It never fails the doctor run.
 
+`toris brief` optionally lists 3–5 high-signal tacit or node headlines (keyword tokens from today's run goals, otherwise the latest tacit). If the store is not initialized, that section is omitted — it does not run `knowledge init` for you. See [BRIEF.md](./BRIEF.md).
+
 ## Chat tools
 
 API-backed chat (`anthropic`, `openai`, `grok`) gets:

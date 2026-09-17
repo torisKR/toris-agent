@@ -1,4 +1,5 @@
 import { EXIT, TorisError, UsageError } from '../../core/errors.js';
+import { BRIEF_SCHEDULE_HINT, looksLikeBriefGoal } from '../../core/brief.js';
 import { asNumber } from '../args.js';
 import { c, keyValues, line, printJson } from '../output.js';
 import { findProject, loadProjects } from './project.js';
@@ -147,6 +148,7 @@ async function resolveProject(ctx, flags) {
 async function runCommand(ctx, positionals, flags, deps) {
   const goal = positionals.join(' ').trim();
   if (!goal) throw new UsageError('Usage: toris daemon run "<goal>" [--dry-run] [-p <project>]');
+  if (looksLikeBriefGoal(goal)) throw new UsageError(BRIEF_SCHEDULE_HINT);
   const running = await (deps.isRunning || isDaemonRunning)(ctx.home);
   if (!running) {
     throw new TorisError(

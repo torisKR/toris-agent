@@ -395,6 +395,7 @@ toris runs [--status <s>] [--project <id>] [--limit <n>]
 toris inspect <runId>            # run detail
 toris receipt <runId> [--md]     # evidence receipt
 toris cost [today] [--json]      # cross-run spend vs maxDailyCostUsd
+toris brief [today] [--json]     # local secretary digest (read-only; not a daemon job)
 toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id> [--reason]
 toris logs <runId> [-f]          # event tail
 toris cancel <runId>
@@ -464,4 +465,13 @@ Not a breaking change to the frozen signatures above. Daily spend is local-only:
 - CLI: `toris cost` | `toris cost today` | `toris cost --json`
 - Receipt (additive): `budgetUsd`, `budgetNote`, `dailyCostUsd`
 - Studio health (additive): `GET /api/health` includes `{ cost: { day, spentUsd, capUsd, remainingUsd } }`
+
+## Additive: local secretary brief (post-0.1)
+
+Read-only digest. No new on-disk format.
+
+- CLI: `toris brief` | `toris brief today` | `toris brief --json`
+- Reuses `summarizeCost`, `Store.listRuns`, `readDaemonStatus`, and the knowledge `index.json`
+- Knowledge headlines skip quietly when `~/.toris/knowledge/` is not initialized
+- Not a daemon job type. `daemon schedule add` / `daemon run` refuse a goal that is only `brief` / `toris brief`. Host cron runs the CLI. See `docs/BRIEF.md`.
 

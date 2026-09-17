@@ -12,6 +12,7 @@ toris runs [--status <s>] [--project <id>] [--limit <n>]
 toris inspect <runId>            # run detail
 toris receipt <runId> [--md]     # evidence receipt
 toris cost [today] [--json]      # cross-run spend vs maxDailyCostUsd
+toris brief [today] [--json]     # local secretary digest (spend, runs, daemon, knowledge)
 toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id> [--reason]
 toris logs <runId> [-f]          # event tail
 toris cancel <runId>

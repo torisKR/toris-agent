@@ -58,3 +58,5 @@ Weekday words on the clock form: `mon`–`sun`, `mon-fri`, `weekdays`, `weekends
 Not supported: seconds fields, `@reboot`, cloud calendars, remote multi-machine clocks, or a timezone other than the host's local zone.
 
 Autonomy / budget / `--dry-run` / `--apply` / `--no-review` / `--provider` / `-p` on `schedule add` become defaults for each fired job (same as `daemon run`). Omit them to use the daemon's usual config defaults.
+
+`toris brief` is **not** a daemon job. The worker has a single job type (`run`). Scheduling `"toris brief"` as a goal would start a coding run; `schedule add` and `daemon run` refuse that goal. Put the CLI on host cron / systemd / launchd instead (`0 9 * * * toris brief`). See [BRIEF.md](./BRIEF.md).

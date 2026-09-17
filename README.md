@@ -128,7 +128,7 @@ Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the
 
 The agent should get better at *your* work over time. `toris knowledge init` seeds a local store at `~/.toris/knowledge/`: bounded `USER.md` / `MEMORY.md`, starter domain packs (product growth, Flutter/Expo Android, Toris ops, solo revenue), and a DAG between knowledge nodes. Search is keyword + tag. Each `toris chat` turn (and Studio agent turns) auto-retrieves matching domain nodes and tacit notes into a bounded `[knowledge context]` block — no manual search required. Disable with `toris chat --no-knowledge` or `knowledge.autoRetrieve: false` in `config.json`. Writes are gated like other mutating chat tools (ask below L3). After a verified run, `/reflect` or `toris knowledge reflect <runId>` proposes a tacit note from the receipt (goal, plan titles, check exits) — it does not write silently. `--json` returns the draft only. Auto-retrieve never writes.
 
-Details: [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md). Studio browse/add is at `http://127.0.0.1:5824/knowledge`.
+`toris brief` is the one-screen morning read of the same stores: today's spend, today's runs, whether the daemon is up, and a few tacit/node headlines. It skips the knowledge block if you have not run `toris knowledge init`. Details: [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md) and [docs/BRIEF.md](docs/BRIEF.md). Studio browse/add is at `http://127.0.0.1:5824/knowledge`.
 
 ### Daemon — worker status without the CLI
 
@@ -235,6 +235,7 @@ toris runs
 toris inspect <runId>
 toris receipt <runId> --md > receipt.md
 toris cost                    # today vs maxDailyCostUsd, recent days
+toris brief                   # one-screen digest (spend, runs, daemon, knowledge)
 ```
 
 ---
@@ -399,6 +400,8 @@ toris receipt <runId> --md     # Markdown, ready to paste into a PR
 toris logs <runId>             # raw JSONL event stream
 toris cost                     # spend by day and recent runs
 toris cost today --json
+toris brief                    # today: spend, runs, daemon, knowledge headlines
+toris brief --json
 ```
 
 `maxDailyCostUsd` (default `20`) is a local daily ceiling. A new run is refused — with a CLI error and a receipt note — when today's spend is already at the cap. Mid-run, remaining tasks and the opposite-provider review stop cleanly instead of crossing the ceiling. `--budget` is still the per-run cap. Set either value to `0` for unlimited. Days follow the machine's local calendar, not UTC. Nothing is sent off-box.
@@ -442,6 +445,8 @@ toris daemon stop
 
 Schedules are **local cron only** (5-field cron, `@hourly`/`@daily`/`@weekly`/`@monthly`, `@every 15m`, or `09:00 mon-fri`). The worker evaluates due items on its heartbeat in the machine timezone and enqueues the same inbox jobs as `daemon run`. The same schedule does not double-fire while a prior job is still queued or running. There is no cloud calendar and no remote multi-machine clock. Studio `/daemon` is a loopback view of the same store. See [docs/DAEMON.md](docs/DAEMON.md).
 
+`toris brief` is a foreground CLI, not a daemon job. Do not `daemon schedule add "09:00" "toris brief"` — that would be a coding goal (and is refused). Put `toris brief` on host cron / systemd / launchd instead. See [docs/BRIEF.md](docs/BRIEF.md).
+
 `toris run` itself still executes in the foreground. Unix-socket RPC (`daemon.sock`) and remote supervisors are not in this release.
 
 ---
@@ -456,7 +461,7 @@ chat ["<message>"]        Talk to a model with tools (REPL if no message)
 project add [path]        Register a project (defaults to cwd)
 project list | inspect <id> | remove <id>
 run "<goal>"              Plan and execute a goal
-runs | inspect <runId> | receipt <runId> [--md] | cost [today] | logs <runId> | cancel <runId>
+runs | inspect <runId> | receipt <runId> [--md] | cost [today] | brief [today] | logs <runId> | cancel <runId>
 approvals | approve <id> | reject <id>
 agents [--category <c>]   Profiles (builtins + .toris/agents/*.json)
 skills                    Skill packages the model follows in chat

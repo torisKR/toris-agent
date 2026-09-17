@@ -133,6 +133,7 @@ test('help documents TUI and GUI doors onto the agent', async () => {
   assert.match(out, /--no-knowledge/);
   assert.match(out, /studio --open/);
   assert.match(out, /toris cost/);
+  assert.match(out, /toris brief/);
   assert.match(out, /daemon start\|stop\|status/);
   assert.match(out, /daemon run/);
   assert.match(out, /daemon schedule/);
