@@ -57,3 +57,7 @@ brief
 ```
 
 `@daily` on `toris daemon schedule` is for recurring **goals** (`lint the repo`, `draft the standup`), not for this digest. See [DAEMON.md](./DAEMON.md).
+
+## Studio
+
+The same digest is on the loopback GUI at `http://127.0.0.1:5824/brief` (`GET /api/brief`). Read-only — no Slack/Telegram send, no daemon start/stop, no enqueue. See [STUDIO.md](./STUDIO.md).

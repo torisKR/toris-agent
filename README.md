@@ -93,6 +93,7 @@ toris studio --open       # http://127.0.0.1:5824
                           # Patch Review /patches
                           # knowledge   /knowledge
                           # daemon      /daemon
+                          # brief       /brief
 ```
 
 ### Design Mode — UI evidence on the agent turn
@@ -128,7 +129,7 @@ Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the
 
 The agent should get better at *your* work over time. `toris knowledge init` seeds a local store at `~/.toris/knowledge/`: bounded `USER.md` / `MEMORY.md`, starter domain packs (product growth, Flutter/Expo Android, Toris ops, solo revenue), and a DAG between knowledge nodes. Search is keyword + tag. Each `toris chat` turn (and Studio agent turns) auto-retrieves matching domain nodes and tacit notes into a bounded `[knowledge context]` block — no manual search required. Disable with `toris chat --no-knowledge` or `knowledge.autoRetrieve: false` in `config.json`. Writes are gated like other mutating chat tools (ask below L3). After a verified run, `/reflect` or `toris knowledge reflect <runId>` proposes a tacit note from the receipt (goal, plan titles, check exits) — it does not write silently. `--json` returns the draft only. Auto-retrieve never writes.
 
-`toris brief` is the one-screen morning read of the same stores: today's spend, today's runs, whether the daemon is up, and a few tacit/node headlines. It skips the knowledge block if you have not run `toris knowledge init`. Details: [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md) and [docs/BRIEF.md](docs/BRIEF.md). Studio browse/add is at `http://127.0.0.1:5824/knowledge`.
+`toris brief` is the one-screen morning read of the same stores: today's spend, today's runs, whether the daemon is up, and a few tacit/node headlines. It skips the knowledge block if you have not run `toris knowledge init`. The same digest is on the loopback GUI at `http://127.0.0.1:5824/brief` (read-only). Details: [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md) and [docs/BRIEF.md](docs/BRIEF.md). Studio browse/add is at `http://127.0.0.1:5824/knowledge`.
 
 ### Daemon — worker status without the CLI
 
@@ -469,7 +470,7 @@ autonomy                  Autonomy levels and what each permits
 daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
 daemon run "<goal>"       Queue a run while the daemon is up (exit 5 if down)
 daemon schedule           Local cron: list | add | remove | enable | disable
-studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge, /daemon)
+studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge, /daemon, /brief)
 studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
 android status|devices|screenshot|logcat|install
 knowledge                 Local secretary store: init, domains, node, tacit, search, reflect

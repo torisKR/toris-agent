@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Studio `/brief`** — loopback read-only page for the same local secretary digest as `toris brief` (`GET /brief`, `GET /api/brief`). Spend, today's runs, daemon status/next due, knowledge headlines. Quiet empty sections. No mutations. See `docs/STUDIO.md`.
 - **`toris brief`** — local secretary digest for today: spend vs `maxDailyCostUsd`, bounded runs (id / goal / status / verify), daemon running + next schedule, and 3–5 tacit/node headlines. `--json` for machines. Knowledge is omitted when the store is missing. The daemon still only runs coding jobs — `daemon schedule add "09:00" "toris brief"` is refused; put `toris brief` on host cron. See `docs/BRIEF.md`.
 - **Receipt-aware secretary reflect** — `toris knowledge reflect [runId]` / `--from-run <id>` (or the latest verified run) proposes one tacit draft from goal, plan titles, check exit codes, and the verdict. Failed or unverified receipts do not propose a success note. `--json` returns the proposal without writing; `--write` / `/reflect accept` is the only accept path. A quiet `reflectHint` line on a passing receipt points at the command. See `docs/KNOWLEDGE.md`.
 - **Studio `/daemon`** — loopback page for worker status, local schedules, recent jobs, and a **Queue run** form (`POST /api/daemon/run`) that drops the same inbox job as `toris daemon run`. Origin + session token. HTTP 503 when the worker is down (CLI exit 5). Does not start or stop the worker. See `docs/STUDIO.md`.
