@@ -13,6 +13,7 @@ COMMANDS
   connect                   Connect a model backend (CLI login or API key)
   chat ["<message>"]        Talk to a model with tools (REPL if no message)
       --agent <id>          Chat as a named agent (see toris agents)
+      --no-knowledge        Skip automatic secretary retrieval this session
   project add [path]        Register a project (defaults to cwd)
   project list              List registered projects
   project inspect <id>      Show one project

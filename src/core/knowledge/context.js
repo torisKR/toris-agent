@@ -35,8 +35,8 @@ function clip(text, size) {
 }
 
 /**
- * Compact briefing injected into a chat turn. Full bodies stay on disk;
- * the model uses knowledge_search / memory_get to go deeper.
+ * Compact profile / domain-header briefing for the system prompt.
+ * Per-turn node + tacit bodies live in retrieveForTurn (auto-retrieve).
  */
 export function renderKnowledgeBriefing({ user, memory, domains = [], hits = [] } = {}) {
   const lines = [

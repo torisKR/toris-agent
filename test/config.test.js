@@ -39,6 +39,15 @@ test('validateConfig reports each bad field', () => {
   assert.match(problems.join(' '), /L9/);
 });
 
+test('knowledge.autoRetrieve defaults to true and can be turned off', () => {
+  assert.equal(DEFAULT_CONFIG.knowledge.autoRetrieve, true);
+  const merged = mergeConfig(DEFAULT_CONFIG, { knowledge: { autoRetrieve: false } });
+  assert.equal(merged.knowledge.autoRetrieve, false);
+  assert.deepEqual(validateConfig(merged), []);
+  const bad = validateConfig({ ...DEFAULT_CONFIG, knowledge: { autoRetrieve: 'nope' } });
+  assert.match(bad.join(' '), /autoRetrieve/);
+});
+
 test('resolveHome prefers an explicit path over the environment', () => {
   assert.match(resolveHome('/tmp/explicit'), /explicit$/);
 });

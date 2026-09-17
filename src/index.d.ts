@@ -228,6 +228,8 @@ export interface TorisConfig {
     profiles: Record<string, unknown>;
     routing: Record<string, unknown>;
   };
+  /** Chat auto-retrieves local domain nodes + tacit. Default true. */
+  knowledge?: { autoRetrieve?: boolean };
   /** Unknown keys are preserved so a newer config survives an older binary. */
   [key: string]: unknown;
 }
@@ -407,6 +409,44 @@ export function createKnowledgeTools(options?: {
   projectPath?: string;
   session?: { activeDomains?: string[] };
 }): Array<Record<string, unknown>>;
+
+export interface KnowledgeRetrievalHit {
+  kind: string;
+  domain: string | null;
+  id: string;
+  title: string;
+  score: number;
+}
+
+export interface KnowledgeRetrieval {
+  enabled: boolean;
+  query: string;
+  briefing: string;
+  retrieved: KnowledgeRetrievalHit[];
+  domains: string[];
+  chars: number;
+  truncated: boolean;
+}
+
+/** Read-only keyword/tag recall of domain nodes + tacit for one chat turn. */
+export function retrieveForTurn(
+  store: KnowledgeStore,
+  options?: {
+    query?: string;
+    history?: Array<{ role: string; content?: string }>;
+    session?: { activeDomains?: string[] };
+    includeProfile?: boolean;
+    enabled?: boolean;
+    budget?: { maxChars?: number; maxNodes?: number; maxTacit?: number };
+  },
+): Promise<KnowledgeRetrieval>;
+
+export function knowledgeAutoRetrieveEnabled(
+  config?: { knowledge?: { autoRetrieve?: boolean } },
+  flags?: Record<string, unknown>,
+): boolean;
+
+export function composeKnowledgeTurn(message: string, briefing: string): string;
 
 export interface ProviderResponse {
   text: string;

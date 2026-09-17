@@ -24,6 +24,15 @@ export {
   composeKnowledgeTurn,
   briefingForQuery,
 } from './context.js';
+export {
+  DEFAULT_RETRIEVE_BUDGET,
+  knowledgeAutoRetrieveEnabled,
+  retrieveForTurn,
+  retrievalQuery,
+  stripKnowledgeContext,
+  formatKnowledgeReceipt,
+  publicKnowledgeReceipt,
+} from './retrieve.js';
 export { createKnowledgeTools } from './tools.js';
 export { knowledgeDoctorCheck } from './doctor.js';
 export {

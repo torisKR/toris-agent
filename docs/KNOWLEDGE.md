@@ -96,7 +96,25 @@ API-backed chat (`anthropic`, `openai`, `grok`) gets:
 | `knowledge_reflect` | propose only |
 | `knowledge_write` | `needsApproval` — asks below L3, auto at L3+ |
 
-Matching domains and keyword hits are injected into the turn as a `[knowledge context]` block. CLI-backed `claude` / `codex` keep their own agent loop; use the CLI to maintain the files they can read.
+On each `toris chat` turn (and Studio agent turns on the same session path), Toris **auto-retrieves** matching domain nodes and tacit notes from `~/.toris/knowledge/` and injects a bounded `[knowledge context]` block. The operator does not need to call `knowledge_search` first.
+
+Retrieval is keyword + tag over the existing `index.json` (no remote embeddings). It prefers domain nodes + tacit, clips each body, and drops the lowest-score items once the char budget is hit. USER.md / MEMORY.md stay in the system prompt when already loaded; they are not dumped again on every turn. Below L3 this path is **read-only** — it never writes tacit, USER.md, or MEMORY.md.
+
+Disable:
+
+```bash
+toris chat --no-knowledge "…"
+```
+
+or in `~/.toris/config.json`:
+
+```json
+{ "knowledge": { "autoRetrieve": false } }
+```
+
+`--json` includes a `knowledge` receipt (`retrieved`, `domains`, `chars`). `--verbose` prints a single dim `knowledge  domain/id · …` line. Default chat stays quiet.
+
+CLI-backed `claude` / `codex` keep their own agent loop and tools; the same bounded block is still prepended to the user message so those CLIs see the local DAG. Use `toris knowledge` to maintain the files.
 
 Slash commands:
 

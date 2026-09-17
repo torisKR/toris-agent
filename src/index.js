@@ -44,6 +44,9 @@ export {
   proposeReflections,
   knowledgeDoctorCheck,
   createKnowledgeTools,
+  retrieveForTurn,
+  knowledgeAutoRetrieveEnabled,
+  composeKnowledgeTurn,
 } from './core/knowledge/index.js';
 export { verify, runCheck, inferChecks } from './core/verifier.js';
 export { buildReceipt, receiptToMarkdown } from './core/receipt.js';

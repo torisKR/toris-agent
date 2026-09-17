@@ -432,6 +432,8 @@ Not a breaking change to the frozen signatures above. On-disk layout for the sec
 
 CLI: `toris knowledge` (alias `toris memory`). Chat tools: `knowledge_search`, `memory_get`, `knowledge_write`, `domain_activate`, `knowledge_reflect`. Studio: `GET /knowledge`. See `docs/KNOWLEDGE.md`.
 
+Additive chat behaviour (does not change frozen signatures): `toris chat` and Studio agent turns auto-retrieve matching domain nodes and tacit notes into a bounded `[knowledge context]` block. Disable with `knowledge.autoRetrieve: false` in `config.json` or `toris chat --no-knowledge`. Retrieval is read-only; tacit writes stay opt-in (`/reflect`, `knowledge_write`).
+
 ## Additive: project-local agent profiles (post-0.1)
 
 Not a breaking change to the frozen signatures above. The live catalogue is still

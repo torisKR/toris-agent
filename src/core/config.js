@@ -28,6 +28,11 @@ export const DEFAULT_CONFIG = Object.freeze({
     profiles: Object.freeze({}),
     routing: Object.freeze({}),
   }),
+  // Chat auto-retrieves domain nodes + tacit each turn. Opt out here or with
+  // `toris chat --no-knowledge`. Retrieval never writes the store.
+  knowledge: Object.freeze({
+    autoRetrieve: true,
+  }),
   channels: Object.freeze({
     workspace: null,
     telegram: Object.freeze({
@@ -93,6 +98,18 @@ export function validateConfig(config) {
     problems.push(
       `maxDailyCostUsd must be a non-negative number, got ${JSON.stringify(config.maxDailyCostUsd)}`,
     );
+  }
+  if (config.knowledge != null) {
+    if (typeof config.knowledge !== 'object' || Array.isArray(config.knowledge)) {
+      problems.push('knowledge must be an object');
+    } else if (
+      config.knowledge.autoRetrieve !== undefined &&
+      typeof config.knowledge.autoRetrieve !== 'boolean'
+    ) {
+      problems.push(
+        `knowledge.autoRetrieve must be a boolean, got ${JSON.stringify(config.knowledge.autoRetrieve)}`,
+      );
+    }
   }
   return problems;
 }
