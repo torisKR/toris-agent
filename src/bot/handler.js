@@ -185,7 +185,7 @@ async function botAutonomy(ctx, value) {
 async function botRun(ctx, goal) {
   if (!goal) return 'usage: /run <goal>';
   const projectPath = workspacePath(ctx);
-  const orchestrator = new Orchestrator({ store: ctx.store, config: ctx.config });
+  const orchestrator = new Orchestrator({ store: ctx.store, config: ctx.config, cwd: projectPath });
   const project = ctx.projects?.find((item) => item.path === projectPath) ?? {
     id: null,
     name: 'workspace',

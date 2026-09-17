@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AGENT_PROFILES, AGENT_CATEGORIES, listAgents, getAgent, listSurfaceAgents, SURFACE_AGENT, resolveSurfaceAgent, matchSurfaceAgents, agentRolePrompt, withAgentPrompt, renderAgentCatalog } from '../src/core/agents.js';
+import { AGENT_PROFILES, AGENT_CATEGORIES, BUILTIN_CATALOGUE, listAgents, getAgent, listSurfaceAgents, SURFACE_AGENT, resolveSurfaceAgent, matchSurfaceAgents, agentRolePrompt, withAgentPrompt, renderAgentCatalog, composeAgentCatalogue, parseAgentProfile, agentSearchPaths } from '../src/core/agents.js';
 
 test('every profile is complete enough to show in a picker', () => {
   // Arrange / Act / Assert
@@ -105,5 +105,91 @@ test('the TUI catalogue marks the selected agent', () => {
   const text = renderAgentCatalog(listSurfaceAgents(), 'implementer');
   assert.match(text, /\* implementer/);
   assert.match(text, /  toris /);
+});
+
+test('an empty overlay catalogue is the builtin list, same object identity', () => {
+  assert.equal(composeAgentCatalogue(), BUILTIN_CATALOGUE);
+  assert.equal(composeAgentCatalogue([]).profiles, AGENT_PROFILES);
+  assert.equal(listAgents(undefined, BUILTIN_CATALOGUE), AGENT_PROFILES);
+});
+
+test('composeAgentCatalogue overlays replace the same id and append new ones', () => {
+  const custom = parseAgentProfile({
+    id: 'aso-specialist',
+    title: 'ASO Specialist',
+    category: 'plan',
+    writes: false,
+    summary: 'Turns a change into store listing copy.',
+  });
+  const implementer = parseAgentProfile({
+    id: 'implementer',
+    title: 'App Implementer',
+    category: 'build',
+    writes: true,
+    summary: 'Writes product code with store metadata in mind.',
+  });
+  const catalogue = composeAgentCatalogue([custom, implementer]);
+  assert.equal(getAgent('aso-specialist', catalogue).title, 'ASO Specialist');
+  assert.equal(getAgent('implementer', catalogue).title, 'App Implementer');
+  assert.equal(getAgent('implementer').title, 'Implementer');
+  assert.ok(listSurfaceAgents(undefined, catalogue).some((agent) => agent.id === 'aso-specialist'));
+  assert.equal(listAgents('plan', catalogue).some((agent) => agent.id === 'aso-specialist'), true);
+  assert.equal(resolveSurfaceAgent('aso-specialist', catalogue).writes, false);
+});
+
+test('a project can replace the chat persona without putting it on the planner list', () => {
+  const overlay = parseAgentProfile({
+    id: 'toris',
+    title: 'House Toris',
+    category: 'core',
+    writes: true,
+    summary: 'General agent tuned for this product repo.',
+    system: 'You ship small and cite the receipt.',
+  });
+  const catalogue = composeAgentCatalogue([overlay]);
+  assert.equal(catalogue.surface.title, 'House Toris');
+  assert.equal(catalogue.profiles.some((agent) => agent.id === 'toris'), false);
+  assert.equal(agentRolePrompt(catalogue.surface), 'You ship small and cite the receipt.');
+});
+
+test('parseAgentProfile rejects unknown keys, bad ids and non-boolean writes', () => {
+  const base = {
+    id: 'aso-specialist',
+    title: 'ASO Specialist',
+    category: 'plan',
+    writes: false,
+    summary: 'Turns a change into store listing copy.',
+  };
+  assert.throws(() => parseAgentProfile({ ...base, extra: true }), /unknown field/);
+  assert.throws(() => parseAgentProfile({ ...base, id: 'ASO' }), /id/);
+  assert.throws(() => parseAgentProfile({ ...base, writes: 'yes' }), /writes/);
+  assert.throws(() => parseAgentProfile({ ...base, category: 'ops' }), /category/);
+  assert.throws(() => parseAgentProfile({ ...base, summary: 'too short' }), /summary/);
+  assert.throws(
+    () => parseAgentProfile({ ...base, id: 'toris', category: 'build' }),
+    /chat persona/,
+  );
+  assert.throws(() => parseAgentProfile(base, { file: 'x.json', stem: 'other' }), /filename/);
+  assert.throws(() => parseAgentProfile([]), /JSON object/);
+});
+
+test('agentSearchPaths orders home then project, like skills', () => {
+  assert.deepEqual(agentSearchPaths({ home: '/h/.toris', projectPath: '/w' }), [
+    '/h/.toris/agents',
+    '/w/.toris/agents',
+  ]);
+  assert.deepEqual(agentSearchPaths({}), []);
+});
+
+test('a custom system prompt replaces the derived role text', () => {
+  const agent = parseAgentProfile({
+    id: 'legal-reviewer',
+    title: 'Legal Reviewer',
+    category: 'review',
+    writes: false,
+    summary: 'Reads copy for claims the store will reject.',
+    system: 'Flag unsubstantiated claims. Do not draft replacements.',
+  });
+  assert.equal(agentRolePrompt(agent), 'Flag unsubstantiated claims. Do not draft replacements.');
 });
 

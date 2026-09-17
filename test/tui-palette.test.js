@@ -7,6 +7,7 @@ import {
   renderPaletteRows,
   createPaletteController,
 } from '../src/cli/tui/palette.js';
+import { composeAgentCatalogue, parseAgentProfile } from '../src/core/agents.js';
 import { SLASH_COMMANDS } from '../src/cli/tui/slash.js';
 import { stripAnsi } from '../src/cli/tui/text.js';
 
@@ -73,6 +74,23 @@ test('tab is inert for prose, arguments and unknown commands', () => {
   assert.deepEqual(completeSlash('hello')[0], []);
   assert.deepEqual(completeSlash('/model son')[0], []);
   assert.deepEqual(completeSlash('/zzz')[0], []);
+});
+
+test('/agent arguments include a project-local profile from the live catalogue', () => {
+  const catalogue = composeAgentCatalogue([
+    parseAgentProfile({
+      id: 'aso-specialist',
+      title: 'ASO Specialist',
+      category: 'plan',
+      writes: false,
+      summary: 'Turns a change into store listing copy.',
+    }),
+  ]);
+  assert.deepEqual(
+    suggestSlashCommands('/agent aso', catalogue).map((s) => s.args),
+    ['aso-specialist'],
+  );
+  assert.deepEqual(completeSlash('/agent aso', catalogue)[0], ['/agent aso-specialist']);
 });
 
 test('/agent arguments suggest matching agent ids', () => {

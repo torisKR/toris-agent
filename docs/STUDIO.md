@@ -28,7 +28,7 @@ Install creates `~/.toris/runtime/auto-shorts` with `uv`, then writes `~/Library
 
 The coding agent from `toris` chat is also on `http://127.0.0.1:5824/agent`. Pick a profile in the left rail and send a message; the inspector shows the matching TUI commands (`toris`, `/agent`, `/studio`). Sending a message auto-approves tools for that turn — the click is the confirmation.
 
-`GET /api/agents` and `GET /api/agent/status` are readable without a session token. `POST /api/agent/turn` is a mutation: it needs the current local `Origin` and the in-memory session token. It still returns JSON by default. Send `Accept: text/event-stream` to stream `text` / `tool-start` progress and a terminal `done` event with the same success payload. Invalid input fails as JSON before a stream starts. Studio still binds only to `127.0.0.1`. The `/agent` room consumes the stream when available, shows progressive text, supports Stop, Enter-to-send, and keeps a per-agent transcript in `localStorage`.
+`GET /api/agents` and `GET /api/agent/status` are readable without a session token. The list is the same catalogue as `toris agents`, including `.toris/agents/*.json` overlays from Studio's working directory. `POST /api/agent/turn` is a mutation: it needs the current local `Origin` and the in-memory session token. It still returns JSON by default. Send `Accept: text/event-stream` to stream `text` / `tool-start` progress and a terminal `done` event with the same success payload. Invalid input fails as JSON before a stream starts. Studio still binds only to `127.0.0.1`. The `/agent` room consumes the stream when available, shows progressive text, supports Stop, Enter-to-send, and keeps a per-agent transcript in `localStorage`.
 
 ## Design Mode
 

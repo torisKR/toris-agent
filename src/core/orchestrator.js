@@ -1,6 +1,7 @@
 import { newRunId, newEventId } from './ids.js';
 import { ADAPTERS, oppositeProvider, invokeProvider, detectBinary } from './providers.js';
 import { buildPlanPrompt, extractJsonArray, normalizeTasks, fallbackPlan } from './planner.js';
+import { loadAgentCatalogue } from './agents.js';
 import { resolveAutonomy, gate, RECOMMENDED_AUTONOMY } from './autonomy.js';
 import { verify, inferChecks, detectChecks } from './verifier.js';
 import { changedFiles, isRepo } from './git.js';
@@ -59,6 +60,8 @@ export class Orchestrator {
     onEvent,
     notify,
     recordCost = recordRunCost,
+    cwd,
+    loadCatalogue = loadAgentCatalogue,
   } = {}) {
     this.store = store;
     this.config = config;
@@ -70,6 +73,15 @@ export class Orchestrator {
     this.onEvent = onEvent;
     this.notify = notify ?? ((text) => notifyChannels(this.config, text));
     this.recordCost = recordCost;
+    this.cwd = cwd;
+    this.loadCatalogue = loadCatalogue;
+  }
+
+  async #catalogueFor(project) {
+    return this.loadCatalogue({
+      home: this.store?.home,
+      projectPath: project?.path || this.cwd,
+    });
   }
 
   async #emit(run, type, data = {}) {
@@ -175,11 +187,12 @@ export class Orchestrator {
 
   /** Planning can cost money; keep that on the run instead of dropping it. */
   async #draftPlan(run, project, adapter, available) {
+    const catalogue = await this.#catalogueFor(project);
     if (!available) {
       await this.#emit(run, 'plan.fallback', { reason: 'no provider binary on PATH' });
-      return { tasks: fallbackPlan(run.goal, { now: this.now }), costUsd: 0 };
+      return { tasks: fallbackPlan(run.goal, { now: this.now, catalogue }), costUsd: 0 };
     }
-    const prompt = buildPlanPrompt(run.goal, project);
+    const prompt = buildPlanPrompt(run.goal, project, { catalogue });
     let result;
     try {
       result = await this.invoke(adapter, prompt, {
@@ -192,12 +205,12 @@ export class Orchestrator {
       // is missing entirely: degrade to the deterministic plan so the user still
       // gets something actionable instead of a stack trace.
       await this.#emit(run, 'plan.failed', { reason: err?.message ?? String(err) });
-      return { tasks: fallbackPlan(run.goal, { now: this.now }), costUsd: 0 };
+      return { tasks: fallbackPlan(run.goal, { now: this.now, catalogue }), costUsd: 0 };
     }
-    const tasks = normalizeTasks(extractJsonArray(result.text), { now: this.now });
+    const tasks = normalizeTasks(extractJsonArray(result.text), { now: this.now, catalogue });
     if (tasks.length === 0) {
       await this.#emit(run, 'plan.unparsable', { replyPreview: String(result.text).slice(0, 300) });
-      return { tasks: fallbackPlan(run.goal, { now: this.now }), costUsd: result.costUsd || 0 };
+      return { tasks: fallbackPlan(run.goal, { now: this.now, catalogue }), costUsd: result.costUsd || 0 };
     }
     return { tasks, costUsd: result.costUsd || 0 };
   }

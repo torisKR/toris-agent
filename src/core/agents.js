@@ -1,9 +1,15 @@
-import { UsageError } from './errors.js';
+import { readFile, readdir } from 'node:fs/promises';
+import { basename, join } from 'node:path';
+
+import { TorisError, UsageError } from './errors.js';
 
 /**
  * Built-in agent profiles. Each profile is a role the orchestrator can assign
  * to a task. `review` roles must run on the opposite provider from the
  * implementer so a model never grades its own homework.
+ *
+ * Project and home overlays (`<repo>/.toris/agents/*.json`, `~/.toris/agents/*.json`)
+ * merge into this same catalogue — they do not create a second list.
  */
 export const AGENT_PROFILES = Object.freeze([
   { id: 'planner', category: 'plan', title: 'Planner', summary: 'Decomposes a goal into ordered, verifiable tasks.', writes: false },
@@ -37,32 +43,57 @@ export const DEFAULT_SURFACE_AGENT_ID = SURFACE_AGENT.id;
 
 export const SURFACE_CATEGORIES = Object.freeze(['core', ...AGENT_CATEGORIES]);
 
-export function listAgents(category) {
-  if (!category) return AGENT_PROFILES;
-  return AGENT_PROFILES.filter((a) => a.category === category);
+const PROFILE_KEYS = Object.freeze(['id', 'title', 'category', 'writes', 'summary', 'system']);
+const ID_PATTERN = /^[a-z][a-z-]*$/;
+const TITLE_MAX = 80;
+const SUMMARY_MIN = 11;
+const SUMMARY_MAX = 500;
+const SYSTEM_MAX = 8_000;
+
+/** @typedef {{surface:object, profiles:ReadonlyArray<object>}} AgentCatalogue */
+
+export const BUILTIN_CATALOGUE = Object.freeze({
+  surface: SURFACE_AGENT,
+  profiles: AGENT_PROFILES,
+});
+
+function catalogueOf(catalogue) {
+  return catalogue && typeof catalogue === 'object' && Array.isArray(catalogue.profiles)
+    ? catalogue
+    : BUILTIN_CATALOGUE;
+}
+
+export function listAgents(category, catalogue) {
+  const profiles = catalogueOf(catalogue).profiles;
+  if (!category) return profiles;
+  return profiles.filter((a) => a.category === category);
 }
 
 /** The catalogue the TUI picker and Studio agent room share. */
-export function listSurfaceAgents(category) {
-  const all = [SURFACE_AGENT, ...AGENT_PROFILES];
+export function listSurfaceAgents(category, catalogue) {
+  const { surface, profiles } = catalogueOf(catalogue);
+  const all = [surface, ...profiles];
   if (!category) return all;
   return all.filter((a) => a.category === category);
 }
 
-export function getAgent(id) {
-  if (id === SURFACE_AGENT.id) return SURFACE_AGENT;
-  return AGENT_PROFILES.find((a) => a.id === id) ?? null;
+export function getAgent(id, catalogue) {
+  const { surface, profiles } = catalogueOf(catalogue);
+  if (id === surface.id) return surface;
+  return profiles.find((a) => a.id === id) ?? null;
 }
 
 /**
  * Resolve a picker value to a surface agent. Blank means the default chat persona.
  * @param {unknown} id
+ * @param {AgentCatalogue} [catalogue]
  */
-export function resolveSurfaceAgent(id) {
-  if (id == null || String(id).trim() === '') return SURFACE_AGENT;
-  const agent = getAgent(String(id).trim());
+export function resolveSurfaceAgent(id, catalogue) {
+  const live = catalogueOf(catalogue);
+  if (id == null || String(id).trim() === '') return live.surface;
+  const agent = getAgent(String(id).trim(), live);
   if (!agent) {
-    const known = listSurfaceAgents()
+    const known = listSurfaceAgents(undefined, live)
       .map((item) => item.id)
       .join(', ');
     throw new UsageError(`Unknown agent "${id}". Known: ${known}`);
@@ -73,12 +104,13 @@ export function resolveSurfaceAgent(id) {
 /**
  * Prefix match for live palettes: id, title, or category.
  * @param {unknown} prefix
+ * @param {AgentCatalogue} [catalogue]
  */
-export function matchSurfaceAgents(prefix) {
+export function matchSurfaceAgents(prefix, catalogue) {
   const query = String(prefix ?? '')
     .trim()
     .toLowerCase();
-  return listSurfaceAgents().filter((agent) => {
+  return listSurfaceAgents(undefined, catalogue).filter((agent) => {
     if (!query) return true;
     return (
       agent.id.startsWith(query) ||
@@ -90,7 +122,9 @@ export function matchSurfaceAgents(prefix) {
 
 /** Extra system text for a selected role. Empty for the default chat persona. */
 export function agentRolePrompt(agent) {
-  if (!agent || agent.id === SURFACE_AGENT.id) return '';
+  if (!agent) return '';
+  if (typeof agent.system === 'string' && agent.system.trim()) return agent.system.trim();
+  if (agent.id === SURFACE_AGENT.id) return '';
   return [
     `You are currently acting as the "${agent.title}" (${agent.id}) agent.`,
     agent.summary,
@@ -121,4 +155,179 @@ export function renderAgentCatalog(agents, selectedId = SURFACE_AGENT.id) {
       return `  ${mark} ${agent.id.padEnd(idWidth)}  ${agent.category.padEnd(catWidth)}  ${agent.summary}`;
     })
     .join('\n');
+}
+
+/**
+ * Overlay directories, lowest precedence first: home then project.
+ * Built-ins live in AGENT_PROFILES and are not a search path.
+ * @param {{home?:string, projectPath?:string}} [roots]
+ */
+export function agentSearchPaths({ home, projectPath } = {}) {
+  return [
+    home ? join(home, 'agents') : null,
+    projectPath ? join(projectPath, '.toris', 'agents') : null,
+  ].filter(Boolean);
+}
+
+function invalidAgent(file, message) {
+  return new TorisError(`${file}: ${message}`, 'E_INVALID_AGENT');
+}
+
+/**
+ * Strict schema for one on-disk profile. Unknown keys and missing fields fail.
+ * @param {unknown} raw
+ * @param {{file?:string, source?:string, stem?:string}} [meta]
+ */
+export function parseAgentProfile(raw, { file = 'profile', source = 'project', stem } = {}) {
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw invalidAgent(file, 'must be a JSON object with id, title, category, writes and summary.');
+  }
+  const extra = Object.keys(raw).filter((key) => !PROFILE_KEYS.includes(key));
+  if (extra.length > 0) {
+    throw invalidAgent(
+      file,
+      `unknown field${extra.length > 1 ? 's' : ''} ${extra.map((key) => `"${key}"`).join(', ')}. Allowed: ${PROFILE_KEYS.join(', ')}.`,
+    );
+  }
+  if (typeof raw.id !== 'string' || !ID_PATTERN.test(raw.id)) {
+    throw invalidAgent(file, 'needs an "id" slug like "aso-specialist" (lowercase letters and hyphens).');
+  }
+  if (stem && stem !== raw.id) {
+    throw invalidAgent(file, `filename must be "${raw.id}.json" to match id (found "${stem}.json").`);
+  }
+  if (typeof raw.title !== 'string' || raw.title.trim() === '') {
+    throw invalidAgent(file, 'needs a non-empty "title".');
+  }
+  if (raw.title.trim().length > TITLE_MAX) {
+    throw invalidAgent(file, `"title" is too long (max ${TITLE_MAX} characters).`);
+  }
+  if (typeof raw.category !== 'string' || !SURFACE_CATEGORIES.includes(raw.category)) {
+    throw invalidAgent(file, `invalid category "${raw.category}". One of: ${SURFACE_CATEGORIES.join(', ')}.`);
+  }
+  if (raw.id === SURFACE_AGENT.id && raw.category !== 'core') {
+    throw invalidAgent(file, 'id "toris" is the chat persona and must use category "core".');
+  }
+  if (typeof raw.writes !== 'boolean') {
+    throw invalidAgent(file, 'needs "writes" as a boolean (true if this role may edit files).');
+  }
+  if (typeof raw.summary !== 'string' || raw.summary.trim().length < SUMMARY_MIN) {
+    throw invalidAgent(file, `needs a "summary" of at least ${SUMMARY_MIN} characters.`);
+  }
+  if (raw.summary.trim().length > SUMMARY_MAX) {
+    throw invalidAgent(file, `"summary" is too long (max ${SUMMARY_MAX} characters).`);
+  }
+  if (raw.system !== undefined) {
+    if (typeof raw.system !== 'string' || raw.system.trim() === '') {
+      throw invalidAgent(file, '"system" must be a non-empty string when present.');
+    }
+    if (raw.system.length > SYSTEM_MAX) {
+      throw invalidAgent(file, `"system" is too long (${raw.system.length} chars; max ${SYSTEM_MAX}).`);
+    }
+  }
+  return Object.freeze({
+    id: raw.id,
+    title: raw.title.trim(),
+    category: raw.category,
+    writes: raw.writes,
+    summary: raw.summary.trim(),
+    ...(raw.system ? { system: raw.system.trim() } : {}),
+    source,
+  });
+}
+
+/** Load and validate one `<id>.json` profile file. */
+export async function loadAgentProfileFile(file, { source = 'project' } = {}) {
+  let text;
+  try {
+    text = await readFile(file, 'utf8');
+  } catch (err) {
+    throw invalidAgent(file, `cannot read file (${err.message}).`);
+  }
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    throw invalidAgent(file, `not valid JSON (${err.message}). Fix the file or remove it.`);
+  }
+  return parseAgentProfile(raw, { file, source, stem: basename(file, '.json') });
+}
+
+function sourceForDir(dir, { home, projectPath } = {}) {
+  if (home && dir === join(home, 'agents')) return 'home';
+  if (projectPath && dir === join(projectPath, '.toris', 'agents')) return 'project';
+  return 'project';
+}
+
+/**
+ * Read every `*.json` file in `dirs` (not recursive). Later directories win
+ * on id, matching skills: builtin < home < project.
+ * Missing directories are normal. A bad file throws TorisError, not a crash.
+ * @param {string[]} dirs
+ * @param {{home?:string, projectPath?:string}} [roots]
+ */
+export async function discoverAgentProfiles(dirs, roots = {}) {
+  const byId = new Map();
+  for (const dir of dirs) {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      if (err && err.code === 'ENOENT') continue;
+      throw invalidAgent(dir, `cannot read directory (${err.message}).`);
+    }
+    const files = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const source = sourceForDir(dir, roots);
+    for (const entry of files) {
+      const profile = await loadAgentProfileFile(join(dir, entry.name), { source });
+      byId.set(profile.id, profile);
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
+ * Merge overlays onto the built-in catalogue. Same id replaces the built-in
+ * (or a lower-precedence overlay). `toris` replaces the chat persona only.
+ * @param {ReadonlyArray<object>} [overlays]
+ */
+export function composeAgentCatalogue(overlays = []) {
+  if (!Array.isArray(overlays) || overlays.length === 0) return BUILTIN_CATALOGUE;
+  let surface = SURFACE_AGENT;
+  const byId = new Map(
+    AGENT_PROFILES.map((agent) => [agent.id, Object.freeze({ ...agent, source: 'builtin' })]),
+  );
+  for (const extra of overlays) {
+    if (!extra || typeof extra !== 'object') continue;
+    if (extra.id === SURFACE_AGENT.id) {
+      surface = Object.freeze({
+        id: SURFACE_AGENT.id,
+        category: 'core',
+        title: extra.title,
+        summary: extra.summary,
+        writes: extra.writes,
+        ...(extra.system ? { system: extra.system } : {}),
+        source: extra.source ?? 'project',
+      });
+      continue;
+    }
+    byId.set(extra.id, extra);
+  }
+  return Object.freeze({
+    surface,
+    profiles: Object.freeze([...byId.values()]),
+  });
+}
+
+/**
+ * Live catalogue for this home + project. No network. Absent dirs are empty.
+ * @param {{home?:string, projectPath?:string}} [roots]
+ */
+export async function loadAgentCatalogue({ home, projectPath } = {}) {
+  const overlays = await discoverAgentProfiles(agentSearchPaths({ home, projectPath }), {
+    home,
+    projectPath,
+  });
+  return composeAgentCatalogue(overlays);
 }

@@ -6,8 +6,9 @@ import {
   fallbackPlan,
   buildPlanPrompt,
   VALID_AGENTS,
+  validAgents,
 } from '../src/core/planner.js';
-import { AGENT_PROFILES } from '../src/core/agents.js';
+import { AGENT_PROFILES, composeAgentCatalogue, parseAgentProfile } from '../src/core/agents.js';
 
 test('extracts a JSON array from a fenced reply', () => {
   const reply = 'Sure!\n```json\n[{"title":"A"}]\n```\nHope that helps';
@@ -103,6 +104,24 @@ test('every advertised agent appears in the plan prompt', () => {
   for (const agent of VALID_AGENTS) {
     assert.ok(prompt.includes(agent), `${agent} is selectable but never mentioned to the model`);
   }
+});
+
+test('a project overlay id is assignable in the plan prompt and normaliser', () => {
+  const catalogue = composeAgentCatalogue([
+    parseAgentProfile({
+      id: 'aso-specialist',
+      title: 'ASO Specialist',
+      category: 'plan',
+      writes: false,
+      summary: 'Turns a change into store listing copy.',
+    }),
+  ]);
+  assert.ok(validAgents(catalogue).has('aso-specialist'));
+  assert.match(buildPlanPrompt('g', null, { catalogue }), /aso-specialist/);
+  assert.equal(
+    normalizeTasks([{ title: 'Listing', agent: 'aso-specialist' }], { catalogue })[0].agent,
+    'aso-specialist',
+  );
 });
 
 test('normalizeTasks keeps a known agent and rewrites an invented one', () => {

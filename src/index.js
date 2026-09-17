@@ -4,10 +4,15 @@ export { loadConfig, saveConfig, resolveHome, DEFAULT_CONFIG, mergeConfig, valid
 export {
   AGENT_PROFILES,
   SURFACE_AGENT,
+  BUILTIN_CATALOGUE,
   listAgents,
   listSurfaceAgents,
   getAgent,
   resolveSurfaceAgent,
+  agentSearchPaths,
+  parseAgentProfile,
+  composeAgentCatalogue,
+  loadAgentCatalogue,
 } from './core/agents.js';
 export {
   studioAgentUrl,
