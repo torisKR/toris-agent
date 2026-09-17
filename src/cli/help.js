@@ -29,7 +29,8 @@ COMMANDS
   agents [--category <c>]   Agent profiles (builtins + .toris/agents/*.json)
   skills                    Skill packages the model follows in chat
   autonomy                  Autonomy levels and what each permits
-  daemon status             Background daemon (not in 0.1.0)
+  daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
+  daemon run "<goal>"       Queue a run for the local daemon (exit 5 if down)
   studio                    Local GUI on 127.0.0.1:5824 (review + /agent + /design + /patches + /knowledge)
   studio --open             Start or attach Studio and open the loopback URL
   studio service <action>   Install, status, restart or uninstall autostart
@@ -82,6 +83,9 @@ EXAMPLES
   toris connect --provider grok --model <grok-model-id>
   toris cost                   # today vs maxDailyCostUsd, recent days
   toris cost today --json
+  toris daemon start
+  toris daemon run "add a health endpoint" --dry-run
+  toris daemon status --json
   toris receipt run_abc123 --md > receipt.md`;
 
 export function printHelp() {

@@ -61,6 +61,15 @@ export {
 } from './core/cost.js';
 export { main } from './cli/index.js';
 export {
+  daemonPaths,
+  isDaemonRunning,
+  isPidAlive,
+  readDaemonStatus,
+  startDaemon,
+  stopDaemon,
+  submitDaemonJob,
+} from './daemon/index.js';
+export {
   normalizeDesignCapture,
   formatDesignContext,
   composeDesignTurnMessage,

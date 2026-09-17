@@ -163,3 +163,10 @@ test('missing knowledge store is a warning, never a failed doctor run', async ()
   assert.equal(checks.get('knowledge').status, 'WARN');
   assert.match(checks.get('knowledge').detail, /toris knowledge init/);
 });
+
+test('a stopped daemon is a warning, never a failed doctor run', async () => {
+  const checks = await runDoctor();
+  assert.ok(checks.has('daemon'));
+  assert.equal(checks.get('daemon').status, 'WARN');
+  assert.match(checks.get('daemon').detail, /toris daemon start/);
+});

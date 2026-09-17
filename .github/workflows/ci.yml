@@ -100,6 +100,40 @@ jobs:
           toris agents
           toris skills
           toris approvals
+          toris daemon status --json
+
+          echo "--- local daemon start / queue / stop ---"
+          cleanup_daemon() { toris daemon stop >/dev/null 2>&1 || true; }
+          trap cleanup_daemon EXIT
+          toris daemon start --json > /tmp/toris-daemon-start.json
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync("/tmp/toris-daemon-start.json","utf8"));
+            if (!s.running || !s.pid) { console.error(s); process.exit(1); }
+            console.log("daemon pid", s.pid);
+          '
+          rc=0
+          toris daemon start --json >/tmp/toris-daemon-dup.json 2>/dev/null || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::second daemon start succeeded; double-start must fail"
+            exit 1
+          fi
+          toris daemon run "add a health endpoint" --dry-run --json > /tmp/toris-daemon-job.json
+          ready=0
+          for _ in $(seq 1 30); do
+            toris daemon status --json > /tmp/toris-daemon-status.json
+            if node -e 'const s=JSON.parse(require("fs").readFileSync("/tmp/toris-daemon-status.json","utf8")); process.exit(s.jobs && s.jobs.succeeded>=1 ? 0 : 1)'; then
+              ready=1
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::queued dry-run did not finish under the daemon"
+            cat /tmp/toris-daemon-status.json || true
+            exit 1
+          fi
+          toris daemon stop --json
+          trap - EXIT
 
           echo "--- misuse must exit 2, not crash ---"
           rc=0

@@ -17,6 +17,7 @@ import { isRepo } from '../../core/git.js';
 import { telegramToken, slackBotToken, slackAppToken } from '../../core/channels.js';
 import { androidDoctorChecks } from '../../core/android.js';
 import { knowledgeDoctorCheck } from '../../core/knowledge/index.js';
+import { daemonDoctorCheck } from './daemon.js';
 import { KnowledgeStore } from '../../core/knowledge/store.js';
 import { printJson, line, keyValues, c, statusColor } from '../output.js';
 
@@ -117,6 +118,7 @@ export async function cmdDoctor(ctx) {
   for (const check of chatChecks(ctx)) checks.push(check);
   checks.push(await skillCheck(ctx));
   checks.push(await knowledgeDoctorCheck({ home: ctx.home, projectPath: process.cwd() }));
+  checks.push(await daemonDoctorCheck(ctx.home));
   for (const check of channelChecks(ctx)) checks.push(check);
   for (const check of androidDoctorChecks()) checks.push(check);
 

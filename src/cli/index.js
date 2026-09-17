@@ -58,7 +58,7 @@ const COMMANDS = {
 };
 
 /** Commands that must not fail merely because config does not exist yet. */
-const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'studio', 'bot', 'version', 'update', 'android', 'knowledge', 'memory']);
+const CONFIG_OPTIONAL = new Set(['init', 'doctor', 'studio', 'bot', 'version', 'update', 'android', 'knowledge', 'memory', 'daemon']);
 
 /** What a bare `toris` runs when a human is watching. */
 const DEFAULT_INTERACTIVE_COMMAND = 'chat';
