@@ -93,6 +93,10 @@ async function resolveEnqueueProject(store, cwd, requested) {
   return publicProjectRef(projects.find((project) => project.path === cwd) ?? null);
 }
 
+function enqueueCwd(project, fallback) {
+  return project?.path ?? fallback ?? null;
+}
+
 async function requireSchedule(home, ref) {
   const found = findSchedule(await listSchedules(home), ref);
   if (!found) throw new HttpError(404, 'schedule not found');
@@ -141,10 +145,11 @@ export function registerDaemonRoutes(router, { sendJson, requireJson, options, s
     const goal = String(body.goal ?? '').trim();
     if (!goal) throw new HttpError(400, 'goal is required');
     try {
+      const project = await resolveEnqueueProject(projectStore, options.cwd, body.project);
       const job = await enqueueDaemonRun(options.home, {
         goal,
-        cwd: options.cwd ?? null,
-        project: await resolveEnqueueProject(projectStore, options.cwd, body.project),
+        cwd: enqueueCwd(project, options.cwd),
+        project,
         autonomy: optionalAutonomy(body.autonomy),
         dryRun: Boolean(body.dryRun),
         budgetUsd: optionalBudget(body.budgetUsd ?? body.budget),
@@ -177,6 +182,7 @@ export function registerDaemonRoutes(router, { sendJson, requireJson, options, s
     if (!expr) throw new HttpError(400, 'expr is required');
     if (!goal) throw new HttpError(400, 'goal is required');
     try {
+      const project = await resolveEnqueueProject(projectStore, options.cwd, body.project);
       const schedule = await addSchedule(options.home, {
         expr,
         goal,
@@ -187,8 +193,8 @@ export function registerDaemonRoutes(router, { sendJson, requireJson, options, s
         apply: Boolean(body.apply),
         review: body.review !== false,
         provider: typeof body.provider === 'string' ? body.provider : null,
-        cwd: options.cwd ?? null,
-        project: await resolveEnqueueProject(projectStore, options.cwd, body.project),
+        cwd: enqueueCwd(project, options.cwd),
+        project,
       });
       sendJson(response, 201, { ok: true, schedule: publicSchedule(schedule) });
     } catch (error) {

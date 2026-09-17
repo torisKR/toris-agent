@@ -294,6 +294,7 @@ test('POST /api/daemon/run attaches the cwd project and ignores client checks', 
       assert.equal(implicit.status, 202);
       const queued = await implicit.json();
       assert.equal(queued.job.project.id, 'proj_studio');
+      assert.equal(queued.job.cwd, home);
       assert.deepEqual(queued.job.project.checks, ['npm test']);
 
       const spoofed = await fetch(`${base}/api/daemon/run`, mutation(base, {
@@ -303,6 +304,25 @@ test('POST /api/daemon/run attaches the cwd project and ignores client checks', 
       }));
       assert.equal(spoofed.status, 202);
       assert.deepEqual((await spoofed.json()).job.project.checks, ['npm test']);
+
+      const otherPath = join(home, 'other');
+      await mkdir(otherPath, { recursive: true });
+      await store.updateCollection('projects', (items) => [...items, {
+        id: 'proj_other',
+        name: 'other',
+        path: otherPath,
+        checks: ['npm run lint'],
+      }]);
+      const selected = await fetch(`${base}/api/daemon/run`, mutation(base, {
+        goal: 'lint the repo',
+        dryRun: true,
+        project: 'proj_other',
+      }));
+      assert.equal(selected.status, 202);
+      const selectedJob = await selected.json();
+      assert.equal(selectedJob.job.project.id, 'proj_other');
+      assert.equal(selectedJob.job.cwd, otherPath);
+      assert.deepEqual(selectedJob.job.project.checks, ['npm run lint']);
     } finally {
       await releaseDaemonLock(home);
     }
