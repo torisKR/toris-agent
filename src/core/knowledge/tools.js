@@ -1,7 +1,9 @@
 import { KnowledgeStore } from './store.js';
+import { Store } from '../store.js';
 import { searchIndex } from './search.js';
 import { matchDomains } from './context.js';
 import { proposeReflections, renderReflection } from './reflect.js';
+import { proposeFromRun } from './reflect-run.js';
 import { splitTags } from './markdown.js';
 
 function stringify(value) {
@@ -173,18 +175,27 @@ export function createKnowledgeTools({ home, projectPath, session } = {}) {
     {
       name: 'knowledge_reflect',
       description:
-        'Propose (do not silently write) a tacit note from recent user/assistant text. ' +
-        'The operator accepts with /reflect accept or toris knowledge reflect --write.',
+        'Propose (do not silently write) a tacit note from recent user/assistant text ' +
+        'or a verified run receipt (runId). The operator accepts with /reflect accept ' +
+        'or toris knowledge reflect --write. Never writes USER.md, MEMORY.md, or tacit.',
       inputSchema: {
         type: 'object',
         properties: {
           user: { type: 'string' },
           assistant: { type: 'string' },
           domain: { type: 'string' },
+          runId: { type: 'string', description: 'Completed run id whose receipt verified successfully' },
         },
       },
-      run: async ({ user, assistant, domain } = {}) => {
-        const result = proposeReflections({ user, assistant, domain });
+      run: async ({ user, assistant, domain, runId } = {}) => {
+        const domains = store ? await store.listDomains() : [];
+        if (runId || (!user && !assistant)) {
+          const blocked = await requireStore();
+          if (blocked) return blocked;
+          const result = await proposeFromRun(new Store(home), { runId, domain, domains });
+          return renderReflection(result);
+        }
+        const result = proposeReflections({ user, assistant, domain, domains });
         return renderReflection(result);
       },
     },

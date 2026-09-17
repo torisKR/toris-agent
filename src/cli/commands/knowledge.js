@@ -1,10 +1,13 @@
 import { readFile } from 'node:fs/promises';
 
 import { EXIT, UsageError } from '../../core/errors.js';
+import { Store } from '../../core/store.js';
 import {
   KnowledgeStore,
   searchIndex,
   proposeReflections,
+  proposeFromRun,
+  looksLikeRunId,
   renderReflection,
   STARTER_DOMAIN_SLUGS,
   EDGE_KINDS,
@@ -349,21 +352,10 @@ async function cmdSearch(ctx, store, rest, flags) {
 
 async function cmdReflect(ctx, store, rest, flags) {
   await ensure(store);
-  let text = flagString(flags, 'text') || rest.join(' ').trim();
-  if (typeof flags.file === 'string') {
-    text = await readFile(flags.file, 'utf8');
-  }
-  if (!text) {
-    throw new UsageError(
-      'Usage: toris knowledge reflect --text "..." [--write] [--domain slug]\n' +
-        'Or: toris knowledge reflect --file <transcript.md>',
-    );
-  }
-  const result = proposeReflections({
-    user: text,
-    domain: flagString(flags, 'domain'),
-  });
-  if (!flags.write && !flags.yes) {
+  const result = await resolveReflectProposal(ctx, store, rest, flags);
+  // Default and --json are propose-only. --write / --yes is the operator accept.
+  // No proposals (including failed verification) never writes, even with --write.
+  if ((!flags.write && !flags.yes) || result.proposals.length === 0) {
     if (ctx.json) {
       printJson({ ok: true, written: false, ...result });
       return EXIT.OK;
@@ -390,6 +382,30 @@ async function cmdReflect(ctx, store, rest, flags) {
   line(`${c.green('+')} Wrote ${written.length} tacit note(s)`);
   for (const note of written) line(`  ${note.path}`);
   return EXIT.OK;
+}
+
+async function resolveReflectProposal(ctx, store, rest, flags) {
+  const domain = flagString(flags, 'domain');
+  const domains = await store.listDomains();
+  const runId = flagString(flags, 'from-run', 'run') || (looksLikeRunId(rest[0]) ? rest[0] : undefined);
+  let text = flagString(flags, 'text');
+  if (typeof flags.file === 'string') {
+    text = await readFile(flags.file, 'utf8');
+  }
+  if (!text && !runId) {
+    const leftover = rest.join(' ').trim();
+    if (leftover && !looksLikeRunId(leftover)) text = leftover;
+  }
+  if (text && !runId) {
+    return proposeReflections({ user: text, domain, domains });
+  }
+  if (!runId && !text && !ctx.store && !ctx.home) {
+    throw new UsageError(
+      'Usage: toris knowledge reflect [runId] [--from-run <id>] [--text "..."] [--file <path>] [--write] [--domain slug]',
+    );
+  }
+  const runStore = ctx.store ?? new Store(ctx.home);
+  return proposeFromRun(runStore, { runId, domain, domains });
 }
 
 async function cmdMemory(ctx, store, which, rest, flags) {

@@ -78,6 +78,8 @@ toris knowledge tacit promote <id> --domain toris-ops
 toris knowledge search "flutter play"
 toris knowledge reflect --text "We always measure on a mid-range phone." --domain flutter-android
 toris knowledge reflect --text "..." --write
+toris knowledge reflect run_abc123
+toris knowledge reflect --from-run run_abc123 --json
 toris knowledge memory get
 toris knowledge user append --text "- Timezone: KST"
 ```
@@ -119,17 +121,20 @@ CLI-backed `claude` / `codex` keep their own agent loop and tools; the same boun
 Slash commands:
 
 - `/knowledge [query]` — status or search
-- `/reflect` — propose tacit notes from this session
+- `/reflect` — propose tacit notes from this session, or the latest verified run
+- `/reflect <runId>` — propose from that run's receipt (verification must have passed)
 - `/reflect accept` — write the proposals (inbox if no domain)
 
 Do not expect silent MEMORY.md updates. That is the point.
 
 ## Tacit promotion
 
-1. Do the work. Verify it.
-2. `/reflect` or `toris knowledge reflect --text "..."`.
-3. Edit the proposal if the wording is too specific.
-4. `--write` / `accept` to inbox, then `tacit promote` into a domain.
+1. Do the work. Verify it. The receipt of a passing run carries a quiet `toris knowledge reflect <runId>` line — it does not write anything.
+2. `/reflect`, `toris knowledge reflect <runId>`, or `toris knowledge reflect --text "..."`.
+3. Edit the proposal if the wording is too specific. `--json` returns the draft without writing.
+4. `--write` / `accept` to inbox, then `tacit promote` into a domain. Below L3, chat `knowledge_write` still asks first.
+
+A receipt-backed draft includes the goal, plan titles, check exit codes, and a short outcome note. Failed or unverified runs do not propose a success tacit. Domain is guessed from keywords/tags on an existing pack when you omit `--domain`.
 
 A tacit note is “how we actually do X **here**”. A skill under `skills/` is a reusable procedure. A domain may list related builtin skills in `DOMAIN.md` frontmatter (`skills: seo-geo-optimizer, ship-small`).
 

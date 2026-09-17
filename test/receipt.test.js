@@ -73,6 +73,23 @@ test('the receipt carries a schema version so stored receipts stay readable', ()
   assert.equal(buildReceipt(run, []).schemaVersion, RECEIPT_SCHEMA_VERSION);
 });
 
+test('a verified receipt points at knowledge reflect without writing anything', () => {
+  const receipt = buildReceipt(run, []);
+  assert.equal(receipt.reflectHint, 'toris knowledge reflect run_abc');
+  assert.match(receiptToMarkdown(receipt), /toris knowledge reflect run_abc/);
+});
+
+test('a failed or unverified receipt stays quiet about reflect', () => {
+  const failed = buildReceipt(
+    { ...run, status: 'failed', verification: { passed: false, checks: [{ command: 'npm test', passed: false }] } },
+    [],
+  );
+  assert.equal(failed.reflectHint, null);
+  assert.doesNotMatch(receiptToMarkdown(failed), /knowledge reflect/);
+  const unproven = buildReceipt({ ...run, verification: { passed: null, checks: [] } }, []);
+  assert.equal(unproven.reflectHint, null);
+});
+
 test('a receipt keeps the additive budget note for a stopped run', () => {
   const receipt = buildReceipt(
     { ...run, budgetUsd: 2, budgetNote: 'daily budget exhausted ($20.00 cap reached)', dailyCostUsd: 19.5 },

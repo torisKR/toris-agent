@@ -21,7 +21,7 @@ export const SLASH_COMMANDS = Object.freeze([
   Object.freeze({ name: 'autonomy', args: '[L1-L5]', summary: 'show or set what runs unattended' }),
   Object.freeze({ name: 'skills', args: '', summary: 'skill packages in the system prompt' }),
   Object.freeze({ name: 'knowledge', args: '[query]', summary: 'search local secretary knowledge' }),
-  Object.freeze({ name: 'reflect', args: '[accept]', summary: 'propose or write a tacit note' }),
+  Object.freeze({ name: 'reflect', args: '[runId|accept]', summary: 'propose or write a tacit note' }),
   Object.freeze({ name: 'tools', args: '', summary: 'tools the model may call' }),
   Object.freeze({ name: 'usage', args: '', summary: 'tokens and turns used so far' }),
   Object.freeze({ name: 'clear', args: '', summary: 'forget the transcript, keep the session' }),
