@@ -132,7 +132,7 @@ The agent should get better at *your* work over time. `toris knowledge init` see
 
 ### Daemon — worker status without the CLI
 
-`http://127.0.0.1:5824/daemon` shows the same local facts as `toris daemon status`: running or not, pid, uptime, heartbeat, next due schedule, the schedule list, and recent jobs from `daemon-jobs.json`. Enable, disable, remove, and add a schedule through the existing store (Origin + session token). Studio does not start or stop the worker. See [docs/DAEMON.md](docs/DAEMON.md).
+`http://127.0.0.1:5824/daemon` shows the same local facts as `toris daemon status`: running or not, pid, uptime, heartbeat, next due schedule, the schedule list, and recent jobs from `daemon-jobs.json`. Enable, disable, remove, and add a schedule through the existing store (Origin + session token). **Queue run** posts the same one-shot inbox job as `toris daemon run` (`POST /api/daemon/run`); a down worker is HTTP 503 (CLI exit 5). Studio does not start or stop the worker. See [docs/DAEMON.md](docs/DAEMON.md).
 
 ### Review room for local drafts
 
@@ -443,7 +443,7 @@ toris daemon stop
 
 `start` writes `~/.toris/daemon.lock` + `daemon.json` and refuses a second start while that pid is alive. `run` drops a job in `~/.toris/daemon/inbox/` for the worker to execute with the same orchestrator as `toris run`. If the daemon is down, `daemon run` exits `5`.
 
-Schedules are **local cron only** (5-field cron, `@hourly`/`@daily`/`@weekly`/`@monthly`, `@every 15m`, or `09:00 mon-fri`). The worker evaluates due items on its heartbeat in the machine timezone and enqueues the same inbox jobs as `daemon run`. The same schedule does not double-fire while a prior job is still queued or running. There is no cloud calendar and no remote multi-machine clock. Studio `/daemon` is a loopback view of the same store. See [docs/DAEMON.md](docs/DAEMON.md).
+Schedules are **local cron only** (5-field cron, `@hourly`/`@daily`/`@weekly`/`@monthly`, `@every 15m`, or `09:00 mon-fri`). The worker evaluates due items on its heartbeat in the machine timezone and enqueues the same inbox jobs as `daemon run`. The same schedule does not double-fire while a prior job is still queued or running. There is no cloud calendar and no remote multi-machine clock. Studio `/daemon` is a loopback view of the same store, including a one-shot Queue run form. See [docs/DAEMON.md](docs/DAEMON.md).
 
 `toris brief` is a foreground CLI, not a daemon job. Do not `daemon schedule add "09:00" "toris brief"` — that would be a coding goal (and is refused). Put `toris brief` on host cron / systemd / launchd instead. See [docs/BRIEF.md](docs/BRIEF.md).
 

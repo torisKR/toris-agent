@@ -35,7 +35,7 @@ toris daemon schedule add "09:00" "toris brief"
 toris daemon run "toris brief"
 ```
 
-Those commands are refused. A schedule named `toris brief` would otherwise burn a planner/provider turn on the words "toris brief".
+Those commands are refused (Studio **Queue run** uses the same check). A schedule named `toris brief` would otherwise burn a planner/provider turn on the words "toris brief".
 
 Schedule the CLI itself with host cron, systemd, or launchd:
 

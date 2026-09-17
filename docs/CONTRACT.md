@@ -379,7 +379,7 @@ export function isDaemonRunning(home?: string): Promise<boolean>;
 export function socketPath(home?: string): string;
 ```
 
-First usable slice (this tree): `toris daemon start|status|stop|run|schedule` is a **local** pid/lock worker under `$TORIS_HOME`. State file is `daemon.json` `{ pid, version, startedAt, heartbeatAt, home, socket, jobs, schedules }`. `socket` is `null` in this slice — there is no `daemon.sock` RPC, no remote multi-machine, and no cloud. Jobs are submitted by dropping JSON into `daemon/inbox/` (`toris daemon run` or a due local schedule). Schedules live in `daemon/schedules/*.json` and tick on the worker heartbeat in the host timezone (5-field cron, `@every`, `HH:MM` weekdays). Full `Supervisor` / `connect()` remains the later hook.
+First usable slice (this tree): `toris daemon start|status|stop|run|schedule` is a **local** pid/lock worker under `$TORIS_HOME`. State file is `daemon.json` `{ pid, version, startedAt, heartbeatAt, home, socket, jobs, schedules }`. `socket` is `null` in this slice — there is no `daemon.sock` RPC, no remote multi-machine, and no cloud. Jobs are submitted by dropping JSON into `daemon/inbox/` (`toris daemon run`, Studio `POST /api/daemon/run`, or a due local schedule). Schedules live in `daemon/schedules/*.json` and tick on the worker heartbeat in the host timezone (5-field cron, `@every`, `HH:MM` weekdays). Full `Supervisor` / `connect()` remains the later hook.
 
 ## `toris-agent` (apps/cli) — command surface
 

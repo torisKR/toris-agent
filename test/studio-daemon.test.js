@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
-import { acquireDaemonLock, addSchedule, releaseDaemonLock } from '../src/daemon/index.js';
+import { acquireDaemonLock, addSchedule, daemonPaths, releaseDaemonLock } from '../src/daemon/index.js';
 
 async function withServer(fn) {
   const home = await mkdtemp(join(tmpdir(), 'toris-studio-daemon-'));
@@ -43,6 +43,7 @@ test('GET /daemon is a standalone page that does not reuse app.js', async () => 
     assert.equal(page.status, 200);
     const html = await page.text();
     assert.match(html, /id="daemon-title"/);
+    assert.match(html, /id="queue-run-form"/);
     assert.match(html, /\/assets\/daemon\.js/);
     assert.doesNotMatch(html, /\/assets\/app\.js/);
     assert.equal((await fetch(`${base}/assets/daemon.js`)).status, 200);
@@ -193,5 +194,83 @@ test('Studio schedule add writes the same files as the CLI helper', async () => 
     const ids = listed.items.map((item) => item.id).sort();
     assert.deepEqual(ids, [viaApi.schedule.id, viaHelper.id].sort());
     assert.ok(listed.items.every((item) => item.nextDueAt && item.expr && item.goal));
+  });
+});
+
+test('POST /api/daemon/run requires Origin and session token', async () => {
+  await withServer(async ({ base }) => {
+    const denied = await fetch(`${base}/api/daemon/run`, { method: 'POST', body: '{}' });
+    assert.equal(denied.status, 403);
+
+    const badOrigin = await fetch(`${base}/api/daemon/run`, {
+      method: 'POST',
+      headers: {
+        origin: 'http://localhost:5824',
+        'x-toris-studio-token': 'test-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ goal: 'lint the repo', dryRun: true }),
+    });
+    assert.equal(badOrigin.status, 403);
+
+    const missing = await fetch(`${base}/api/daemon/run`, mutation(base, { dryRun: true }));
+    assert.equal(missing.status, 400);
+    assert.match((await missing.json()).error.message, /goal is required/);
+  });
+});
+
+test('POST /api/daemon/run enqueues the same inbox job as the CLI', async () => {
+  await withServer(async ({ base, home }) => {
+    await acquireDaemonLock(home, { pid: process.pid, startedAt: new Date().toISOString(), version: '0.4.0' });
+    try {
+      const response = await fetch(`${base}/api/daemon/run`, mutation(base, {
+        goal: 'add a health endpoint',
+        dryRun: true,
+        autonomy: 'L3',
+        budgetUsd: 2,
+      }));
+      assert.equal(response.status, 202);
+      const body = await response.json();
+      assert.equal(body.ok, true);
+      assert.equal(body.queued, true);
+      assert.equal(body.job.type, 'run');
+      assert.equal(body.job.status, 'queued');
+      assert.equal(body.job.goal, 'add a health endpoint');
+      assert.equal(body.job.dryRun, true);
+      assert.equal(body.job.autonomy, 'L3');
+      assert.equal(body.job.budgetUsd, 2);
+      assert.equal(body.job.review, true);
+      const inbox = JSON.parse(await readFile(join(daemonPaths(home).inbox, `${body.job.id}.json`), 'utf8'));
+      assert.equal(inbox.id, body.job.id);
+      assert.equal(inbox.goal, 'add a health endpoint');
+      assert.equal(inbox.dryRun, true);
+    } finally {
+      await releaseDaemonLock(home);
+    }
+  });
+});
+
+test('POST /api/daemon/run maps a down worker to HTTP 503 (CLI exit 5)', async () => {
+  await withServer(async ({ base }) => {
+    const response = await fetch(`${base}/api/daemon/run`, mutation(base, {
+      goal: 'add a health endpoint',
+      dryRun: true,
+    }));
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.ok, false);
+    assert.equal(body.error.code, 503);
+    assert.match(body.error.message, /not running/);
+  });
+});
+
+test('POST /api/daemon/run refuses a brief-only goal', async () => {
+  await withServer(async ({ base }) => {
+    for (const goal of ['brief', 'toris brief']) {
+      const response = await fetch(`${base}/api/daemon/run`, mutation(base, { goal }));
+      assert.equal(response.status, 400);
+      const body = await response.json();
+      assert.match(body.error.message, /foreground CLI digest/);
+    }
   });
 });

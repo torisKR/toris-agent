@@ -38,6 +38,8 @@
 .daemon-goal { margin: 0; color: var(--text); font-size: 15px; line-height: 1.5; }
 .daemon-row small { color: var(--quiet); font-size: 12px; }
 .check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.inspector .row .field { flex: 1; min-width: 0; }
+.daemon-error { margin: 0; color: var(--failure); font-size: 12px; line-height: 1.5; }
 .daemon-hits { display: grid; gap: 6px; margin-top: 10px; }
 .daemon-hit {
   display: grid;

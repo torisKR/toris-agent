@@ -1,14 +1,12 @@
-import { EXIT, TorisError, UsageError } from '../../core/errors.js';
-import { BRIEF_SCHEDULE_HINT, looksLikeBriefGoal } from '../../core/brief.js';
+import { EXIT, UsageError } from '../../core/errors.js';
 import { asNumber } from '../args.js';
 import { c, keyValues, line, printJson } from '../output.js';
 import { findProject, loadProjects } from './project.js';
 import {
-  isDaemonRunning,
+  enqueueDaemonRun,
   readDaemonStatus,
   startDaemon,
   stopDaemon,
-  submitDaemonJob,
 } from '../../daemon/index.js';
 import { cmdDaemonSchedule } from './daemon-schedule.js';
 
@@ -148,31 +146,24 @@ async function resolveProject(ctx, flags) {
 async function runCommand(ctx, positionals, flags, deps) {
   const goal = positionals.join(' ').trim();
   if (!goal) throw new UsageError('Usage: toris daemon run "<goal>" [--dry-run] [-p <project>]');
-  if (looksLikeBriefGoal(goal)) throw new UsageError(BRIEF_SCHEDULE_HINT);
-  const running = await (deps.isRunning || isDaemonRunning)(ctx.home);
-  if (!running) {
-    throw new TorisError(
-      'Daemon is not running. Start it with `toris daemon start`, then retry.',
-      'E_DAEMON_UNAVAILABLE',
-      EXIT.DAEMON_UNAVAILABLE,
-    );
-  }
   const project = await resolveProject(ctx, flags);
-  const submit = deps.submit || submitDaemonJob;
-  const job = await submit(ctx.home, {
-    type: 'run',
-    goal,
-    cwd: ctx.cwd,
-    project: project
-      ? { id: project.id, name: project.name, path: project.path, checks: project.checks ?? [] }
-      : null,
-    autonomy: typeof flags.autonomy === 'string' ? flags.autonomy : null,
-    dryRun: Boolean(flags['dry-run']),
-    budgetUsd: asNumber(flags.budget, 'budget') ?? null,
-    provider: typeof flags.provider === 'string' ? flags.provider : null,
-    apply: Boolean(flags.apply),
-    review: flags['no-review'] ? false : true,
-  });
+  const job = await enqueueDaemonRun(
+    ctx.home,
+    {
+      goal,
+      cwd: ctx.cwd,
+      project: project
+        ? { id: project.id, name: project.name, path: project.path, checks: project.checks ?? [] }
+        : null,
+      autonomy: typeof flags.autonomy === 'string' ? flags.autonomy : null,
+      dryRun: Boolean(flags['dry-run']),
+      budgetUsd: asNumber(flags.budget, 'budget') ?? null,
+      provider: typeof flags.provider === 'string' ? flags.provider : null,
+      apply: Boolean(flags.apply),
+      review: flags['no-review'] ? false : true,
+    },
+    { isRunning: deps.isRunning, submit: deps.submit },
+  );
   if (ctx.json) {
     printJson({ ok: true, queued: true, job });
     return EXIT.OK;
