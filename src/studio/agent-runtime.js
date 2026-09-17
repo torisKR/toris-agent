@@ -22,7 +22,14 @@ import {
   renderSkillBriefing,
   BUILTIN_SKILL_DIR,
 } from '../core/skills.js';
-import { KnowledgeStore, briefingForQuery } from '../core/knowledge/index.js';
+import {
+  KnowledgeStore,
+  briefingForQuery,
+  composeKnowledgeTurn,
+  knowledgeAutoRetrieveEnabled,
+  publicKnowledgeReceipt,
+  retrieveForTurn,
+} from '../core/knowledge/index.js';
 import { HttpError } from './http.js';
 import { composeDesignTurnMessage, listDesignCaptures, normalizeDesignCapture } from './design.js';
 import { formatPatchReviewMessage } from './patch-view.js';
@@ -207,6 +214,8 @@ export async function runAgentTurn(options) {
   const cliBacked = CLI_PROVIDERS.includes(resolved.provider);
   const cwd = options.cwd || process.cwd();
   const knowledgeSession = { activeDomains: [] };
+  const knowledgeStore = new KnowledgeStore({ home: options.home, projectPath: cwd });
+  const autoRetrieve = knowledgeAutoRetrieveEnabled(config);
   const tools = cliBacked
     ? []
     : createDefaultTools({ cwd, home: options.home, knowledge: knowledgeSession });
@@ -215,11 +224,19 @@ export async function runAgentTurn(options) {
     : await discoverSkills(
         skillSearchPaths({ builtinDir: BUILTIN_SKILL_DIR, home: options.home, projectPath: cwd }),
       );
-  const knowledgeBriefing = cliBacked
-    ? ''
-    : await briefingForQuery(new KnowledgeStore({ home: options.home, projectPath: cwd }), composed, knowledgeSession, {
-        includeProfile: true,
-      });
+  const knowledgeBriefing =
+    cliBacked || !autoRetrieve
+      ? ''
+      : await briefingForQuery(knowledgeStore, '', knowledgeSession, { includeProfile: true });
+  const retrieved = autoRetrieve
+    ? await retrieveForTurn(knowledgeStore, {
+        query: composed,
+        history: options.history,
+        session: knowledgeSession,
+        includeProfile: cliBacked,
+      })
+    : { enabled: false, retrieved: [], briefing: '' };
+  const userMessage = retrieved.briefing ? composeKnowledgeTurn(composed, retrieved.briefing) : composed;
   const events = [];
   const onEvent = (evt) => {
     events.push(evt);
@@ -250,7 +267,7 @@ export async function runAgentTurn(options) {
       onEvent,
     });
     session.reset(sanitizeHistory(options.history));
-    const result = await session.send(composed, { signal: options.signal });
+    const result = await session.send(userMessage, { signal: options.signal });
     return {
       ok: true,
       agent,
@@ -260,6 +277,7 @@ export async function runAgentTurn(options) {
       text: result.text,
       usage: result.usage,
       events,
+      knowledge: publicKnowledgeReceipt(retrieved),
       tui: tuiAgentHint(agent.id),
       design: captures[0]
         ? { id: captures[0].id || null, url: captures[0].url, selector: captures[0].selector }

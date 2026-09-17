@@ -29,6 +29,12 @@ test('daemon --foreground is a boolean and does not consume the next token', () 
   assert.equal(flags.home, '/tmp/h');
 });
 
+test('chat --no-knowledge is a boolean and does not consume the next token', () => {
+  const { positionals, flags } = parseArgs(['chat', '--no-knowledge', 'flutter play']);
+  assert.equal(flags['no-knowledge'], true);
+  assert.deepEqual(positionals, ['chat', 'flutter play']);
+});
+
 test('schedule --disabled is a boolean and does not consume the next token', () => {
   const { positionals, flags } = parseArgs([
     'daemon',

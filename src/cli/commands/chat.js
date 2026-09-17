@@ -50,8 +50,12 @@ import {
   KnowledgeStore,
   briefingForQuery,
   composeKnowledgeTurn,
+  formatKnowledgeReceipt,
+  knowledgeAutoRetrieveEnabled,
   proposeReflections,
+  publicKnowledgeReceipt,
   renderReflection,
+  retrieveForTurn,
 } from '../../core/knowledge/index.js';
 
 const require = createRequire(import.meta.url);
@@ -157,6 +161,7 @@ export async function cmdChat(ctx, args, flags) {
   };
   const knowledgeSession = { activeDomains: [] };
   const knowledgeStore = new KnowledgeStore({ home: ctx.home, projectPath: ctx.cwd });
+  const autoRetrieve = knowledgeAutoRetrieveEnabled(config, flags);
   const tools =
     flags['no-tools'] || isCliBacked
       ? []
@@ -173,20 +178,36 @@ export async function cmdChat(ctx, args, flags) {
           }),
         );
   const briefing = renderSkillBriefing(skills);
-  const knowledgeBriefing = isCliBacked
-    ? ''
-    : await briefingForQuery(knowledgeStore, '', knowledgeSession, { includeProfile: true });
+  const knowledgeBriefing =
+    isCliBacked || !autoRetrieve
+      ? ''
+      : await briefingForQuery(knowledgeStore, '', knowledgeSession, { includeProfile: true });
   const systemFor = (agent = activeAgent) =>
     chatSystemPrompt({ agent, briefing, knowledgeBriefing, cliBacked: isCliBacked });
   const autoApprove =
     Boolean(flags.yes) || autoApprovesTools(flags.autonomy ?? config.defaultAutonomy);
 
-  const composeTurn = async (text) => {
-    if (isCliBacked) return text;
-    const extra = await briefingForQuery(knowledgeStore, text, knowledgeSession, {
-      includeProfile: false,
+  /** Last retrieve receipt for --json / --verbose. Read-only; never writes tacit. */
+  let lastKnowledge = { enabled: autoRetrieve, retrieved: [], domains: [], chars: 0, truncated: false, query: '' };
+
+  const composeTurn = async (text, history = []) => {
+    if (!autoRetrieve) {
+      lastKnowledge = { enabled: false, retrieved: [], domains: [], chars: 0, truncated: false, query: text };
+      return text;
+    }
+    lastKnowledge = await retrieveForTurn(knowledgeStore, {
+      query: text,
+      history,
+      session: knowledgeSession,
+      includeProfile: isCliBacked,
     });
-    return extra ? composeKnowledgeTurn(text, extra) : text;
+    return lastKnowledge.briefing ? composeKnowledgeTurn(text, lastKnowledge.briefing) : text;
+  };
+
+  const noteKnowledge = (logLine) => {
+    if (!ctx.verbose || json) return;
+    const note = formatKnowledgeReceipt(lastKnowledge);
+    if (note) logLine(c.dim(`  ${note}`));
   };
 
   const oneShot = args.length > 0;
@@ -212,6 +233,7 @@ export async function cmdChat(ctx, args, flags) {
       usage: result.usage,
       patchId: settled?.patch?.id ?? null,
       applied: Boolean(settled?.applied),
+      knowledge: publicKnowledgeReceipt(lastKnowledge),
     });
     return EXIT.OK;
   }
@@ -314,9 +336,11 @@ export async function cmdChat(ctx, args, flags) {
 
   const askModel = async (text) => {
     generation = new AbortController();
+    const composed = await composeTurn(text, session.history);
+    noteKnowledge(log);
     spinner.start('thinking');
     try {
-      await session.send(await composeTurn(text), { signal: generation.signal });
+      await session.send(composed, { signal: generation.signal });
     } catch (err) {
       // Stop the spinner before printing, or its line-erase would wipe the message.
       spinner.stop();

@@ -125,7 +125,7 @@ Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the
 
 ### Secretary knowledge — domains, DAG, tacit memory
 
-The agent should get better at *your* work over time. `toris knowledge init` seeds a local store at `~/.toris/knowledge/`: bounded `USER.md` / `MEMORY.md`, starter domain packs (product growth, Flutter/Expo Android, Toris ops, solo revenue), and a DAG between knowledge nodes. Search is keyword + tag. Writes are gated like other mutating chat tools (ask below L3). After a real win, `/reflect` or `toris knowledge reflect` proposes a tacit note — it does not write silently.
+The agent should get better at *your* work over time. `toris knowledge init` seeds a local store at `~/.toris/knowledge/`: bounded `USER.md` / `MEMORY.md`, starter domain packs (product growth, Flutter/Expo Android, Toris ops, solo revenue), and a DAG between knowledge nodes. Search is keyword + tag. Each `toris chat` turn (and Studio agent turns) auto-retrieves matching domain nodes and tacit notes into a bounded `[knowledge context]` block — no manual search required. Disable with `toris chat --no-knowledge` or `knowledge.autoRetrieve: false` in `config.json`. Writes are gated like other mutating chat tools (ask below L3). After a real win, `/reflect` or `toris knowledge reflect` proposes a tacit note — it does not write silently. Auto-retrieve never writes.
 
 Details: [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md). Studio browse/add is at `http://127.0.0.1:5824/knowledge`.
 
