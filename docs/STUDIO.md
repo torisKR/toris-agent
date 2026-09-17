@@ -70,6 +70,10 @@ Enable, disable, remove, and the optional add-schedule form call the existing sc
 
 The page does **not** start or stop the worker — that stays on `toris daemon start` / `stop` so a browser tab cannot take the lock. See [DAEMON.md](./DAEMON.md).
 
+## Brief
+
+`http://127.0.0.1:5824/brief` is a standalone read-only page for the same local secretary digest as `toris brief`: today's spend, today's runs, daemon running/next due, and 3–5 tacit/node headlines. Empty run and knowledge sections stay quiet. `GET /api/brief` is the same-origin JSON read (`buildBrief`). There is no send, enqueue, or start/stop from this page. See [BRIEF.md](./BRIEF.md).
+
 ## Review flow
 
 1. Save a post draft or import an MP4. The item enters `awaiting_review`.

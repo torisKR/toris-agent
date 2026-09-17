@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local secretary digest: today's spend, runs, daemon, and knowledge headlines in Toris Studio.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <title>Toris Studio · Brief</title>
+  <link rel="stylesheet" href="/assets/tokens.css">
+  <link rel="stylesheet" href="/assets/components.css">
+  <link rel="stylesheet" href="/assets/studio.css">
+  <link rel="stylesheet" href="/assets/brief.css">
+</head>
+<body>
+  <div class="studio-frame">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">T</span><span>Toris Studio</span></a>
+      <nav class="surface-nav" aria-label="Workspace">
+        <a class="tab" href="/">Review</a>
+        <a class="tab" href="/agent">Agent</a>
+        <a class="tab" href="/design">Design</a>
+        <a class="tab" href="/patches">Patches</a>
+        <a class="tab" href="/knowledge">Knowledge</a>
+        <a class="tab" href="/daemon">Daemon</a>
+        <a class="tab" href="/brief" aria-current="page">Brief</a>
+      </nav>
+      <div class="local-state"><span class="pulse" aria-hidden="true"></span><span>127.0.0.1 · local files</span></div>
+      <a class="system-link" href="/design-system">Design system</a>
+    </header>
+
+    <div class="studio-shell is-brief">
+      <aside class="queue-panel" aria-labelledby="brief-title">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">Secretary</p>
+            <h1 id="brief-title">Brief</h1>
+          </div>
+          <span class="queue-count" id="brief-day">—</span>
+        </div>
+        <p class="agent-lead">Same facts as <code>toris brief</code>. Read-only — Studio does not send, enqueue, or start the worker.</p>
+        <section class="brief-card" aria-label="Today's spend">
+          <div class="brief-card-top">
+            <span class="badge" id="spend-badge">spend</span>
+            <button class="button quiet" id="refresh-brief" type="button">Refresh</button>
+          </div>
+          <dl id="spend-meta" class="design-meta">
+            <div><dt>Today</dt><dd id="spend-today">—</dd></div>
+            <div><dt>Remaining</dt><dd id="spend-remaining">—</dd></div>
+            <div><dt>Runs</dt><dd id="spend-runs">—</dd></div>
+          </dl>
+        </section>
+      </aside>
+
+      <main id="brief-workspace" class="content-workspace" tabindex="-1">
+        <section class="workspace-empty" id="runs-empty">
+          <span class="empty-orbit" aria-hidden="true"></span>
+          <p class="kicker">Today</p>
+          <h2>No runs yet.</h2>
+          <p>Today's coding runs will list here with status and verify. Same store as <code>toris runs</code>.</p>
+        </section>
+        <section class="workspace-detail" id="runs-list" hidden>
+          <div class="workspace-header">
+            <div>
+              <p class="kicker">Runs</p>
+              <h2>Today</h2>
+            </div>
+          </div>
+          <div id="run-rows" class="brief-rows" role="list"></div>
+        </section>
+      </main>
+
+      <aside class="inspector" aria-label="Daemon status and knowledge headlines">
+        <section class="inspector-section" id="daemon-section">
+          <div class="section-title"><span>01</span><h2>Daemon</h2></div>
+          <div class="brief-card-top">
+            <span class="badge" id="daemon-badge">stopped</span>
+          </div>
+          <dl class="design-meta">
+            <div><dt>PID</dt><dd id="daemon-pid">—</dd></div>
+            <div id="daemon-next-row" hidden><dt>Next due</dt><dd id="daemon-next">—</dd></div>
+            <div id="daemon-schedules-row" hidden><dt>Schedules</dt><dd id="daemon-schedules">—</dd></div>
+          </dl>
+          <p id="daemon-hint" class="brief-hint">Start with <code>toris daemon start</code>. This page does not start it.</p>
+        </section>
+        <section class="inspector-section" id="knowledge-section" hidden>
+          <div class="section-title"><span>02</span><h2>Knowledge</h2></div>
+          <p>Tacit and node headlines from the same index as <code>toris brief</code>.</p>
+          <div id="knowledge-hits" class="brief-hits"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+  <div id="toast" class="sr-toast" aria-live="polite"></div>
+  <script type="module" src="/assets/brief.js"></script>
+</body>
+</html>

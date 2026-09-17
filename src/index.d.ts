@@ -106,6 +106,7 @@ export function studioDesignUrl(port?: number): string;
 export function studioPatchesUrl(port?: number): string;
 export function studioKnowledgeUrl(port?: number): string;
 export function studioDaemonUrl(port?: number): string;
+export function studioBriefUrl(port?: number): string;
 export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
 export function tuiAgentHint(agentId?: string): string;
 export function isLoopbackHttpUrl(value: unknown): boolean;

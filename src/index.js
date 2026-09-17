@@ -20,6 +20,7 @@ export {
   studioPatchesUrl,
   studioKnowledgeUrl,
   studioDaemonUrl,
+  studioBriefUrl,
   renderStudioAccess,
   tuiAgentHint,
   isLoopbackHttpUrl,

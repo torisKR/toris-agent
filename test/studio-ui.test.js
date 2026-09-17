@@ -10,7 +10,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('product shell contains queue, editor, media review, quality, guarded publish, and agent regions', async () => {
   const html = await readFile(join(root, 'src/studio/ui/index.html'), 'utf8');
-  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
+  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'nav-brief', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /id="agent-send"[^>]*disabled/);
@@ -68,6 +68,8 @@ test('root app and fixed product assets are served with CSP', async () => {
     assert.match(await (await fetch(`${base}/patches`)).text(), /id="patches-shell"/);
     assert.equal((await fetch(`${base}/daemon`)).status, 200);
     assert.match(await (await fetch(`${base}/daemon`)).text(), /id="daemon-title"/);
+    assert.equal((await fetch(`${base}/brief`)).status, 200);
+    assert.match(await (await fetch(`${base}/brief`)).text(), /id="brief-title"/);
     assert.equal((await fetch(`${base}/assets/app.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/design-picker.js`)).status, 200);
     assert.equal((await fetch(`${base}/design/sample`)).status, 200);
