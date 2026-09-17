@@ -75,15 +75,7 @@ export class DaemonQueue {
   }
 
   recent(limit = 10) {
-    return this.jobs.slice(-limit).map((job) => ({
-      id: job.id,
-      type: job.type,
-      status: job.status,
-      goal: job.goal ?? null,
-      runId: job.result?.runId ?? null,
-      scheduleId: job.scheduleId ?? null,
-      updatedAt: job.updatedAt,
-    }));
+    return this.jobs.slice(-limit).map(publicDaemonJob);
   }
 
   async enqueueInbox(input) {
@@ -198,6 +190,35 @@ export class DaemonQueue {
     this.write = result.catch(() => undefined);
     return result;
   }
+}
+
+export function publicDaemonJob(job) {
+  if (!job) return null;
+  return {
+    id: job.id,
+    type: job.type,
+    status: job.status,
+    goal: job.goal ?? null,
+    runId: job.result?.runId ?? null,
+    scheduleId: job.scheduleId ?? null,
+    dryRun: Boolean(job.dryRun),
+    error: typeof job.error === 'string' ? job.error : job.error?.message ?? null,
+    createdAt: job.createdAt ?? null,
+    updatedAt: job.updatedAt ?? null,
+  };
+}
+
+/**
+ * Read-only worker history. Does not drain the inbox or rewrite running jobs,
+ * so Studio can list history while the daemon owns `daemon-jobs.json`.
+ */
+export async function listRecentDaemonJobs(home, options = {}) {
+  const store = options.store || new Store(home);
+  await store.init();
+  const jobs = await store.readCollection(COLLECTION);
+  const rawLimit = Number(options.limit);
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+  return jobs.slice(-limit).reverse().map(publicDaemonJob);
 }
 
 export async function submitDaemonJob(home, input, options = {}) {

@@ -104,6 +104,8 @@ export function loadAgentCatalogue(roots?: { home?: string; projectPath?: string
 export function studioAgentUrl(port?: number): string;
 export function studioDesignUrl(port?: number): string;
 export function studioPatchesUrl(port?: number): string;
+export function studioKnowledgeUrl(port?: number): string;
+export function studioDaemonUrl(port?: number): string;
 export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
 export function tuiAgentHint(agentId?: string): string;
 export function isLoopbackHttpUrl(value: unknown): boolean;
@@ -707,7 +709,10 @@ export interface DaemonRecentJob {
   goal: string | null;
   runId: string | null;
   scheduleId: string | null;
-  updatedAt: string;
+  dryRun?: boolean;
+  error?: string | null;
+  createdAt?: string | null;
+  updatedAt: string | null;
 }
 
 export interface DaemonScheduleSummary {
@@ -765,6 +770,7 @@ export function daemonPaths(home: string): {
 export function parseScheduleExpr(input: string): { kind: 'cron' | 'every'; source: string; everyMs?: number };
 export function addSchedule(home: string, input: Record<string, unknown>, options?: Record<string, unknown>): Promise<DaemonSchedule>;
 export function listSchedules(home: string): Promise<DaemonSchedule[]>;
+export function listRecentDaemonJobs(home: string, options?: { limit?: number; store?: unknown }): Promise<DaemonRecentJob[]>;
 export function tickSchedules(home: string, queue: unknown, options?: Record<string, unknown>): Promise<Array<{ scheduleId: string; jobId: string }>>;
 
 export function isPidAlive(pid: number, killer?: (pid: number, signal?: number | string) => boolean): boolean;

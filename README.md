@@ -92,6 +92,7 @@ toris studio --open       # http://127.0.0.1:5824
                           # Design Mode /design
                           # Patch Review /patches
                           # knowledge   /knowledge
+                          # daemon      /daemon
 ```
 
 ### Design Mode — UI evidence on the agent turn
@@ -128,6 +129,10 @@ Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the
 The agent should get better at *your* work over time. `toris knowledge init` seeds a local store at `~/.toris/knowledge/`: bounded `USER.md` / `MEMORY.md`, starter domain packs (product growth, Flutter/Expo Android, Toris ops, solo revenue), and a DAG between knowledge nodes. Search is keyword + tag. Each `toris chat` turn (and Studio agent turns) auto-retrieves matching domain nodes and tacit notes into a bounded `[knowledge context]` block — no manual search required. Disable with `toris chat --no-knowledge` or `knowledge.autoRetrieve: false` in `config.json`. Writes are gated like other mutating chat tools (ask below L3). After a real win, `/reflect` or `toris knowledge reflect` proposes a tacit note — it does not write silently. Auto-retrieve never writes.
 
 Details: [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md). Studio browse/add is at `http://127.0.0.1:5824/knowledge`.
+
+### Daemon — worker status without the CLI
+
+`http://127.0.0.1:5824/daemon` shows the same local facts as `toris daemon status`: running or not, pid, uptime, heartbeat, next due schedule, the schedule list, and recent jobs from `daemon-jobs.json`. Enable, disable, remove, and add a schedule through the existing store (Origin + session token). Studio does not start or stop the worker. See [docs/DAEMON.md](docs/DAEMON.md).
 
 ### Review room for local drafts
 
@@ -435,7 +440,7 @@ toris daemon stop
 
 `start` writes `~/.toris/daemon.lock` + `daemon.json` and refuses a second start while that pid is alive. `run` drops a job in `~/.toris/daemon/inbox/` for the worker to execute with the same orchestrator as `toris run`. If the daemon is down, `daemon run` exits `5`.
 
-Schedules are **local cron only** (5-field cron, `@hourly`/`@daily`/`@weekly`/`@monthly`, `@every 15m`, or `09:00 mon-fri`). The worker evaluates due items on its heartbeat in the machine timezone and enqueues the same inbox jobs as `daemon run`. The same schedule does not double-fire while a prior job is still queued or running. There is no cloud calendar and no remote multi-machine clock. See [docs/DAEMON.md](docs/DAEMON.md).
+Schedules are **local cron only** (5-field cron, `@hourly`/`@daily`/`@weekly`/`@monthly`, `@every 15m`, or `09:00 mon-fri`). The worker evaluates due items on its heartbeat in the machine timezone and enqueues the same inbox jobs as `daemon run`. The same schedule does not double-fire while a prior job is still queued or running. There is no cloud calendar and no remote multi-machine clock. Studio `/daemon` is a loopback view of the same store. See [docs/DAEMON.md](docs/DAEMON.md).
 
 `toris run` itself still executes in the foreground. Unix-socket RPC (`daemon.sock`) and remote supervisors are not in this release.
 
@@ -459,7 +464,7 @@ autonomy                  Autonomy levels and what each permits
 daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
 daemon run "<goal>"       Queue a run while the daemon is up (exit 5 if down)
 daemon schedule           Local cron: list | add | remove | enable | disable
-studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge)
+studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge, /daemon)
 studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
 android status|devices|screenshot|logcat|install
 knowledge                 Local secretary store: init, domains, node, tacit, search, reflect
@@ -584,7 +589,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md]
 ## Docs
 
 - [docs/DAEMON.md](docs/DAEMON.md) — local daemon start/stop/run and schedule expressions
-- [docs/STUDIO.md](docs/STUDIO.md) — Studio bind, agent room, Design Mode, review, security boundary
+- [docs/STUDIO.md](docs/STUDIO.md) — Studio bind, agent room, Design Mode, review, daemon page, security boundary
 - [docs/AGENTS.md](docs/AGENTS.md) — built-in profiles and `.toris/agents/*.json` overlays
 - [docs/CONTRACT.md](docs/CONTRACT.md) — public CLI / programmatic contract
 - [docs/specs/](docs/specs/) — per-module specifications

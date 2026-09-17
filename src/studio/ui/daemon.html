@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local daemon worker status, schedules, and recent jobs in Toris Studio.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <title>Toris Studio · Daemon</title>
+  <link rel="stylesheet" href="/assets/tokens.css">
+  <link rel="stylesheet" href="/assets/components.css">
+  <link rel="stylesheet" href="/assets/studio.css">
+  <link rel="stylesheet" href="/assets/daemon.css">
+</head>
+<body>
+  <div class="studio-frame">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">T</span><span>Toris Studio</span></a>
+      <nav class="surface-nav" aria-label="Workspace">
+        <a class="tab" href="/">Review</a>
+        <a class="tab" href="/agent">Agent</a>
+        <a class="tab" href="/design">Design</a>
+        <a class="tab" href="/patches">Patches</a>
+        <a class="tab" href="/knowledge">Knowledge</a>
+        <a class="tab" href="/daemon" aria-current="page">Daemon</a>
+      </nav>
+      <div class="local-state"><span class="pulse" aria-hidden="true"></span><span>127.0.0.1 · local files</span></div>
+      <a class="system-link" href="/design-system">Design system</a>
+    </header>
+
+    <div class="studio-shell is-daemon">
+      <aside class="queue-panel" aria-labelledby="daemon-title">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">Local worker</p>
+            <h1 id="daemon-title">Daemon</h1>
+          </div>
+          <span class="queue-count" id="schedule-count">0</span>
+        </div>
+        <p class="agent-lead">Same facts as <code>toris daemon status</code>. Studio does not start or stop the worker.</p>
+        <section class="daemon-status" aria-label="Worker status">
+          <div class="daemon-status-top">
+            <span class="badge" id="worker-badge">stopped</span>
+            <button class="button quiet" id="refresh-status" type="button">Refresh</button>
+          </div>
+          <dl id="worker-meta" class="design-meta">
+            <div><dt>PID</dt><dd id="worker-pid">—</dd></div>
+            <div><dt>Uptime</dt><dd id="worker-uptime">—</dd></div>
+            <div><dt>Heartbeat</dt><dd id="worker-heartbeat">—</dd></div>
+            <div><dt>Next due</dt><dd id="worker-next">—</dd></div>
+            <div><dt>Jobs</dt><dd id="worker-jobs">—</dd></div>
+          </dl>
+          <p id="worker-hint" class="daemon-hint">Start with <code>toris daemon start</code> (loopback files only).</p>
+        </section>
+      </aside>
+
+      <main id="daemon-workspace" class="content-workspace" tabindex="-1">
+        <section class="workspace-empty" id="schedule-empty">
+          <span class="empty-orbit" aria-hidden="true"></span>
+          <p class="kicker">Local cron</p>
+          <h2>No schedules yet.</h2>
+          <p>Add an expression and a goal. The running daemon ticks these on its heartbeat — same store as <code>toris daemon schedule</code>.</p>
+        </section>
+        <section class="workspace-detail" id="schedule-list" hidden>
+          <div class="workspace-header">
+            <div>
+              <p class="kicker">Schedules</p>
+              <h2>Local cron</h2>
+            </div>
+          </div>
+          <div id="schedule-rows" class="daemon-rows" role="list"></div>
+        </section>
+      </main>
+
+      <aside class="inspector" aria-label="Add schedule and recent jobs">
+        <section class="inspector-section">
+          <div class="section-title"><span>01</span><h2>Add schedule</h2></div>
+          <form id="add-schedule-form" class="stack">
+            <label class="field" for="new-expr">Expression<input id="new-expr" name="expr" maxlength="80" required placeholder="@daily or 09:00 mon-fri"></label>
+            <label class="field" for="new-goal">Goal<textarea id="new-goal" name="goal" maxlength="400" required placeholder="lint the repo"></textarea></label>
+            <label class="check" for="new-dry-run"><input id="new-dry-run" name="dryRun" type="checkbox"> dry-run</label>
+            <button class="button" type="submit">Save schedule</button>
+          </form>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>02</span><h2>Recent jobs</h2></div>
+          <p>Worker history from <code>daemon-jobs.json</code>. Run ids link when a job produced one.</p>
+          <div id="job-list" class="daemon-hits"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+  <div id="toast" class="sr-toast" aria-live="polite"></div>
+  <script type="module" src="/assets/daemon.js"></script>
+</body>
+</html>

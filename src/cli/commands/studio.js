@@ -31,6 +31,7 @@ function printReady(output, label = 'READY') {
   output(c.dim('      design     http://127.0.0.1:5824/design'));
   output(c.dim('      patches    http://127.0.0.1:5824/patches'));
   output(c.dim('      knowledge  http://127.0.0.1:5824/knowledge'));
+  output(c.dim('      daemon     http://127.0.0.1:5824/daemon'));
   output(c.dim('      agent TUI  toris   ·  /agent  ·  /studio'));
 }
 

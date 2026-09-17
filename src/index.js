@@ -18,6 +18,8 @@ export {
   studioAgentUrl,
   studioDesignUrl,
   studioPatchesUrl,
+  studioKnowledgeUrl,
+  studioDaemonUrl,
   renderStudioAccess,
   tuiAgentHint,
   isLoopbackHttpUrl,
@@ -73,6 +75,7 @@ export {
   submitDaemonJob,
   addSchedule,
   listSchedules,
+  listRecentDaemonJobs,
   parseScheduleExpr,
   tickSchedules,
 } from './daemon/index.js';
