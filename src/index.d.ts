@@ -208,6 +208,64 @@ export function budgetHeadroom(input: {
   maxDailyCostUsd?: number;
 }): { runRemaining: number; dailyRemaining: number; remaining: number };
 
+export type BriefPeriod = 'today';
+export type BriefVerify = 'pass' | 'fail' | null;
+
+export interface BriefDigest {
+  period: BriefPeriod;
+  day: string;
+  timezone: 'local';
+  generatedAt: string;
+  spend: {
+    day: string;
+    spentUsd: number;
+    capUsd: number | null;
+    remainingUsd: number | null;
+    runCount: number;
+  };
+  runs: ReadonlyArray<{
+    id: string;
+    goal: string;
+    status: string;
+    verify: BriefVerify;
+    at: string | null;
+  }>;
+  daemon: {
+    running: boolean;
+    pid: number | null;
+    nextDueAt: string | null;
+    nextId: string | null;
+    scheduleCount: number;
+    schedulesEnabled: number;
+  };
+  knowledge: {
+    available: boolean;
+    headlines: ReadonlyArray<{
+      kind: string;
+      id: string;
+      domain: string | null;
+      title: string;
+      score: number | null;
+    }>;
+  };
+}
+
+/** Read-only local digest. Reuses cost, runs, daemon status, and knowledge index. */
+export function buildBrief(options: {
+  home?: string;
+  store?: Store;
+  config?: Pick<TorisConfig, 'maxDailyCostUsd'>;
+  cwd?: string;
+  period?: string;
+  now?: number | Date | (() => number);
+  limitRuns?: number;
+  limitKnowledge?: number;
+}): Promise<BriefDigest>;
+
+export function looksLikeBriefGoal(goal: unknown): boolean;
+export function resolveBriefPeriod(period?: string | null): BriefPeriod;
+export function verifyOutcome(run: { verification?: { passed?: boolean | null } } | null | undefined): BriefVerify;
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------

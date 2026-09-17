@@ -23,6 +23,7 @@ COMMANDS
   inspect <runId>           Show a run in detail
   receipt <runId> [--md]    Evidence receipt for a run
   cost [today]              Cross-run spend vs maxDailyCostUsd
+  brief [today]             Local secretary digest (spend, runs, daemon, knowledge)
   logs <runId>              Event log for a run
   cancel <runId>            Mark a run cancelled
   approvals                 List approval requests
@@ -87,6 +88,8 @@ EXAMPLES
   toris connect --provider grok --model <grok-model-id>
   toris cost                   # today vs maxDailyCostUsd, recent days
   toris cost today --json
+  toris brief                  # one-screen digest; safe for cron
+  toris brief today --json
   toris daemon start
   toris daemon run "add a health endpoint" --dry-run
   toris daemon schedule add "@daily" "add a health endpoint" --dry-run

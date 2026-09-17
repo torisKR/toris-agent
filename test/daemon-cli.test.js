@@ -223,6 +223,8 @@ test('start, queue a dry-run, stop — real child process', async () => {
       const stopped = await captureJson(() => cmdDaemon(ctx(home), ['stop'], {}));
       assert.equal(stopped.code, EXIT.OK);
       assert.equal(stopped.body.running, false);
+      // The worker drops daemon.lock before the Node process actually exits.
+      await waitUntil(() => !isPidAlive(pid), { timeoutMs: 2000, intervalMs: 50 });
       assert.equal(isPidAlive(pid), false);
       pid = null;
 

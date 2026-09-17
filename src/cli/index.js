@@ -12,6 +12,7 @@ import { cmdInit, cmdDoctor, cmdVersion } from './commands/setup.js';
 import { cmdProject } from './commands/project.js';
 import { cmdRun, cmdRuns, cmdInspect, cmdReceipt, cmdLogs, cmdCancel } from './commands/run.js';
 import { cmdCost } from './commands/cost.js';
+import { cmdBrief } from './commands/brief.js';
 import { cmdAgents, cmdSkills, cmdAutonomy } from './commands/catalog.js';
 import { cmdApprovals, cmdApprove, cmdReject } from './commands/approvals.js';
 import { cmdDaemon } from './commands/daemon.js';
@@ -35,6 +36,7 @@ const COMMANDS = {
   inspect: cmdInspect,
   receipt: cmdReceipt,
   cost: cmdCost,
+  brief: cmdBrief,
   logs: cmdLogs,
   cancel: cmdCancel,
   approvals: cmdApprovals,

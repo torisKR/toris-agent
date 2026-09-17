@@ -67,6 +67,7 @@ export {
   formatUsd,
   budgetHeadroom,
 } from './core/cost.js';
+export { buildBrief, looksLikeBriefGoal, resolveBriefPeriod, verifyOutcome } from './core/brief.js';
 export { main } from './cli/index.js';
 export {
   daemonPaths,

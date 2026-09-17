@@ -96,6 +96,9 @@ jobs:
           toris inspect "$RUN_ID"
           toris logs "$RUN_ID"
           toris runs
+          toris cost
+          toris brief
+          toris brief --json
           toris project list
           toris agents
           toris skills
@@ -151,6 +154,12 @@ jobs:
           toris definitely-not-a-command >/dev/null 2>&1 || rc=$?
           if [ "$rc" -ne 2 ]; then
             echo "::error::unknown command exited $rc, expected 2"
+            exit 1
+          fi
+          rc=0
+          toris daemon schedule add "09:00" "toris brief" >/dev/null 2>&1 || rc=$?
+          if [ "$rc" -ne 2 ]; then
+            echo "::error::scheduling toris brief as a goal exited $rc, expected 2"
             exit 1
           fi
 
