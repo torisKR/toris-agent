@@ -6,6 +6,7 @@ import { EXIT, UsageError } from '../../core/errors.js';
 import { AUTONOMY_LEVELS, autoApprovesTools } from '../../core/autonomy.js';
 import {
   listSurfaceAgents,
+  loadAgentCatalogue,
   renderAgentCatalog,
   resolveSurfaceAgent,
 } from '../../core/agents.js';
@@ -35,7 +36,7 @@ import {
 } from '../../core/skills.js';
 import { renderBanner, renderTurnStatus, resolveWidth, countOf } from '../tui/banner.js';
 import { parseSlashCommand, isQuitWord, renderSlashHelp } from '../tui/slash.js';
-import { completeSlash, createPaletteController } from '../tui/palette.js';
+import { completeSlash, createPaletteController, suggestSlashCommands } from '../tui/palette.js';
 import { stripAnsi, stringWidth } from '../tui/text.js';
 import { createInterruptPolicy } from '../tui/interrupt.js';
 import { SYM } from '../tui/theme.js';
@@ -103,7 +104,11 @@ export async function cmdChat(ctx, args, flags) {
   if (flags.agent === true) {
     throw new UsageError('--agent needs an agent id. Try `toris agents` or `/agent`.');
   }
-  let activeAgent = resolveSurfaceAgent(typeof flags.agent === 'string' ? flags.agent : undefined);
+  const catalogue = await loadAgentCatalogue({ home: ctx.home, projectPath: ctx.cwd });
+  let activeAgent = resolveSurfaceAgent(
+    typeof flags.agent === 'string' ? flags.agent : undefined,
+    catalogue,
+  );
 
   const resolved = pickChatModel(config, typeof flags.profile === 'string' ? flags.profile : undefined);
   assertChatUsable(resolved, config);
@@ -211,7 +216,8 @@ export async function cmdChat(ctx, args, flags) {
     return EXIT.OK;
   }
 
-  const rl = createInterface({ input: stdin, output: stdout, completer: completeSlash });
+  const completer = (line) => completeSlash(line, catalogue);
+  const rl = createInterface({ input: stdin, output: stdout, completer });
   const log = (line) => stdout.write(`${line}\n`);
 
   const UNWRAPPED_WIDTH = 1_000_000;
@@ -417,7 +423,7 @@ export async function cmdChat(ctx, args, flags) {
   const switchAgent = (id) => {
     let next;
     try {
-      next = resolveSurfaceAgent(id);
+      next = resolveSurfaceAgent(id, catalogue);
     } catch (err) {
       log(c.yellow(`  ${err.message}`));
       return;
@@ -451,7 +457,7 @@ export async function cmdChat(ctx, args, flags) {
         switchAgent(rest[0]);
         return;
       }
-      log(renderAgentCatalog(listSurfaceAgents(), activeAgent.id));
+      log(renderAgentCatalog(listSurfaceAgents(undefined, catalogue), activeAgent.id));
       log(c.dim(`  GUI  ${guiFor(activeAgent.id)}`));
     },
     studio: async () => {
@@ -589,7 +595,10 @@ export async function cmdChat(ctx, args, flags) {
   // As `/…` is typed, matching commands paint just below the prompt. Each
   // keystroke lands here *after* readline applied it (readline registered its
   // keypress listener first), so `rl.line`/`rl.cursor` are already current.
-  const palette = createPaletteController({ output: stdout });
+  const palette = createPaletteController({
+    output: stdout,
+    suggest: (line) => suggestSlashCommands(line, catalogue),
+  });
   const promptColumns = stringWidth(stripAnsi(renderPrompt()));
   const clearPalette = () =>
     palette.update({ line: '', cursor: 0, promptLength: promptColumns, width: terminalWidth() });

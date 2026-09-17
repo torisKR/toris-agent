@@ -33,6 +33,7 @@ export async function cmdRun(ctx, positionals, flags) {
   const orchestrator = new Orchestrator({
     store: ctx.store,
     config: ctx.config,
+    cwd: ctx.cwd,
     onEvent: ctx.verbose && !ctx.json ? (e) => line(c.dim(`  [${e.type}] ${e.title ?? e.taskId ?? ''}`)) : undefined,
   });
 

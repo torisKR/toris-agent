@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Orchestrator, buildTaskPrompt } from '../src/core/orchestrator.js';
+import { composeAgentCatalogue, parseAgentProfile } from '../src/core/agents.js';
 import { DEFAULT_CONFIG } from '../src/core/config.js';
 import { RECOMMENDED_AUTONOMY } from '../src/core/autonomy.js';
 import { BudgetExceededError } from '../src/core/errors.js';
@@ -48,6 +49,7 @@ const build = (over = {}) => {
     detect: over.detect ?? (async () => true),
     verifyFn: over.verifyFn ?? (async () => ({ passed: true, checks: [] })),
     detectChecksFn: over.detectChecksFn ?? (async () => []),
+    ...(over.loadCatalogue ? { loadCatalogue: over.loadCatalogue } : {}),
   });
   return { orch, store };
 };
@@ -65,6 +67,27 @@ test('a dry run plans and stops before any execution', async () => {
   assert.equal(run.tasks.length, 2);
   assert.equal(invocations, 1, 'only the planning call may happen during a dry run');
   assert.ok(store.events.some((e) => e.type === 'run.planned'));
+});
+
+test('the planner can assign a project-local profile from the same catalogue', async () => {
+  const catalogue = composeAgentCatalogue([
+    parseAgentProfile({
+      id: 'aso-specialist',
+      title: 'ASO Specialist',
+      category: 'plan',
+      writes: false,
+      summary: 'Turns a change into store listing copy.',
+    }),
+  ]);
+  const { orch } = build({
+    loadCatalogue: async () => catalogue,
+    invoke: async () => ({
+      text: JSON.stringify([{ title: 'Draft listing', agent: 'aso-specialist' }]),
+      costUsd: 0,
+    }),
+  });
+  const run = await orch.run({ goal: 'ship listing', dryRun: true });
+  assert.equal(run.tasks[0].agent, 'aso-specialist');
 });
 
 test('L1 plans then blocks on the write gate instead of editing files', async () => {

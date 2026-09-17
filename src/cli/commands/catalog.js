@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { listSurfaceAgents, SURFACE_CATEGORIES } from '../../core/agents.js';
+import { listSurfaceAgents, loadAgentCatalogue, SURFACE_CATEGORIES } from '../../core/agents.js';
 import { AUTONOMY_LEVELS } from '../../core/autonomy.js';
 import { discoverSkills, skillSearchPaths, BUILTIN_SKILL_DIR } from '../../core/skills.js';
 import { UsageError, EXIT } from '../../core/errors.js';
@@ -10,16 +10,18 @@ export async function cmdAgents(ctx, _positionals, flags) {
   if (category && !SURFACE_CATEGORIES.includes(category)) {
     throw new UsageError(`Unknown category "${category}". One of: ${SURFACE_CATEGORIES.join(', ')}`);
   }
-  const agents = listSurfaceAgents(category);
+  const catalogue = await loadAgentCatalogue({ home: ctx.home, projectPath: ctx.cwd });
+  const agents = listSurfaceAgents(category, catalogue);
+  const listed = agents.map((a) => ({ ...a, source: a.source ?? 'builtin' }));
   if (ctx.json) {
-    printJson({ agents });
+    printJson({ agents: listed });
     return EXIT.OK;
   }
-  line(c.bold(`Agent profiles (${agents.length})`));
+  line(c.bold(`Agent profiles (${listed.length})`));
   line();
   table(
-    ['ID', 'CATEGORY', 'WRITES', 'SUMMARY'],
-    agents.map((a) => [a.id, a.category, a.writes ? 'yes' : 'no', a.summary]),
+    ['ID', 'CATEGORY', 'WRITES', 'SOURCE', 'SUMMARY'],
+    listed.map((a) => [a.id, a.category, a.writes ? 'yes' : 'no', a.source, a.summary]),
   );
   return EXIT.OK;
 }

@@ -1,6 +1,7 @@
 import { loadConfig } from '../core/config.js';
 import {
   listSurfaceAgents,
+  loadAgentCatalogue,
   resolveSurfaceAgent,
   SURFACE_AGENT,
 } from '../core/agents.js';
@@ -40,9 +41,19 @@ function sanitizeHistory(history) {
   });
 }
 
-export async function inspectAgentRuntime({ home, loadConfigFn = loadConfig } = {}) {
+export async function inspectAgentRuntime({ home, cwd, loadConfigFn = loadConfig } = {}) {
   const tui = 'toris';
   const gui = studioAgentUrl();
+  let catalogue;
+  let agentsError = null;
+  try {
+    catalogue = await loadAgentCatalogue({ home, projectPath: cwd });
+  } catch (error) {
+    agentsError = error.message;
+    catalogue = undefined;
+  }
+  const agents = listSurfaceAgents(undefined, catalogue);
+  const agent = catalogue?.surface ?? SURFACE_AGENT;
   try {
     const { config, exists } = await loadConfigFn(home);
     if (!exists || listProfiles(config).length === 0) {
@@ -51,8 +62,10 @@ export async function inspectAgentRuntime({ home, loadConfigFn = loadConfig } = 
         reason: '모델 프로필이 없습니다. 터미널에서 `toris connect`를 실행하세요.',
         tui: 'toris connect',
         gui,
-        agent: SURFACE_AGENT,
-        agents: listSurfaceAgents(),
+        agent,
+        agents,
+        catalogue,
+        agentsError,
         config,
       };
     }
@@ -61,8 +74,10 @@ export async function inspectAgentRuntime({ home, loadConfigFn = loadConfig } = 
       reason: null,
       tui,
       gui,
-      agent: SURFACE_AGENT,
-      agents: listSurfaceAgents(),
+      agent,
+      agents,
+      catalogue,
+      agentsError,
       config,
     };
   } catch (error) {
@@ -71,19 +86,21 @@ export async function inspectAgentRuntime({ home, loadConfigFn = loadConfig } = 
       reason: error.message,
       tui: 'toris doctor',
       gui,
-      agent: SURFACE_AGENT,
-      agents: listSurfaceAgents(),
+      agent,
+      agents,
+      catalogue,
+      agentsError,
       config: null,
     };
   }
 }
 
 export function publicAgentStatus(status, agentId) {
-  let agent = SURFACE_AGENT;
+  let agent = status.agent || SURFACE_AGENT;
   try {
-    agent = resolveSurfaceAgent(agentId);
+    agent = resolveSurfaceAgent(agentId, status.catalogue);
   } catch {
-    agent = SURFACE_AGENT;
+    agent = status.agent || SURFACE_AGENT;
   }
   return {
     ready: status.ready,
@@ -92,6 +109,7 @@ export function publicAgentStatus(status, agentId) {
     gui: status.gui,
     agent,
     agents: status.agents,
+    ...(status.agentsError ? { agentsError: status.agentsError } : {}),
   };
 }
 
@@ -151,9 +169,17 @@ export async function runAgentTurn(options) {
   if (!message && !hasDesign && !hasPatchReview) throw new HttpError(400, 'message is required');
   if (message.length > MAX_MESSAGE_CHARS) throw new HttpError(400, 'message is too long');
 
+  let catalogue = options.catalogue;
+  if (!catalogue) {
+    try {
+      catalogue = await loadAgentCatalogue({ home: options.home, projectPath: options.cwd });
+    } catch (error) {
+      throw new HttpError(400, error.message);
+    }
+  }
   let agent;
   try {
-    agent = resolveSurfaceAgent(options.agent);
+    agent = resolveSurfaceAgent(options.agent, catalogue);
   } catch (error) {
     throw new HttpError(400, error.message);
   }

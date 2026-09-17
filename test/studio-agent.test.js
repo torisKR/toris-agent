@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
@@ -37,6 +37,52 @@ function mutation(base, body) {
     body: JSON.stringify(body),
   };
 }
+
+test('GET /api/agents includes a project-local profile from .toris/agents', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'toris-studio-agents-cwd-'));
+  await mkdir(join(cwd, '.toris', 'agents'), { recursive: true });
+  await writeFile(
+    join(cwd, '.toris', 'agents', 'aso-specialist.json'),
+    JSON.stringify({
+      id: 'aso-specialist',
+      title: 'ASO Specialist',
+      category: 'plan',
+      writes: false,
+      summary: 'Turns a change into store listing copy.',
+    }),
+    'utf8',
+  );
+  try {
+    await withServer(
+      async ({ base }) => {
+        const response = await fetch(`${base}/api/agents`);
+        const body = await response.json();
+        assert.equal(response.status, 200);
+        assert.ok(body.agents.some((agent) => agent.id === 'aso-specialist'));
+        assert.ok(body.agents.some((agent) => agent.id === 'implementer'));
+        const status = await fetch(`${base}/api/agent/status?agent=aso-specialist`);
+        assert.equal((await status.json()).agent.id, 'aso-specialist');
+        const turn = await fetch(
+          `${base}/api/agent/turn`,
+          mutation(base, { agent: 'aso-specialist', message: 'draft listing' }),
+        );
+        assert.equal(turn.status, 200);
+        assert.equal((await turn.json()).agent.id, 'aso-specialist');
+      },
+      {
+        cwd,
+        runAgentTurn: async ({ agent }) => ({
+          ok: true,
+          agent: { id: agent, title: 'ASO Specialist' },
+          text: 'ok',
+          events: [],
+        }),
+      },
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
 
 test('GET /api/agents lists the same catalogue the TUI picker uses', async () => {
   await withServer(async ({ base }) => {

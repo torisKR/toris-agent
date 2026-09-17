@@ -26,7 +26,7 @@ COMMANDS
   cancel <runId>            Mark a run cancelled
   approvals                 List approval requests
   approve <id> | reject <id>
-  agents [--category <c>]   Agent profiles for TUI /agent and Studio /agent
+  agents [--category <c>]   Agent profiles (builtins + .toris/agents/*.json)
   skills                    Skill packages the model follows in chat
   autonomy                  Autonomy levels and what each permits
   daemon status             Background daemon (not in 0.1.0)

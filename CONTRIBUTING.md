@@ -142,10 +142,14 @@ field, a new exported function) are much easier to land than breaking ones.
 
 ## Adding a new agent profile
 
-Profiles live in `src/core/agents.js`. Each one declares an `id`, a `category`
+Built-in profiles live in `src/core/agents.js`. Each one declares an `id`, a `category`
 (`plan` | `build` | `review` | `verify` | `ship`), whether it `writes`, a one-line `summary`, and
 the prompt scaffolding it contributes. Add the profile, then add a test asserting it appears in the
 catalog with the right `writes` flag — the flag is a safety boundary, not documentation.
+
+A solo builder can add a domain specialist without a fork: one JSON file per role at
+`<repo>/.toris/agents/<id>.json` (or `~/.toris/agents/<id>.json`). That path merges into the
+same catalogue — see [docs/AGENTS.md](docs/AGENTS.md).
 
 ## Adding a new provider
 

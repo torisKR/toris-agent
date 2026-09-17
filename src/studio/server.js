@@ -11,7 +11,7 @@ import { mediaResponse, saveMp4Upload } from './media-store.js';
 import { RenderService } from './render-service.js';
 import { checkRelease, contentHash } from './release-guard.js';
 import { inspectAgentRuntime, publicAgentStatus, runAgentTurn } from './agent-runtime.js';
-import { resolveSurfaceAgent } from '../core/agents.js';
+import { loadAgentCatalogue, resolveSurfaceAgent } from '../core/agents.js';
 import { Store } from '../core/store.js';
 import { applySavedPatch, discardSavedPatch, getPatch, listPatches, readPatchDiff, refreshSavedPatchDiff } from '../core/patches.js';
 import { isRepo } from '../core/git.js';
@@ -181,12 +181,12 @@ export async function createStudioServer(options) {
     sendJson(response, 200, { token, origin: origin() });
   });
   router.add('GET', '/api/agents', async (_request, response) => {
-    const status = await inspectAgentRuntime({ home: options.home });
+    const status = await inspectAgentRuntime({ home: options.home, cwd: options.cwd });
     sendJson(response, 200, publicAgentStatus(status));
   });
   router.add('GET', '/api/agent/status', async (request, response) => {
     const url = new URL(request.url || '/', origin());
-    const status = await inspectAgentRuntime({ home: options.home });
+    const status = await inspectAgentRuntime({ home: options.home, cwd: options.cwd });
     sendJson(response, 200, publicAgentStatus(status, url.searchParams.get('agent')));
   });
   router.add('POST', '/api/agent/turn', async (request, response) => {
@@ -196,8 +196,10 @@ export async function createStudioServer(options) {
     if (!message && !body.design && !body.designId && !body.tray && !body.designIds?.length && !body.designs?.length) {
       throw new HttpError(400, 'message is required');
     }
+    let catalogue;
     try {
-      resolveSurfaceAgent(body.agent);
+      catalogue = await loadAgentCatalogue({ home: options.home, projectPath: options.cwd });
+      resolveSurfaceAgent(body.agent, catalogue);
     } catch (error) {
       throw new HttpError(400, error.message);
     }
@@ -207,6 +209,7 @@ export async function createStudioServer(options) {
     const payload = {
       home: options.home,
       cwd: options.cwd,
+      catalogue,
       agent: body.agent,
       message,
       history: body.history,
@@ -358,7 +361,8 @@ export async function createStudioServer(options) {
     if (!note && !hunk) throw new HttpError(400, 'review note or hunk is required');
     if (note.length > PATCH_REVIEW_NOTE_LIMIT) throw new HttpError(400, 'review note is too long');
     try {
-      resolveSurfaceAgent(body.agent);
+      const catalogue = await loadAgentCatalogue({ home: options.home, projectPath: options.cwd });
+      resolveSurfaceAgent(body.agent, catalogue);
     } catch (error) {
       throw new HttpError(400, error.message);
     }

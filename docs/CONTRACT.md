@@ -427,6 +427,24 @@ Not a breaking change to the frozen signatures above. On-disk layout for the sec
 
 CLI: `toris knowledge` (alias `toris memory`). Chat tools: `knowledge_search`, `memory_get`, `knowledge_write`, `domain_activate`, `knowledge_reflect`. Studio: `GET /knowledge`. See `docs/KNOWLEDGE.md`.
 
+## Additive: project-local agent profiles (post-0.1)
+
+Not a breaking change to the frozen signatures above. The live catalogue is still
+`listAgents` / `listSurfaceAgents` / `getAgent` / `resolveSurfaceAgent`. Those functions take an
+optional `AgentCatalogue` from `loadAgentCatalogue({ home, projectPath })`.
+
+On-disk convention (one file per role, not recursive):
+
+- `torisHome()/agents/<id>.json`
+- `<repo>/.toris/agents/<id>.json`
+
+Precedence: builtin < home < project (same id replaces). Filename stem must equal `id`.
+Required fields: `id`, `title`, `category` (`core|plan|build|review|verify|ship`), `writes` (boolean),
+`summary`. Optional: `system` (specialist prompt). Unknown keys fail with `E_INVALID_AGENT`.
+`toris` may be overridden only as `category: "core"`. New non-`core` ids are planner-assignable.
+
+CLI: `toris agents` lists `source`. See `docs/AGENTS.md`.
+
 ## Additive: cross-run cost ledger (post-0.1)
 
 Not a breaking change to the frozen signatures above. Daily spend is local-only:

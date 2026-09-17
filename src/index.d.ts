@@ -55,22 +55,51 @@ export interface AgentProfile {
   summary: string;
   /** True when the role is allowed to modify files. */
   writes: boolean;
+  /** Optional specialist system prompt from a project/home overlay file. */
+  system?: string;
+  /** Where this profile was loaded from when overlays are merged. */
+  source?: 'builtin' | 'home' | 'project';
+}
+
+/** Live catalogue after merging builtins with optional home/project overlays. */
+export interface AgentCatalogue {
+  readonly surface: AgentProfile;
+  readonly profiles: readonly AgentProfile[];
 }
 
 export const AGENT_PROFILES: readonly AgentProfile[];
 export const SURFACE_AGENT: AgentProfile;
+export const BUILTIN_CATALOGUE: AgentCatalogue;
 
 /** Orchestrator task roles when `category` is omitted, otherwise those in that category. */
-export function listAgents(category?: Exclude<AgentCategory, 'core'>): readonly AgentProfile[];
+export function listAgents(
+  category?: Exclude<AgentCategory, 'core'>,
+  catalogue?: AgentCatalogue,
+): readonly AgentProfile[];
 
 /** TUI/GUI picker: the chat persona first, then every task role. */
-export function listSurfaceAgents(category?: AgentCategory): readonly AgentProfile[];
+export function listSurfaceAgents(category?: AgentCategory, catalogue?: AgentCatalogue): readonly AgentProfile[];
 
 /** The profile with this id, or `null` when unknown. */
-export function getAgent(id: string): AgentProfile | null;
+export function getAgent(id: string, catalogue?: AgentCatalogue): AgentProfile | null;
 
 /** Blank resolves to the default chat persona; unknown ids throw. */
-export function resolveSurfaceAgent(id?: string | null): AgentProfile;
+export function resolveSurfaceAgent(id?: string | null, catalogue?: AgentCatalogue): AgentProfile;
+
+/** Overlay search paths, lowest precedence first: `~/.toris/agents`, `<repo>/.toris/agents`. */
+export function agentSearchPaths(roots?: { home?: string; projectPath?: string }): string[];
+
+/** Strict parse of one on-disk profile object. Throws TorisError on invalid shape. */
+export function parseAgentProfile(
+  raw: unknown,
+  meta?: { file?: string; source?: 'home' | 'project'; stem?: string },
+): AgentProfile;
+
+/** Merge overlays onto the built-in catalogue. Same id replaces the built-in. */
+export function composeAgentCatalogue(overlays?: readonly AgentProfile[]): AgentCatalogue;
+
+/** Load `<repo>/.toris/agents/*.json` and `~/.toris/agents/*.json` into the live catalogue. */
+export function loadAgentCatalogue(roots?: { home?: string; projectPath?: string }): Promise<AgentCatalogue>;
 
 export function studioAgentUrl(port?: number): string;
 export function studioDesignUrl(port?: number): string;

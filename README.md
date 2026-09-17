@@ -380,6 +380,8 @@ Agent profiles (12)
 
 Filter with `toris agents --category build`.
 
+Add a domain specialist without forking Toris: drop one JSON file per role in **`.toris/agents/<id>.json`**. The same id replaces a built-in; a new id appears in `toris agents`, `/agent`, `--agent`, Studio, and planner assignment. Optional overlay: `~/.toris/agents/` (home, then project wins — same order as skills). Bad files fail with a path and a field error, not a stack trace. See [docs/AGENTS.md](docs/AGENTS.md).
+
 ---
 
 ## Receipts
@@ -429,7 +431,7 @@ project list | inspect <id> | remove <id>
 run "<goal>"              Plan and execute a goal
 runs | inspect <runId> | receipt <runId> [--md] | cost [today] | logs <runId> | cancel <runId>
 approvals | approve <id> | reject <id>
-agents [--category <c>]   Profiles for TUI /agent and Studio /agent
+agents [--category <c>]   Profiles (builtins + .toris/agents/*.json)
 skills                    Skill packages the model follows in chat
 autonomy                  Autonomy levels and what each permits
 daemon status             Background daemon (not implemented in this release)
@@ -552,6 +554,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md]
 ## Docs
 
 - [docs/STUDIO.md](docs/STUDIO.md) — Studio bind, agent room, Design Mode, review, security boundary
+- [docs/AGENTS.md](docs/AGENTS.md) — built-in profiles and `.toris/agents/*.json` overlays
 - [docs/CONTRACT.md](docs/CONTRACT.md) — public CLI / programmatic contract
 - [docs/specs/](docs/specs/) — per-module specifications
 - [CHANGELOG.md](CHANGELOG.md)
@@ -565,7 +568,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow and [docs/CONTRACT.md]
 - [x] Git worktree isolation so coding CLIs never write the original checkout
 - [x] Cost tracking and budget enforcement across runs, not just within one
 - [ ] More provider adapters
-- [ ] Custom agent profiles from a project-local file
+- [x] Custom agent profiles from a project-local file
 
 Ideas and complaints both welcome in [issues](https://github.com/torisKR/toris-agent/issues).
 

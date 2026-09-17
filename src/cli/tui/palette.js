@@ -35,7 +35,7 @@ const DEFAULT_MAX_ROWS = 8;
  * @param {unknown} line
  * @returns {SlashCommandSpec[]}
  */
-export function suggestSlashCommands(line) {
+export function suggestSlashCommands(line, catalogue) {
   if (typeof line !== 'string' || !line.startsWith('/')) return [];
   const body = line.slice(1);
 
@@ -44,7 +44,7 @@ export function suggestSlashCommands(line) {
     const head = (parts[0] ?? '').toLowerCase();
     const name = SLASH_ALIASES[head] ?? head;
     if (name === 'agent') {
-      return matchSurfaceAgents(parts[1] ?? '').map((agent) =>
+      return matchSurfaceAgents(parts[1] ?? '', catalogue).map((agent) =>
         Object.freeze({ name: 'agent', args: agent.id, summary: agent.summary }),
       );
     }
@@ -75,11 +75,11 @@ export function suggestSlashCommands(line) {
  * @param {string} line
  * @returns {[string[], string]}
  */
-export function completeSlash(line) {
+export function completeSlash(line, catalogue) {
   if (typeof line !== 'string' || !line.startsWith('/')) {
     return [[], String(line ?? '')];
   }
-  const [top] = suggestSlashCommands(line);
+  const [top] = suggestSlashCommands(line, catalogue);
   if (!top) return [[], line];
   if (/\s/.test(line.slice(1))) {
     if (top.name === 'agent' && top.args) return [[`/agent ${top.args}`], line];

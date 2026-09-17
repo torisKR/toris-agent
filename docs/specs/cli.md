@@ -16,7 +16,7 @@ toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id>
 toris logs <runId> [-f]          # event tail
 toris cancel <runId>
 toris daemon start|stop|status
-toris agents [--category <c>]    # agent profile catalog
+toris agents [--category <c>]    # agent profile catalog (builtins + .toris/agents/*.json)
 toris skills
 toris version
 ```
