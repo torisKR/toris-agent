@@ -56,7 +56,7 @@ function renderStatus() {
   const jobs = status?.jobs || {};
   $('worker-jobs').textContent = `${jobs.queued || 0} queued  ${jobs.running || 0} running  ${jobs.succeeded || 0} done`;
   $('worker-hint').textContent = running
-    ? 'Local-only. Queue work with `toris daemon run` or the schedule form.'
+    ? 'Local-only. Queue a one-shot below, or add a schedule. Studio will not start or stop the worker.'
     : 'Start with `toris daemon start` (loopback files only). Studio will not start it.';
 }
 
@@ -162,12 +162,53 @@ async function mutateSchedule(id, action) {
   }
 }
 
+function showQueueError(message) {
+  const node = $('queue-run-error');
+  if (!message) {
+    node.hidden = true;
+    node.textContent = '';
+    return;
+  }
+  node.hidden = false;
+  node.textContent = message;
+}
+
 $('refresh-status').addEventListener('click', async () => {
   try {
     await refresh();
     announce('Refreshed.');
   } catch (error) {
     announce(error.message);
+  }
+});
+
+$('queue-run-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  showQueueError('');
+  const submit = $('queue-run-submit');
+  submit.disabled = true;
+  try {
+    const autonomy = $('run-autonomy').value.trim();
+    const budgetRaw = $('run-budget').value.trim();
+    const body = {
+      goal: $('run-goal').value,
+      dryRun: $('run-dry-run').checked,
+    };
+    if (autonomy) body.autonomy = autonomy;
+    if (budgetRaw) body.budgetUsd = Number(budgetRaw);
+    const created = await api('/api/daemon/run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    $('queue-run-form').reset();
+    announce(`Queued ${created.job.id}.`);
+    await refresh();
+  } catch (error) {
+    showQueueError(error.message);
+    announce(error.message);
+  } finally {
+    submit.disabled = false;
   }
 });
 

@@ -71,9 +71,23 @@
         </section>
       </main>
 
-      <aside class="inspector" aria-label="Add schedule and recent jobs">
+      <aside class="inspector" aria-label="Queue a run, add a schedule, and recent jobs">
         <section class="inspector-section">
-          <div class="section-title"><span>01</span><h2>Add schedule</h2></div>
+          <div class="section-title"><span>01</span><h2>Queue run</h2></div>
+          <p>Same inbox job as <code>toris daemon run</code>. Studio will not start the worker.</p>
+          <form id="queue-run-form" class="stack">
+            <label class="field" for="run-goal">Goal<textarea id="run-goal" name="goal" maxlength="400" required placeholder="add a health endpoint"></textarea></label>
+            <div class="row">
+              <label class="field" for="run-autonomy">Autonomy<input id="run-autonomy" name="autonomy" maxlength="4" placeholder="L3" autocomplete="off"></label>
+              <label class="field" for="run-budget">Budget USD<input id="run-budget" name="budgetUsd" type="number" min="0" step="0.01" placeholder="optional"></label>
+            </div>
+            <label class="check" for="run-dry-run"><input id="run-dry-run" name="dryRun" type="checkbox"> dry-run</label>
+            <button class="button" id="queue-run-submit" type="submit">Queue run</button>
+            <p id="queue-run-error" class="daemon-error" hidden role="alert"></p>
+          </form>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>02</span><h2>Add schedule</h2></div>
           <form id="add-schedule-form" class="stack">
             <label class="field" for="new-expr">Expression<input id="new-expr" name="expr" maxlength="80" required placeholder="@daily or 09:00 mon-fri"></label>
             <label class="field" for="new-goal">Goal<textarea id="new-goal" name="goal" maxlength="400" required placeholder="lint the repo"></textarea></label>
@@ -82,7 +96,7 @@
           </form>
         </section>
         <section class="inspector-section">
-          <div class="section-title"><span>02</span><h2>Recent jobs</h2></div>
+          <div class="section-title"><span>03</span><h2>Recent jobs</h2></div>
           <p>Worker history from <code>daemon-jobs.json</code>. Run ids link when a job produced one.</p>
           <div id="job-list" class="daemon-hits"></div>
         </section>

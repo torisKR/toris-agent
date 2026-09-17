@@ -17,6 +17,7 @@ export {
   DAEMON_JOB_STATUS,
   DAEMON_JOB_TYPES,
   DaemonQueue,
+  enqueueDaemonRun,
   listRecentDaemonJobs,
   publicDaemonJob,
   submitDaemonJob,

@@ -1,10 +1,12 @@
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { BRIEF_SCHEDULE_HINT, looksLikeBriefGoal } from '../core/brief.js';
+import { EXIT, TorisError, UsageError } from '../core/errors.js';
 import { createId } from '../core/ids.js';
 import { Store } from '../core/store.js';
 import { daemonPaths } from './paths.js';
-import { emptyJobCounts } from './state.js';
+import { emptyJobCounts, isDaemonRunning } from './state.js';
 
 export const DAEMON_JOB_TYPES = Object.freeze({ RUN: 'run' });
 export const DAEMON_JOB_STATUS = Object.freeze({
@@ -224,4 +226,35 @@ export async function listRecentDaemonJobs(home, options = {}) {
 export async function submitDaemonJob(home, input, options = {}) {
   const queue = new DaemonQueue(home, options);
   return queue.enqueueInbox(input);
+}
+
+/**
+ * Same checks as `toris daemon run`: refuse a brief-only goal, require a live
+ * worker, then drop one `run` job in `daemon/inbox/`.
+ */
+export async function enqueueDaemonRun(home, input = {}, options = {}) {
+  const goal = String(input.goal ?? '').trim();
+  if (!goal) throw new UsageError('goal is required');
+  if (looksLikeBriefGoal(goal)) throw new UsageError(BRIEF_SCHEDULE_HINT);
+  const running = await (options.isRunning || isDaemonRunning)(home);
+  if (!running) {
+    throw new TorisError(
+      'Daemon is not running. Start it with `toris daemon start`, then retry.',
+      'E_DAEMON_UNAVAILABLE',
+      EXIT.DAEMON_UNAVAILABLE,
+    );
+  }
+  const submit = options.submit || submitDaemonJob;
+  return submit(home, {
+    type: DAEMON_JOB_TYPES.RUN,
+    goal,
+    cwd: input.cwd ?? null,
+    project: input.project ?? null,
+    autonomy: input.autonomy ?? null,
+    dryRun: Boolean(input.dryRun),
+    budgetUsd: input.budgetUsd ?? null,
+    provider: input.provider ?? null,
+    apply: Boolean(input.apply),
+    review: input.review !== false,
+  });
 }

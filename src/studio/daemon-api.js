@@ -1,5 +1,7 @@
+import { EXIT, TorisError, UsageError } from '../core/errors.js';
 import {
   addSchedule,
+  enqueueDaemonRun,
   findSchedule,
   listRecentDaemonJobs,
   listSchedules,
@@ -17,6 +19,30 @@ function scheduleHttpError(error) {
   if (error instanceof HttpError) throw error;
   if (error instanceof ScheduleExprError) throw new HttpError(400, error.message);
   throw error;
+}
+
+/** CLI exit 5 (daemon unavailable) maps to HTTP 503; usage/brief refusal to 400. */
+function runHttpError(error) {
+  if (error instanceof HttpError) throw error;
+  if (error instanceof UsageError) throw new HttpError(400, error.message);
+  if (error instanceof TorisError && error.exitCode === EXIT.DAEMON_UNAVAILABLE) {
+    throw new HttpError(503, error.message);
+  }
+  throw error;
+}
+
+function optionalString(value, name) {
+  if (value == null) return null;
+  if (typeof value !== 'string') throw new HttpError(400, `${name} must be a string`);
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function optionalBudget(value) {
+  if (value == null || value === '') return null;
+  const num = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(num) || num < 0) throw new HttpError(400, 'budgetUsd must be a non-negative number');
+  return num;
 }
 
 async function requireSchedule(home, ref) {
@@ -51,12 +77,36 @@ export async function presentDaemonSnapshot(home, options = {}) {
 }
 
 /**
- * Additive Studio routes for /api/daemon. Reuses the same schedule store as
- * `toris daemon schedule`. Does not start or stop the worker.
+ * Additive Studio routes for /api/daemon. Reuses the same inbox and schedule
+ * store as `toris daemon run` / `toris daemon schedule`. Does not start or
+ * stop the worker.
  */
 export function registerDaemonRoutes(router, { sendJson, requireJson, options }) {
   router.add('GET', '/api/daemon', async (_request, response) => {
     sendJson(response, 200, await presentDaemonSnapshot(options.home));
+  });
+
+  router.add('POST', '/api/daemon/run', async (request, response) => {
+    requireJson(request);
+    const body = await readJson(request);
+    const goal = String(body.goal ?? '').trim();
+    if (!goal) throw new HttpError(400, 'goal is required');
+    try {
+      const job = await enqueueDaemonRun(options.home, {
+        goal,
+        cwd: options.cwd ?? null,
+        project: body.project ?? null,
+        autonomy: optionalString(body.autonomy, 'autonomy'),
+        dryRun: Boolean(body.dryRun),
+        budgetUsd: optionalBudget(body.budgetUsd ?? body.budget),
+        provider: optionalString(body.provider, 'provider'),
+        apply: Boolean(body.apply),
+        review: body.review !== false && !body.noReview,
+      });
+      sendJson(response, 202, { ok: true, queued: true, job });
+    } catch (error) {
+      runHttpError(error);
+    }
   });
 
   router.add('GET', '/api/daemon/schedules', async (_request, response) => {
