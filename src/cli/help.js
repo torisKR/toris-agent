@@ -41,6 +41,7 @@ COMMANDS
   knowledge                 Local secretary knowledge (domains, DAG, tacit)
   knowledge init            Create ~/.toris/knowledge and seed starter domains
   knowledge search <query>  Keyword + tag recall across USER/MEMORY/domains
+  knowledge reflect [runId] Propose a tacit note from a verified run (does not write)
   bot                       Listen for Slack and Telegram commands
   patches                   Isolated diffs waiting to be applied
   diff <patchId>            Show one stored patch
@@ -76,6 +77,7 @@ EXAMPLES
   toris android status      # adb/emulator presence (optional)
   toris knowledge init      # USER.md, MEMORY.md, starter domain packs
   toris knowledge search flutter
+  toris knowledge reflect run_abc123 --json
   toris init && toris doctor
   toris project add .
   toris run "add a health endpoint" --dry-run

@@ -52,6 +52,8 @@ import {
   composeKnowledgeTurn,
   formatKnowledgeReceipt,
   knowledgeAutoRetrieveEnabled,
+  looksLikeRunId,
+  proposeFromRun,
   proposeReflections,
   publicKnowledgeReceipt,
   renderReflection,
@@ -551,12 +553,18 @@ export async function cmdChat(ctx, args, flags) {
       );
     },
     reflect: async (rest) => {
-      const history = session.history.filter((item) => item.role === 'user' || item.role === 'assistant');
-      const result = proposeReflections({
-        history,
-        domain: rest.find((arg) => arg !== 'accept' && arg !== 'write') || undefined,
-      });
       const accept = rest.includes('accept') || rest.includes('write');
+      const extra = rest.filter((arg) => arg !== 'accept' && arg !== 'write');
+      const runId = extra.find((arg) => looksLikeRunId(arg));
+      const domain = extra.find((arg) => !looksLikeRunId(arg));
+      const domains = await knowledgeStore.listDomains();
+      const history = session.history.filter((item) => item.role === 'user' || item.role === 'assistant');
+      let result = runId
+        ? await proposeFromRun(ctx.store, { runId, domain, domains })
+        : proposeReflections({ history, domain, domains });
+      if (!runId && !result.notable) {
+        result = await proposeFromRun(ctx.store, { domain, domains });
+      }
       if (!accept) {
         log(renderReflection(result));
         return;

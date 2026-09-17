@@ -434,6 +434,8 @@ CLI: `toris knowledge` (alias `toris memory`). Chat tools: `knowledge_search`, `
 
 Additive chat behaviour (does not change frozen signatures): `toris chat` and Studio agent turns auto-retrieve matching domain nodes and tacit notes into a bounded `[knowledge context]` block. Disable with `knowledge.autoRetrieve: false` in `config.json` or `toris chat --no-knowledge`. Retrieval is read-only; tacit writes stay opt-in (`/reflect`, `knowledge_write`).
 
+Additive reflect: `toris knowledge reflect [runId|--from-run <id>]` proposes a tacit draft from a verified run receipt (or the latest verified run). Receipt JSON may include `reflectHint`. Schema version stays `1`. No silent USER.md / MEMORY.md / tacit writes.
+
 ## Additive: project-local agent profiles (post-0.1)
 
 Not a breaking change to the frozen signatures above. The live catalogue is still

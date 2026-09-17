@@ -8,6 +8,8 @@ import { cmdKnowledge } from '../src/cli/commands/knowledge.js';
 import { EXIT } from '../src/core/errors.js';
 import { proposeReflections } from '../src/core/knowledge/index.js';
 import { createDefaultTools } from '../src/core/tools.js';
+import { Store } from '../src/core/store.js';
+import { KnowledgeStore } from '../src/core/knowledge/store.js';
 
 async function captureJson(fn) {
   const chunks = [];
@@ -34,7 +36,22 @@ async function withHome(fn) {
 }
 
 function ctx(home) {
-  return { home, cwd: home, json: true };
+  return { home, cwd: home, json: true, store: new Store(home) };
+}
+
+function verifiedRun(id = 'run_cliok01') {
+  return {
+    id,
+    goal: 'Cite the receipt after a Toris autonomy check',
+    status: 'succeeded',
+    autonomy: 'L3',
+    provider: 'claude',
+    costUsd: 0.01,
+    createdAt: '2026-09-17T00:00:00.000Z',
+    finishedAt: '2026-09-17T00:01:00.000Z',
+    tasks: [{ id: 't1', title: 'Read the receipt path', status: 'succeeded', agent: 'implementer' }],
+    verification: { passed: true, checks: [{ command: 'npm test', passed: true, exitCode: 0 }] },
+  };
 }
 
 test('knowledge init seeds starter domains and is json-scriptable', async () => {
@@ -96,6 +113,57 @@ test('reflect proposes a note and --write captures it', async () => {
     );
     assert.equal(wrote.body.written, true);
     assert.ok(wrote.body.notes.length >= 1);
+  });
+});
+
+test('reflect --from-run and --json propose without writing', async () => {
+  await withHome(async (home) => {
+    await captureJson(() => cmdKnowledge(ctx(home), ['init'], {}));
+    await new Store(home).saveRun(verifiedRun());
+    const knowledge = new KnowledgeStore({ home });
+    const inboxBefore = (await knowledge.listInbox()).length;
+
+    const fromFlag = await captureJson(() =>
+      cmdKnowledge(ctx(home), ['reflect'], { 'from-run': 'run_cliok01' }),
+    );
+    assert.equal(fromFlag.code, EXIT.OK);
+    assert.equal(fromFlag.body.written, false);
+    assert.equal(fromFlag.body.notable, true);
+    assert.equal(fromFlag.body.source.runId, 'run_cliok01');
+    assert.match(fromFlag.body.proposals[0].body, /npm test/);
+    assert.match(fromFlag.body.proposals[0].body, /Read the receipt path/);
+
+    const fromPositional = await captureJson(() =>
+      cmdKnowledge(ctx(home), ['reflect', 'run_cliok01'], {}),
+    );
+    assert.equal(fromPositional.body.written, false);
+    assert.equal(fromPositional.body.source.runId, 'run_cliok01');
+
+    const latest = await captureJson(() => cmdKnowledge(ctx(home), ['reflect'], {}));
+    assert.equal(latest.body.written, false);
+    assert.equal(latest.body.source.runId, 'run_cliok01');
+
+    assert.equal((await knowledge.listInbox()).length, inboxBefore);
+  });
+});
+
+test('reflect on a failed verification does not write a success tacit', async () => {
+  await withHome(async (home) => {
+    await captureJson(() => cmdKnowledge(ctx(home), ['init'], {}));
+    await new Store(home).saveRun({
+      ...verifiedRun('run_clibad01'),
+      status: 'failed',
+      verification: { passed: false, checks: [{ command: 'npm test', passed: false, exitCode: 1 }] },
+    });
+    const knowledge = new KnowledgeStore({ home });
+    const proposed = await captureJson(() =>
+      cmdKnowledge(ctx(home), ['reflect'], { 'from-run': 'run_clibad01', write: true }),
+    );
+    assert.equal(proposed.body.written, false);
+    assert.equal(proposed.body.notable, false);
+    assert.equal(proposed.body.notes, undefined);
+    assert.match(proposed.body.reason, /Verification failed/);
+    assert.equal((await knowledge.listInbox()).length, 0);
   });
 });
 

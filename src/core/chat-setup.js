@@ -24,7 +24,7 @@ export const CHAT_SYSTEM_PROMPT = [
   '- If a tool is denied, do not retry it. Explain the alternative.',
   '- Be concrete and brief. The operator is one person, not a committee.',
   '- Retrieved domain nodes and tacit notes appear in [knowledge context] each turn. Search only if you need more than that block.',
-  '- After successful non-trivial work, propose a tacit note (knowledge_reflect or /reflect). Never write knowledge silently.',
+  '- After a verified successful run, propose a tacit note from the receipt (knowledge_reflect runId or /reflect). Never write knowledge silently.',
   '- knowledge_write is gated: below autonomy L3 it asks first. Prefer inbox/tacit over dumping a transcript into MEMORY.md.',
 ].join('\n');
 

@@ -96,6 +96,8 @@ export function buildReceipt(run, events = []) {
     dailyCostUsd: run.dailyCostUsd ?? null,
     eventCount: events.length,
     artifacts: run.artifacts ?? [],
+    // Quiet opt-in: a receipt line, not a chat ping. Additive; schema stays 1.
+    reflectHint: verification.passed === true ? `toris knowledge reflect ${run.id}` : null,
   };
 }
 
@@ -216,6 +218,7 @@ function detailLines(receipt) {
     `| Cost | $${receipt.costUsd.toFixed(4)} |`,
     ...(receipt.budgetUsd != null ? [`| Run budget | $${Number(receipt.budgetUsd).toFixed(4)} |`] : []),
     ...(receipt.budgetNote ? [`| Budget | ${receipt.budgetNote} |`] : []),
+    ...(receipt.reflectHint ? [`| Reflect | \`${receipt.reflectHint}\` |`] : []),
     '',
   ];
 }

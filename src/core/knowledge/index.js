@@ -17,7 +17,15 @@ export {
   compressBounded,
 } from './store.js';
 export { searchIndex, tokenizeQuery } from './search.js';
-export { proposeReflections, renderReflection } from './reflect.js';
+export {
+  proposeReflections,
+  renderReflection,
+  guessDomain,
+  isVerifiedSuccess,
+  emptyReflection,
+} from './reflect.js';
+export { proposeReflectionsFromReceipt } from './reflect-receipt.js';
+export { looksLikeRunId, getRunFromStore, proposeFromRun } from './reflect-run.js';
 export {
   matchDomains,
   renderKnowledgeBriefing,

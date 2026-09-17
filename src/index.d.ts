@@ -404,7 +404,28 @@ export function proposeReflections(input?: Record<string, unknown>): {
   notable: boolean;
   reason: string;
   proposals: Array<Record<string, unknown>>;
+  source?: Record<string, unknown>;
 };
+export function proposeReflectionsFromReceipt(
+  receipt: Record<string, unknown>,
+  options?: { domain?: string; domains?: Array<Record<string, unknown>> },
+): {
+  notable: boolean;
+  reason: string;
+  proposals: Array<Record<string, unknown>>;
+  source?: Record<string, unknown>;
+};
+export function proposeFromRun(
+  store: { getRun?(id: string): Promise<unknown>; listRuns?(): Promise<unknown[]> } | null,
+  options?: { runId?: string; domain?: string; domains?: Array<Record<string, unknown>> },
+): Promise<{
+  notable: boolean;
+  reason: string;
+  proposals: Array<Record<string, unknown>>;
+  source?: Record<string, unknown>;
+}>;
+export function looksLikeRunId(value?: string): boolean;
+export function isVerifiedSuccess(receiptOrRun?: { verification?: { passed?: boolean | null } }): boolean;
 export function knowledgeDoctorCheck(options?: { home?: string; projectPath?: string }): Promise<DoctorCheck>;
 export function createKnowledgeTools(options?: {
   home?: string;

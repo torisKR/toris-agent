@@ -42,7 +42,7 @@ export function renderKnowledgeBriefing({ user, memory, domains = [], hits = [] 
   const lines = [
     'Local secretary knowledge (plain files under ~/.toris/knowledge).',
     'Search before inventing facts about this operator or their domains.',
-    'After a successful non-trivial turn, propose a tacit note — never write knowledge silently.',
+    'After a verified successful run, propose a tacit note from the receipt — never write knowledge silently.',
     'Use knowledge_search, memory_get, domain_activate, and (when allowed) knowledge_write.',
   ];
   if (user) lines.push('', 'USER.md (excerpt):', clip(user, USER_CHARS));

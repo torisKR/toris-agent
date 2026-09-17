@@ -93,6 +93,9 @@ function printRun(run) {
   if (run.budgetNote) line(c.yellow(`  budget: ${run.budgetNote}`));
   line();
   line(`  ${c.dim('cost')} $${(run.costUsd ?? 0).toFixed(4)}   ${c.dim('receipt')} toris receipt ${run.id}`);
+  if (run.verification?.passed === true) {
+    line(`  ${c.dim('reflect')} toris knowledge reflect ${run.id}`);
+  }
 }
 
 export async function cmdRuns(ctx, _positionals, flags) {
@@ -138,6 +141,7 @@ export async function cmdReceipt(ctx, positionals, flags) {
     ['verified', receipt.verification.passed === null ? 'n/a' : String(receipt.verification.passed)],
     ['cost', `$${receipt.costUsd.toFixed(4)}`],
     ...(receipt.budgetNote ? [['budget', receipt.budgetNote]] : []),
+    ...(receipt.reflectHint ? [['reflect', receipt.reflectHint]] : []),
     ['events', String(receipt.eventCount)],
   ]);
   return EXIT.OK;

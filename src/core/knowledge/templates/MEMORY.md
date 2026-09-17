@@ -23,4 +23,4 @@ Durable facts about the environment and ongoing work. Bounded at 12 KB. Prefer d
 
 - (add one line after something that should compound)
 
-After a successful non-trivial turn, run `toris knowledge reflect` or chat `/reflect` instead of appending a transcript here.
+After a verified run, `toris knowledge reflect <runId>` or chat `/reflect` proposes a tacit note. It does not write until you accept.
