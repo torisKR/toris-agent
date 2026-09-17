@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import { Orchestrator, buildTaskPrompt } from '../src/core/orchestrator.js';
 import { DEFAULT_CONFIG } from '../src/core/config.js';
 import { RECOMMENDED_AUTONOMY } from '../src/core/autonomy.js';
+import { BudgetExceededError } from '../src/core/errors.js';
+import { Store } from '../src/core/store.js';
+import { loadCostLedger, summarizeCost } from '../src/core/cost.js';
 import { tmpdir } from 'node:os';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 
 /** Minimal in-memory store so tests never touch the filesystem. */
 const memoryStore = () => {
@@ -502,6 +507,95 @@ test('a failing opposite-provider review holds L3 auto-apply', async () => {
     assert.equal(await readFile(join(origin, 'isolated.md'), 'utf8').catch(() => ''), '');
   } finally {
     await rm(origin, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('planning cost is kept on the run instead of being dropped', async () => {
+  let call = 0;
+  const { orch } = build({
+    invoke: async () => {
+      call += 1;
+      if (call === 1) return { text: planReply, costUsd: 0.3 };
+      return { text: 'done', costUsd: 0.1 };
+    },
+  });
+  const run = await orch.run({ goal: 'g', autonomy: 'L2' });
+  assert.ok(run.costUsd >= 0.5, `plan plus tasks should accumulate, got ${run.costUsd}`);
+});
+
+test('a daily ceiling already spent refuses to start and writes a receipt note', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'toris-daily-'));
+  try {
+    const store = new Store(home);
+    await store.init();
+    await store.saveRun({
+      id: 'run_prior',
+      goal: 'already spent today',
+      status: 'succeeded',
+      costUsd: 20,
+      createdAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+    });
+    const orch = new Orchestrator({
+      store,
+      config: { ...DEFAULT_CONFIG, maxDailyCostUsd: 20 },
+      invoke: async () => ({ text: planReply, costUsd: 1 }),
+      detect: async () => true,
+      verifyFn: async () => ({ passed: true, checks: [] }),
+      detectChecksFn: async () => [],
+    });
+    await assert.rejects(() => orch.run({ goal: 'another run', autonomy: 'L2' }), (err) => {
+      assert.ok(err instanceof BudgetExceededError);
+      assert.match(err.message, /daily budget/);
+      assert.match(err.message, /toris receipt/);
+      return true;
+    });
+    const blocked = (await store.listRuns()).find((run) => run.goal === 'another run');
+    assert.ok(blocked, 'a refused run still leaves a receipt');
+    assert.equal(blocked.budgetBlocked, true);
+    assert.match(blocked.budgetNote, /daily budget/);
+    assert.equal(blocked.costUsd, 0);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('crossing the daily cap mid-run skips remaining work and records the ledger', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'toris-daily-mid-'));
+  try {
+    const store = new Store(home);
+    await store.init();
+    await store.saveRun({
+      id: 'run_prior',
+      goal: 'already spent most of today',
+      status: 'succeeded',
+      costUsd: 19.9,
+      createdAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+    });
+    const orch = new Orchestrator({
+      store,
+      config: { ...DEFAULT_CONFIG, maxDailyCostUsd: 20 },
+      invoke: async () => ({ text: planReply, costUsd: 0.08 }),
+      detect: async () => true,
+      verifyFn: async () => ({ passed: true, checks: [] }),
+      detectChecksFn: async () => [],
+    });
+    const run = await orch.run({ goal: 'nibble the rest', autonomy: 'L2' });
+    assert.ok(run.tasks.some((task) => task.status === 'skipped'));
+    assert.match(run.budgetNote ?? '', /daily budget/);
+    const ledger = await loadCostLedger(home);
+    const recorded = Object.values(ledger.days)[0]?.entries.find((entry) => entry.runId === run.id);
+    assert.ok(recorded, 'this run must be upserted into cost.json');
+    assert.ok(recorded.costUsd > 0);
+    const summary = await summarizeCost({
+      home,
+      store,
+      config: { ...DEFAULT_CONFIG, maxDailyCostUsd: 20 },
+    });
+    assert.ok(summary.today.spentUsd >= 19.9, 'prior run files still count toward today');
+  } finally {
     await rm(home, { recursive: true, force: true });
   }
 });

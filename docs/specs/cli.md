@@ -11,6 +11,7 @@ toris run "<goal>" [-p <project>] [--autonomy L1..L5] [--budget <usd>] [--dry-ru
 toris runs [--status <s>] [--project <id>] [--limit <n>]
 toris inspect <runId>            # run detail
 toris receipt <runId> [--md]     # evidence receipt
+toris cost [today] [--json]      # cross-run spend vs maxDailyCostUsd
 toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id> [--reason]
 toris logs <runId> [-f]          # event tail
 toris cancel <runId>

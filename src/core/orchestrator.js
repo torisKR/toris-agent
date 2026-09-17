@@ -1,11 +1,18 @@
 import { newRunId, newEventId } from './ids.js';
 import { ADAPTERS, oppositeProvider, invokeProvider, detectBinary } from './providers.js';
 import { buildPlanPrompt, extractJsonArray, normalizeTasks, fallbackPlan } from './planner.js';
-import { resolveAutonomy, gate, withinBudget, RECOMMENDED_AUTONOMY } from './autonomy.js';
+import { resolveAutonomy, gate, RECOMMENDED_AUTONOMY } from './autonomy.js';
 import { verify, inferChecks, detectChecks } from './verifier.js';
 import { changedFiles, isRepo } from './git.js';
 import { buildReceipt } from './receipt.js';
-import { TorisError } from './errors.js';
+import { BudgetExceededError, TorisError } from './errors.js';
+import {
+  canAfford,
+  checkBudget,
+  dailyBudgetMessage,
+  dailySpendFromRuns,
+  recordRunCost,
+} from './cost.js';
 import { openIsolation, settleIsolation } from './isolation.js';
 import { formatPatchNotice, notifyChannels } from './channels.js';
 import { worktreeDiff } from './worktree.js';
@@ -51,6 +58,7 @@ export class Orchestrator {
     now = Date.now,
     onEvent,
     notify,
+    recordCost = recordRunCost,
   } = {}) {
     this.store = store;
     this.config = config;
@@ -61,6 +69,7 @@ export class Orchestrator {
     this.now = now;
     this.onEvent = onEvent;
     this.notify = notify ?? ((text) => notifyChannels(this.config, text));
+    this.recordCost = recordCost;
   }
 
   async #emit(run, type, data = {}) {
@@ -160,9 +169,15 @@ export class Orchestrator {
   }
 
   async plan(run, project, adapter, available) {
+    const { tasks } = await this.#draftPlan(run, project, adapter, available);
+    return tasks;
+  }
+
+  /** Planning can cost money; keep that on the run instead of dropping it. */
+  async #draftPlan(run, project, adapter, available) {
     if (!available) {
       await this.#emit(run, 'plan.fallback', { reason: 'no provider binary on PATH' });
-      return fallbackPlan(run.goal, { now: this.now });
+      return { tasks: fallbackPlan(run.goal, { now: this.now }), costUsd: 0 };
     }
     const prompt = buildPlanPrompt(run.goal, project);
     let result;
@@ -177,14 +192,26 @@ export class Orchestrator {
       // is missing entirely: degrade to the deterministic plan so the user still
       // gets something actionable instead of a stack trace.
       await this.#emit(run, 'plan.failed', { reason: err?.message ?? String(err) });
-      return fallbackPlan(run.goal, { now: this.now });
+      return { tasks: fallbackPlan(run.goal, { now: this.now }), costUsd: 0 };
     }
     const tasks = normalizeTasks(extractJsonArray(result.text), { now: this.now });
     if (tasks.length === 0) {
       await this.#emit(run, 'plan.unparsable', { replyPreview: String(result.text).slice(0, 300) });
-      return fallbackPlan(run.goal, { now: this.now });
+      return { tasks: fallbackPlan(run.goal, { now: this.now }), costUsd: result.costUsd || 0 };
     }
-    return tasks;
+    return { tasks, costUsd: result.costUsd || 0 };
+  }
+
+  async #priorDailySpend(excludeRunId) {
+    if (typeof this.store?.listRuns !== 'function') return { spentUsd: 0, entries: [] };
+    const runs = await this.store.listRuns();
+    return dailySpendFromRuns(runs, { excludeRunId, now: this.now });
+  }
+
+  async #persistCost(run) {
+    const home = this.store?.home;
+    if (!home || typeof this.recordCost !== 'function') return;
+    await this.recordCost(home, run);
   }
 
   /**
@@ -261,14 +288,41 @@ export class Orchestrator {
       provider: run.provider,
     });
 
-    const tasks = await this.plan(run, opts.project, adapter, available);
-    const planned = { ...run, tasks, status: 'planned' };
+    const priorDay = await this.#priorDailySpend(run.id);
+    const dailyCeiling = checkBudget(priorDay.spentUsd, undefined, this.config);
+    if (!dailyCeiling.ok) {
+      const budgetNote = `${dailyBudgetMessage(this.config?.maxDailyCostUsd, priorDay.spentUsd)} Receipt: toris receipt ${run.id}`;
+      const blocked = {
+        ...run,
+        status: 'failed',
+        budgetBlocked: true,
+        blockedReason: dailyCeiling.reason,
+        budgetNote,
+        dailyCostUsd: priorDay.spentUsd,
+        finishedAt: nowIso(),
+      };
+      await this.store?.saveRun(blocked);
+      await this.#emit(blocked, 'run.blocked', { reason: dailyCeiling.reason });
+      await this.#emit(blocked, 'run.finished', { status: blocked.status });
+      throw new BudgetExceededError(budgetNote, { runId: run.id });
+    }
+
+    const drafted = await this.#draftPlan(run, opts.project, adapter, available);
+    const planned = {
+      ...run,
+      tasks: drafted.tasks,
+      costUsd: run.costUsd + (drafted.costUsd || 0),
+      dailyCostUsd: priorDay.spentUsd,
+      status: 'planned',
+    };
     await this.store?.saveRun(planned);
-    await this.#emit(planned, 'run.planned', { taskCount: tasks.length });
+    await this.#persistCost(planned);
+    await this.#emit(planned, 'run.planned', { taskCount: drafted.tasks.length, costUsd: drafted.costUsd || 0 });
 
     if (opts.dryRun) {
       const finished = { ...planned, status: 'dry-run', finishedAt: nowIso() };
       await this.store?.saveRun(finished);
+      await this.#persistCost(finished);
       await this.#emit(finished, 'run.finished', { status: finished.status });
       return finished;
     }
@@ -282,11 +336,13 @@ export class Orchestrator {
         finishedAt: nowIso(),
       };
       await this.store?.saveRun(blocked);
+      await this.#persistCost(blocked);
       await this.#emit(blocked, 'run.blocked', { reason: writeGate.reason });
       return blocked;
     }
 
     if (!available) {
+      await this.#persistCost(planned);
       throw new TorisError(
         `No provider CLI found. Install "claude" or "codex", or set TORIS_CLAUDE_BIN / TORIS_CODEX_BIN.`,
         'E_NO_PROVIDER',
@@ -310,14 +366,22 @@ export class Orchestrator {
     let current = { ...planned, status: 'running' };
     await this.store?.saveRun(current);
     const executed = [];
+    let budgetNote = current.budgetNote ?? null;
     for (const task of current.tasks) {
-      const budget = withinBudget(current.costUsd, 0.05, current.budgetUsd);
+      const budget = canAfford({
+        spentUsd: current.costUsd,
+        dailySpentUsd: priorDay.spentUsd,
+        estimateUsd: 0.05,
+        budgetUsd: current.budgetUsd,
+        maxDailyCostUsd: this.config?.maxDailyCostUsd,
+      });
       if (!budget.ok) {
         executed.push({ ...task, status: 'skipped', note: 'budget exhausted' });
+        budgetNote = budget.reason;
         await this.#emit(current, 'task.skipped', {
           taskId: task.id,
           title: task.title,
-          reason: `budget exhausted ($${Number(current.budgetUsd).toFixed(2)} cap reached)`,
+          reason: budget.reason,
         });
         continue;
       }
@@ -352,18 +416,31 @@ export class Orchestrator {
         break;
       }
     }
-    current = { ...current, tasks: executed };
+    current = { ...current, tasks: executed, budgetNote };
 
     current = await this.#verifyRun(current, opts, execCwd);
     if (execCwd && (await isRepo(execCwd))) {
       current = { ...current, artifacts: await changedFiles(execCwd) };
     }
 
-    current = await this.#secondPass(current, {
-      isolation,
-      implementer: adapter,
-      enabled: opts.review,
+    const reviewBudget = canAfford({
+      spentUsd: current.costUsd,
+      dailySpentUsd: priorDay.spentUsd,
+      estimateUsd: 0.05,
+      budgetUsd: current.budgetUsd,
+      maxDailyCostUsd: this.config?.maxDailyCostUsd,
     });
+    if (opts.review !== false && !reviewBudget.ok) {
+      const review = skippedReview(reviewBudget.reason);
+      current = { ...current, review, budgetNote: current.budgetNote ?? reviewBudget.reason };
+      await this.#emit(current, 'review.skipped', { reason: review.reason });
+    } else {
+      current = await this.#secondPass(current, {
+        isolation,
+        implementer: adapter,
+        enabled: opts.review,
+      });
+    }
 
     let pendingApply = false;
     if (isolation) {
@@ -409,6 +486,7 @@ export class Orchestrator {
       finishedAt: nowIso(),
     };
     await this.store?.saveRun(finished);
+    await this.#persistCost(finished);
     await this.#emit(finished, 'run.finished', { status: finished.status });
     return finished;
   }

@@ -16,6 +16,8 @@ import { Store } from '../core/store.js';
 import { applySavedPatch, discardSavedPatch, getPatch, listPatches, readPatchDiff, refreshSavedPatchDiff } from '../core/patches.js';
 import { isRepo } from '../core/git.js';
 import { TorisError } from '../core/errors.js';
+import { summarizeCost } from '../core/cost.js';
+import { loadConfig } from '../core/config.js';
 import { DesignStore } from './design-store.js';
 import { buildBookmarklet } from './design.js';
 import {
@@ -99,6 +101,21 @@ function createContentInput(input) {
   return Object.fromEntries(['kind', 'title', 'brief', 'channels'].filter((key) => Object.hasOwn(input, key)).map((key) => [key, input[key]]));
 }
 
+async function studioCostReadout(home, store) {
+  try {
+    const { config } = await loadConfig(home);
+    const summary = await summarizeCost({ home, store, config });
+    return {
+      day: summary.today.day,
+      spentUsd: summary.today.spentUsd,
+      capUsd: summary.today.capUsd,
+      remainingUsd: summary.today.remainingUsd,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function patchHttpError(error) {
   if (error instanceof HttpError) throw error;
   if (error instanceof TorisError && error.code === 'E_UNKNOWN_PATCH') throw new HttpError(404, error.message);
@@ -147,12 +164,14 @@ export async function createStudioServer(options) {
   };
 
   router.add('GET', '/api/health', async (_request, response) => {
+    const cost = await studioCostReadout(options.home, store);
     sendJson(response, 200, {
       ok: true,
       name: 'Toris Studio',
       localOnly: true,
       status: 'ready',
       surfaces: ['review', 'agent', 'design', 'patches', 'knowledge'],
+      cost,
     });
   });
   for (const pathname of STATIC_ASSETS.keys()) {

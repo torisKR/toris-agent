@@ -12,6 +12,8 @@ import {
   readPatchDiff,
 } from '../core/patches.js';
 import { Orchestrator } from '../core/orchestrator.js';
+import { BudgetExceededError } from '../core/errors.js';
+import { formatUsd, summarizeCost } from '../core/cost.js';
 import { parseBotCommand, renderBotHelp, senderAllowed } from './commands.js';
 
 const DIFF_LIMIT = 3500;
@@ -77,16 +79,19 @@ async function botStatus(ctx) {
   const runs = (await ctx.store.listRuns()).slice(0, 5);
   const pending = await listPatches(ctx.store, { status: 'pending' });
   const autonomy = ctx.config.defaultAutonomy;
+  const cost = await summarizeCost({ home: ctx.home, store: ctx.store, config: ctx.config }).catch(() => null);
+  const cap = cost?.today.capUsd == null ? 'unlimited' : formatUsd(cost.today.capUsd);
   const lines = [
     `workspace ${workspacePath(ctx)}`,
     `autonomy ${autonomy} (${applyDecision(autonomy)})`,
     pending.length ? `pending patches ${pending.length}` : 'pending patches 0',
+    cost ? `today ${formatUsd(cost.today.spentUsd)} / ${cap}` : null,
     '',
     'recent runs',
     ...(runs.length
       ? runs.map((run) => `- ${run.id} ${run.status} ${run.goal}`)
       : ['- none']),
-  ];
+  ].filter((line) => line !== null);
   return lines.join('\n');
 }
 
@@ -186,11 +191,17 @@ async function botRun(ctx, goal) {
     name: 'workspace',
     path: projectPath,
   };
-  const run = await orchestrator.run({
-    goal,
-    project,
-    autonomy: ctx.config.defaultAutonomy,
-  });
+  let run;
+  try {
+    run = await orchestrator.run({
+      goal,
+      project,
+      autonomy: ctx.config.defaultAutonomy,
+    });
+  } catch (err) {
+    if (err instanceof BudgetExceededError) return err.message;
+    throw err;
+  }
   const pending = (await listPatches(ctx.store, { status: 'pending' })).find(
     (patch) => patch.runId === run.id,
   );
