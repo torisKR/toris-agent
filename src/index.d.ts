@@ -72,6 +72,16 @@ export function studioDesignUrl(port?: number): string;
 export function studioPatchesUrl(port?: number): string;
 export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
 export function tuiAgentHint(agentId?: string): string;
+export function isLoopbackHttpUrl(value: unknown): boolean;
+export function openLocalCommand(platform?: string): { command: string; args: string[] };
+export function openLocalUrl(
+  url: string,
+  deps?: {
+    opener?: (url: string) => unknown;
+    spawn?: (...args: unknown[]) => unknown;
+    platform?: string;
+  },
+): Promise<{ ok: boolean; error?: string }>;
 
 // ---------------------------------------------------------------------------
 // Autonomy

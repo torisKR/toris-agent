@@ -92,6 +92,61 @@ test('POST /api/agent/turn rejects an empty message and an unknown agent', async
   );
 });
 
+test('POST /api/agent/turn streams SSE when the client asks for it', async () => {
+  await withServer(
+    async ({ base }) => {
+      const init = mutation(base, { agent: 'planner', message: 'split this goal' });
+      init.headers.accept = 'text/event-stream';
+      const response = await fetch(`${base}/api/agent/turn`, init);
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get('content-type'), /text\/event-stream/);
+      const body = await response.text();
+      assert.match(body, /event: text/);
+      assert.match(body, /"delta":"hel"/);
+      assert.match(body, /event: tool-start/);
+      assert.match(body, /event: done/);
+      assert.match(body, /"text":"hello"/);
+      assert.match(body, /"ok":true/);
+    },
+    {
+      runAgentTurn: async ({ agent, onEvent }) => {
+        onEvent?.({ type: 'text', delta: 'hel' });
+        onEvent?.({ type: 'tool-start', name: 'read_file' });
+        onEvent?.({ type: 'text', delta: 'lo' });
+        return {
+          ok: true,
+          agent: { id: agent, title: 'Planner' },
+          text: 'hello',
+          events: [
+            { type: 'text', delta: 'hel' },
+            { type: 'tool-start', name: 'read_file' },
+            { type: 'text', delta: 'lo' },
+          ],
+        };
+      },
+    },
+  );
+});
+
+test('POST /api/agent/turn still rejects empty input as JSON when SSE is requested', async () => {
+  await withServer(
+    async ({ base }) => {
+      const init = mutation(base, { message: '   ' });
+      init.headers.accept = 'text/event-stream';
+      const response = await fetch(`${base}/api/agent/turn`, init);
+      assert.equal(response.status, 400);
+      assert.match(response.headers.get('content-type'), /application\/json/);
+      const body = await response.json();
+      assert.equal(body.ok, false);
+    },
+    {
+      runAgentTurn: async () => {
+        throw new Error('runner must not be called for invalid input');
+      },
+    },
+  );
+});
+
 test('POST /api/agent/turn runs the selected agent and returns text', async () => {
   await withServer(
     async ({ base }) => {

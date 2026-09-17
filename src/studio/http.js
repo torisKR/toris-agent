@@ -78,6 +78,27 @@ export class Router {
   }
 }
 
+export function wantsEventStream(request) {
+  return String(request.headers?.accept || '')
+    .split(',')
+    .some((part) => part.trim().toLowerCase().startsWith('text/event-stream'));
+}
+
+export function startSse(response) {
+  response.writeHead(200, {
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    'content-type': 'text/event-stream; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+  });
+  if (typeof response.flushHeaders === 'function') response.flushHeaders();
+}
+
+export function writeSse(response, event, data) {
+  if (response.writableEnded) return;
+  response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
 export function resolveStaticFile(root, pathname) {
   let decoded;
   try {

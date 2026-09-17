@@ -101,7 +101,11 @@
           <div id="agent-log" class="chat-log" aria-live="polite"></div>
           <form id="agent-form" class="chat-composer">
             <label class="field" for="agent-input">메시지<textarea id="agent-input" name="message" maxlength="8000" required placeholder="무엇을 할까요?" disabled></textarea></label>
-            <button class="button" id="agent-send" type="submit" disabled>보내기</button>
+            <div class="chat-actions">
+              <button class="button" id="agent-send" type="submit" disabled>보내기</button>
+              <button class="button secondary" id="agent-stop" type="button" hidden>중지</button>
+              <p class="composer-hint">Enter 보내기 · Shift+Enter 줄바꿈</p>
+            </div>
           </form>
         </section>
       </main>

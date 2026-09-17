@@ -3,6 +3,48 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { cmdStudio } from '../src/cli/commands/studio.js';
 
+test('studio --open launches the loopback origin after listen', async () => {
+  const signals = new EventEmitter();
+  const opened = [];
+  const lines = [];
+  const code = await cmdStudio({ home: '/tmp/toris-home', json: false }, [], { open: true }, {
+    signals,
+    output(text) { lines.push(text); },
+    openLocalUrl: async (url) => {
+      opened.push(url);
+      return { ok: true };
+    },
+    createStudioServer: async () => ({
+      listen: async () => {},
+      close: async () => {},
+    }),
+    onReady: () => setImmediate(() => signals.emit('SIGTERM')),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(opened, ['http://127.0.0.1:5824']);
+  assert.match(lines.join('\n'), /opened in browser/);
+});
+
+test('studio --open attaches when 127.0.0.1:5824 is already in use', async () => {
+  const opened = [];
+  const lines = [];
+  const code = await cmdStudio({ home: '/tmp/home' }, [], { open: true }, {
+    signals: new EventEmitter(),
+    output(text) { lines.push(text); },
+    openLocalUrl: async (url) => {
+      opened.push(url);
+      return { ok: true };
+    },
+    createStudioServer: async () => ({
+      listen: async () => { const error = new Error('busy'); error.code = 'EADDRINUSE'; throw error; },
+      close: async () => {},
+    }),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(opened, ['http://127.0.0.1:5824']);
+  assert.match(lines.join('\n'), /ATTACHED/);
+});
+
 test('studio command binds the fixed loopback address and shuts down on SIGTERM', async () => {
   const signals = new EventEmitter();
   let options;

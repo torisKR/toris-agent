@@ -1,3 +1,7 @@
+const AGENT_ID_KEY = 'toris.studio.agentId';
+const TRANSCRIPT_KEY = 'toris.studio.agent.transcripts';
+const MAX_STORED_TURNS = 40;
+
 const state = {
   token: '',
   contents: [],
@@ -9,7 +13,9 @@ const state = {
   agentReady: false,
   agentReason: '',
   agentTui: 'toris\n/agent',
-  messages: [],
+  threads: {},
+  busy: false,
+  abort: null,
   design: null,
   captures: [],
   tray: [],
@@ -20,7 +26,7 @@ const state = {
   selectedHunk: '',
 };
 const elementIds = [
-  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
+  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
 ];
 const elements = Object.fromEntries(elementIds.map((id) => [id, document.getElementById(id)]));
 
@@ -202,17 +208,56 @@ function readSurface() {
   return 'review';
 }
 
+function storedAgentId() {
+  try { return localStorage.getItem(AGENT_ID_KEY) || ''; } catch { return ''; }
+}
+
+function rememberAgent(id) {
+  try { localStorage.setItem(AGENT_ID_KEY, id); } catch { /* private mode */ }
+}
+
+function loadTranscripts() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TRANSCRIPT_KEY) || '{}');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    return raw;
+  } catch {
+    return {};
+  }
+}
+
+function persistTranscripts() {
+  try {
+    const slim = {};
+    for (const [id, turns] of Object.entries(state.threads)) {
+      slim[id] = (turns || [])
+        .filter((item) => (item.role === 'user' || item.role === 'assistant') && !item.streaming)
+        .slice(-MAX_STORED_TURNS)
+        .map((item) => ({ role: item.role, content: item.content, agent: item.agent, tools: item.tools }));
+    }
+    localStorage.setItem(TRANSCRIPT_KEY, JSON.stringify(slim));
+  } catch { /* private mode */ }
+}
+
+function threadOf(id = state.agentId) {
+  if (!state.threads[id]) state.threads[id] = [];
+  return state.threads[id];
+}
+
 function readAgentId() {
   const params = new URLSearchParams(location.search);
   if (params.get('id')) return params.get('id');
   const hash = location.hash.match(/^#agent\/([^/]+)/);
   if (hash) return hash[1];
-  return state.agentId || 'toris';
+  return storedAgentId() || state.agentId || 'toris';
 }
 
 function showSurface(name, options = {}) {
   state.surface = name === 'agent' || name === 'design' || name === 'patches' ? name : 'review';
-  if (state.surface === 'agent') state.agentId = options.agentId || readAgentId();
+  if (state.surface === 'agent') {
+    state.agentId = options.agentId || readAgentId();
+    rememberAgent(state.agentId);
+  }
   elements['review-shell'].hidden = state.surface !== 'review';
   elements['agent-shell'].hidden = state.surface !== 'agent';
   elements['design-shell'].hidden = state.surface !== 'design';
@@ -282,18 +327,23 @@ function renderAgents() {
     meta.textContent = agent.summary;
     top.append(kind, status);
     button.append(top, title, meta);
-    button.addEventListener('click', () => {
-      state.agentId = agent.id;
-      state.messages = [];
-      showSurface('agent', { agentId: agent.id });
-    });
+    button.addEventListener('click', () => showSurface('agent', { agentId: agent.id }));
     elements['agent-list'].append(button);
   }
 }
 
+function setAgentBusy(busy) {
+  state.busy = busy;
+  elements['agent-send'].hidden = busy;
+  elements['agent-send'].disabled = busy || !state.agentReady;
+  elements['agent-send'].setAttribute('aria-disabled', String(busy || !state.agentReady));
+  elements['agent-stop'].hidden = !busy;
+  elements['agent-input'].disabled = busy || !state.agentReady;
+}
+
 function renderAgentWorkspace() {
   const agent = currentAgent();
-  const hasTurns = state.messages.length > 0;
+  const hasTurns = threadOf().length > 0;
   elements['agent-empty'].hidden = hasTurns;
   elements['agent-chat'].hidden = false;
   elements['agent-empty-copy'].textContent = state.agentReady
@@ -304,9 +354,7 @@ function renderAgentWorkspace() {
   elements['agent-status-copy'].textContent = state.agentReady
     ? '로컬 채팅 준비됨. 보내기는 이 브라우저에서만 동작합니다.'
     : (state.agentReason || '연결 대기');
-  elements['agent-send'].disabled = !state.agentReady;
-  elements['agent-send'].setAttribute('aria-disabled', String(!state.agentReady));
-  elements['agent-input'].disabled = !state.agentReady;
+  setAgentBusy(state.busy);
   syncDesignSend();
   elements['design-agent-status'].textContent = state.agentReady
     ? (state.tray.length ? `트레이 ${state.tray.length}개를 같은 로컬 에이전트에게 보냅니다.` : '요소를 고르면 트레이에 쌓입니다.')
@@ -322,9 +370,9 @@ function syncDesignSend() {
 
 function renderAgentLog() {
   elements['agent-log'].replaceChildren();
-  for (const turn of state.messages) {
+  for (const turn of threadOf()) {
     const article = document.createElement('article');
-    article.className = `chat-turn${turn.role === 'user' ? ' is-user' : ''}`;
+    article.className = `chat-turn${turn.role === 'user' ? ' is-user' : ''}${turn.streaming ? ' is-streaming' : ''}`;
     const who = document.createElement('span');
     who.className = 'who';
     who.textContent = turn.role === 'user' ? 'YOU' : (turn.agent || 'TORIS').toUpperCase();
@@ -351,8 +399,65 @@ async function loadAgents() {
   state.agentReason = status.reason || '';
   state.agentTui = status.tui || 'toris\n/agent';
   if (status.agent?.id) state.agentId = status.agent.id;
+  rememberAgent(state.agentId);
   renderAgents();
   renderAgentWorkspace();
+}
+
+async function readSse(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replaceAll('\r\n', '\n');
+    let split;
+    while ((split = buffer.indexOf('\n\n')) !== -1) {
+      const block = buffer.slice(0, split);
+      buffer = buffer.slice(split + 2);
+      let eventName = 'message';
+      const data = [];
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) eventName = line.slice(6).trim();
+        else if (line.startsWith('data:')) data.push(line.slice(5).trim());
+      }
+      if (!data.length) continue;
+      try { onEvent(eventName, JSON.parse(data.join('\n'))); } catch { /* drop a malformed event */ }
+    }
+  }
+}
+
+async function streamAgentTurn({ agent, message, history, tray, signal, onEvent }) {
+  const payload = { agent, message, history };
+  if (tray) payload.tray = true;
+  const response = await fetch('/api/agent/turn', {
+    method: 'POST',
+    headers: {
+      origin: location.origin,
+      'x-toris-studio-token': state.token,
+      'content-type': 'application/json',
+      accept: 'text/event-stream',
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  const type = response.headers.get('content-type') || '';
+  if (!type.includes('text/event-stream')) {
+    const body = type.includes('application/json') ? await response.json() : await response.text();
+    if (!response.ok) throw new Error(body?.error?.message || `요청 실패 (${response.status})`);
+    return body;
+  }
+  let result = null;
+  let streamError = null;
+  await readSse(response, (event, data) => {
+    onEvent?.(event, data);
+    if (event === 'done') result = data;
+    if (event === 'error') streamError = new Error(data.message || `요청 실패 (${data.status || 500})`);
+  });
+  if (streamError) throw streamError;
+  if (!result) throw new Error('응답이 끝나기 전에 연결이 끊겼습니다.');
+  return result;
 }
 
 function renderDesignCaptures() {
@@ -520,15 +625,11 @@ elements['design-agent-form'].addEventListener('submit', async (event) => {
   const text = elements['design-note'].value.trim() || 'Inspect and fix the selected UI elements.';
   elements['design-send'].disabled = true;
   try {
-    const result = await api('/api/agent/turn', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        agent: state.agentId,
-        message: text,
-        history: [],
-        tray: true,
-      }),
+    const result = await streamAgentTurn({
+      agent: state.agentId,
+      message: text,
+      history: [],
+      tray: true,
     });
     announce(`${result.agent?.title || '에이전트'}가 트레이 ${state.tray.length}개를 받았습니다.`);
     elements['design-note'].value = '';
@@ -552,31 +653,57 @@ for (const link of [elements['nav-review'], elements['nav-agent'], elements['nav
   });
 }
 
+elements['agent-input'].addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.shiftKey) return;
+  event.preventDefault();
+  elements['agent-form'].requestSubmit();
+});
+
+elements['agent-stop'].addEventListener('click', () => state.abort?.abort());
+
 elements['agent-form'].addEventListener('submit', async (event) => {
   event.preventDefault();
   const text = elements['agent-input'].value.trim();
-  if (!text || !state.agentReady) return;
+  if (!text || !state.agentReady || state.busy) return;
   elements['agent-input'].value = '';
-  state.messages.push({ role: 'user', content: text });
+  const thread = threadOf();
+  thread.push({ role: 'user', content: text });
+  const history = thread
+    .filter((item) => (item.role === 'user' || item.role === 'assistant') && !item.streaming)
+    .slice(0, -1)
+    .map((item) => ({ role: item.role, content: item.content }));
+  const assistant = { role: 'assistant', agent: state.agentId, content: '', tools: [], streaming: true };
+  thread.push(assistant);
+  state.abort = new AbortController();
+  setAgentBusy(true);
   renderAgentWorkspace();
-  elements['agent-send'].disabled = true;
   try {
-    const result = await api('/api/agent/turn', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        agent: state.agentId,
-        message: text,
-        history: state.messages.slice(0, -1).map((item) => ({ role: item.role, content: item.content })),
-      }),
+    const result = await streamAgentTurn({
+      agent: state.agentId,
+      message: text,
+      history,
+      signal: state.abort.signal,
+      onEvent: (event, data) => {
+        if (event === 'text' && data.delta) assistant.content += data.delta;
+        if (event === 'tool-start' && data.name) assistant.tools.push(data.name);
+        renderAgentLog();
+      },
     });
-    const tools = (result.events || []).filter((evt) => evt.type === 'tool-start').map((evt) => evt.name);
-    state.messages.push({ role: 'assistant', agent: result.agent?.id, content: result.text, tools });
+    assistant.agent = result.agent?.id || assistant.agent;
+    assistant.content = result.text || assistant.content;
+    assistant.tools = (result.events || []).filter((evt) => evt.type === 'tool-start').map((evt) => evt.name);
+    assistant.streaming = false;
+    persistTranscripts();
     announce(`${result.agent?.title || '에이전트'}가 답했습니다.`);
   } catch (error) {
-    state.messages.push({ role: 'assistant', agent: state.agentId, content: error.message });
-    announce(error.message);
+    const aborted = error.name === 'AbortError';
+    assistant.streaming = false;
+    if (!assistant.content) assistant.content = aborted ? '중단했습니다.' : error.message;
+    persistTranscripts();
+    announce(aborted ? '응답을 중단했습니다.' : error.message);
   }
+  state.abort = null;
+  setAgentBusy(false);
   renderAgentWorkspace();
 });
 
@@ -778,6 +905,7 @@ elements['patch-review-form'].addEventListener('submit', async (event) => {
 
 try {
   const session = await api('/api/session'); state.token = session.token; await refresh(); document.getElementById('live-status').textContent = `${new URL(session.origin).host} · local`;
+  state.threads = loadTranscripts();
   state.agentId = readAgentId();
   await loadAgents();
   const bookmarklet = await api('/api/design/bookmarklet');

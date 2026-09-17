@@ -30,6 +30,7 @@ COMMANDS
   autonomy                  Autonomy levels and what each permits
   daemon status             Background daemon (not in 0.1.0)
   studio                    Local GUI on 127.0.0.1:5824 (review + /agent + /design + /patches + /knowledge)
+  studio --open             Start or attach Studio and open the loopback URL
   studio service <action>   Install, status, restart or uninstall autostart
   android status|devices|screenshot|logcat|install
                             Optional adb helpers for Android verify evidence
@@ -67,6 +68,7 @@ EXAMPLES
   toris                     # TUI chat
   toris --agent implementer
   toris studio              # GUI; agent room at /agent, Design Mode at /design, patches at /patches, knowledge at /knowledge
+  toris studio --open       # same, then open the loopback URL in the browser
   toris android status      # adb/emulator presence (optional)
   toris knowledge init      # USER.md, MEMORY.md, starter domain packs
   toris knowledge search flutter

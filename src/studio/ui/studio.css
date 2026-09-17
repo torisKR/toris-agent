@@ -14,6 +14,9 @@ body { overflow-x: hidden; }
 .chat-turn p { margin: 0; color: var(--text); font-size: 15px; line-height: 1.65; white-space: pre-wrap; }
 .chat-tool { color: var(--quiet); font-size: 11px; }
 .chat-composer { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--panel); }
+.chat-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.composer-hint { margin: 0; color: var(--quiet); font-size: 11px; }
+.chat-turn.is-streaming p::after { content: '▍'; color: var(--accent); }
 .access-code { margin: 12px 0 0; padding: 12px; border-radius: var(--radius-control); background: var(--raised); color: var(--muted); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow: auto; max-height: 220px; }
 .design-url-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: end; margin-bottom: 16px; }
 .design-frame-wrap { min-height: 480px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-media); background: var(--media-black); box-shadow: var(--shadow); }

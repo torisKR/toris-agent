@@ -82,12 +82,12 @@ Screenshots, the poster, and the demo were captured from a running Toris Studio 
   <img src="docs/assets/readme/studio-agent.png" alt="Toris Studio agent room listing twelve local profiles including Toris, Planner, Architect, Researcher, Implementer, Test Author, and Refactorer" width="920">
 </p>
 
-`toris` opens the chat TUI. `toris studio` opens the localhost GUI. `/agent` in either place is the same catalogue: the `toris` coding persona plus eleven task roles.
+`toris` opens the chat TUI. `toris studio` opens the localhost GUI. `toris studio --open` starts or attaches and opens the loopback URL so you do not copy it. `/studio` in the TUI does the same jump when Studio is already up. `/agent` in either place is the same catalogue: the `toris` coding persona plus eleven task roles. Studio agent turns stream live over SSE when the browser sends `Accept: text/event-stream`.
 
 ```bash
 toris                     # TUI chat
 toris --agent implementer
-toris studio              # http://127.0.0.1:5824
+toris studio --open       # http://127.0.0.1:5824
                           # agent room  /agent
                           # Design Mode /design
                           # Patch Review /patches
@@ -235,7 +235,7 @@ toris receipt <runId> --md > receipt.md
 
 ## Design Mode workflow
 
-1. Start Studio: `toris studio` → open `http://127.0.0.1:5824/design`.
+1. Start Studio: `toris studio --open` → Design Mode is at `http://127.0.0.1:5824/design`.
 2. Load a target URL, or click **샘플** for the built-in page at `/design/sample`.
 3. Click elements into the tray. Studio records CSS selector, bounded `outerHTML`, computed styles, page URL, a cropped screenshot when the browser can rasterize it, and an optional per-element note.
 4. Write one instruction (“match these to 44px height”) and send the whole tray on a single coding-agent turn.
