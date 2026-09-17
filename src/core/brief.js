@@ -1,4 +1,4 @@
-import { dayKey, formatUsd, summarizeCost } from './cost.js';
+import { dayKey, summarizeCost } from './cost.js';
 import { KnowledgeStore, searchIndex, tokenizeQuery } from './knowledge/index.js';
 import { readDaemonStatus } from '../daemon/state.js';
 
@@ -215,15 +215,5 @@ export async function buildBrief({
     runs,
     daemon,
     knowledge,
-  };
-}
-
-export function formatSpendLine(spend) {
-  const cap = spend.capUsd == null ? 'unlimited' : formatUsd(spend.capUsd);
-  const remaining = spend.remainingUsd == null ? 'unlimited' : formatUsd(spend.remainingUsd);
-  return {
-    today: `${formatUsd(spend.spentUsd)} / ${cap}`,
-    remaining,
-    runs: String(spend.runCount),
   };
 }
