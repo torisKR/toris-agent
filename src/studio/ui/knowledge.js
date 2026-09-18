@@ -1,3 +1,5 @@
+const PIN_KEY = 'toris.studio.knowledge.pin';
+
 const state = {
   token: '',
   domains: [],
@@ -5,6 +7,7 @@ const state = {
   detail: null,
   dag: null,
   nodeId: null,
+  pin: null,
   reflect: null,
   reflectHidden: false,
 };
@@ -71,6 +74,30 @@ function selectedNode() {
 
 function selectedDagNode() {
   return state.dag?.nodes?.find((node) => node.id === state.nodeId) || null;
+}
+
+function readPin() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PIN_KEY) || 'null');
+    if (!raw || typeof raw !== 'object') return null;
+    const domain = String(raw.domain || '').trim();
+    const nodeId = String(raw.nodeId || raw.id || '').trim();
+    return domain && nodeId ? { domain, nodeId } : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePin(pin) {
+  state.pin = pin;
+  try {
+    if (pin) localStorage.setItem(PIN_KEY, JSON.stringify(pin));
+    else localStorage.removeItem(PIN_KEY);
+  } catch { /* private mode */ }
+}
+
+function isPinned(node) {
+  return Boolean(state.pin && state.pin.domain === state.selected && state.pin.nodeId === node.id);
 }
 
 function dagTitle(id) {
@@ -170,7 +197,17 @@ function renderDag() {
       state.nodeId = node.id;
       renderDetail();
     });
-    item.append(button);
+    const pin = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.name = 'knowledge-pin';
+    box.checked = isPinned(node);
+    box.addEventListener('change', () => {
+      writePin(box.checked ? { domain: state.selected, nodeId: node.id } : null);
+      renderDag();
+    });
+    pin.append(box, document.createTextNode(' use on next turn'));
+    item.append(button, pin);
     const links = outgoing.get(node.id) || [];
     if (links.length) {
       const nest = document.createElement('ul');
@@ -396,4 +433,5 @@ $('add-edge-form').addEventListener('submit', async (event) => {
 
 const session = await api('/api/session');
 state.token = session.token;
+state.pin = readPin();
 await refresh();

@@ -441,6 +441,8 @@ Additive Studio reflect (same helper, same store): `GET /api/knowledge/reflect` 
 
 Additive Studio DAG read (same store): `GET /api/knowledge/domains/:slug/dag` returns `{ ok, slug, title, source, nodes: [{ id, title, kind, excerpt }], edges: [{ from, to, kind }], nodeCount, edgeCount }` from `inspectDomain`. Unknown domain is HTTP 404 (same as `GET /api/knowledge/domains/:slug`). Empty domains return empty arrays. The GET never calls `init` and does not write.
 
+Additive Studio knowledge pin (same store, same turn): optional `knowledge: { domain, nodeId }` on the existing `POST /api/agent/turn`. The server loads that node from `KnowledgeStore` and prepends a capped title/kind/excerpt `[pinned knowledge]` block. Unknown id is HTTP 400 (no model call, no write, no fabricated text). Omitted pin is unchanged. Auto-retrieve ranking is unchanged. No second turn endpoint. See `docs/KNOWLEDGE.md`.
+
 ## Additive: project-local agent profiles (post-0.1)
 
 Not a breaking change to the frozen signatures above. The live catalogue is still

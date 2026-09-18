@@ -33,6 +33,7 @@ import {
 import { HttpError } from './http.js';
 import { composeAndroidTurnMessage, loadAndroidEvidence } from './android-api.js';
 import { composeDesignTurnMessage, listDesignCaptures, normalizeDesignCapture } from './design.js';
+import { composePinnedKnowledgeTurn, knowledgePinOf, loadPinnedKnowledge } from './knowledge-pin.js';
 import { formatPatchReviewMessage } from './patch-view.js';
 
 const MAX_MESSAGE_CHARS = 8_000;
@@ -183,6 +184,15 @@ async function resolveAndroidEvidence(options) {
   return load(rels);
 }
 
+async function resolvePinnedKnowledge(options, store) {
+  if (options.pinnedKnowledge && typeof options.pinnedKnowledge === 'object') {
+    return options.pinnedKnowledge;
+  }
+  const pin = options.knowledgePin || knowledgePinOf(options);
+  if (!pin) return null;
+  return loadPinnedKnowledge(store, pin);
+}
+
 export async function runAgentTurn(options) {
   const message = String(options.message ?? '').trim();
   const hasDesign = Boolean(options.design || options.designId || options.tray || options.designIds?.length || options.designs?.length);
@@ -234,6 +244,7 @@ export async function runAgentTurn(options) {
   const cwd = options.cwd || process.cwd();
   const knowledgeSession = { activeDomains: [] };
   const knowledgeStore = new KnowledgeStore({ home: options.home, projectPath: cwd });
+  const pinnedKnowledge = await resolvePinnedKnowledge(options, knowledgeStore);
   const autoRetrieve = knowledgeAutoRetrieveEnabled(config);
   const tools = cliBacked
     ? []
@@ -255,13 +266,16 @@ export async function runAgentTurn(options) {
         includeProfile: cliBacked,
       })
     : { enabled: false, retrieved: [], briefing: '' };
-  const userMessage = retrieved.briefing ? composeKnowledgeTurn(composed, retrieved.briefing) : composed;
+  const retrievedMessage = retrieved.briefing ? composeKnowledgeTurn(composed, retrieved.briefing) : composed;
+  const userMessage = pinnedKnowledge
+    ? composePinnedKnowledgeTurn(retrievedMessage, pinnedKnowledge)
+    : retrievedMessage;
   const events = [];
   const onEvent = (evt) => {
     events.push(evt);
     options.onEvent?.(evt);
   };
-  const provider = createProvider(resolved, {
+  const provider = options.provider || createProvider(resolved, {
     bins: {
       'claude-cli': cliBinFor('claude-cli', config),
       'codex-cli': cliBinFor('codex-cli', config),
@@ -296,7 +310,17 @@ export async function runAgentTurn(options) {
       text: result.text,
       usage: result.usage,
       events,
-      knowledge: publicKnowledgeReceipt(retrieved),
+      knowledge: {
+        ...publicKnowledgeReceipt(retrieved),
+        pinned: pinnedKnowledge
+          ? {
+              domain: pinnedKnowledge.domain,
+              id: pinnedKnowledge.id,
+              title: pinnedKnowledge.title,
+              kind: pinnedKnowledge.kind,
+            }
+          : null,
+      },
       tui: tuiAgentHint(agent.id),
       design: captures[0]
         ? { id: captures[0].id || null, url: captures[0].url, selector: captures[0].selector }
