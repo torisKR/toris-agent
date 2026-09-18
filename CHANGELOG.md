@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Studio `/android` attach-to-turn** — select recent files under `~/.toris/android/` and send one instruction on the existing `POST /api/agent/turn` (canonical screenshot path and/or a short logcat excerpt). Same Origin + session token as Design Mode. Traversal is rejected. No second turn endpoint.
 - **Studio `/android`** — loopback device-evidence page for the same optional adb helpers as `toris android` (`GET /android`, `GET /api/android`, artifacts, screenshot/logcat). Missing adb is a quiet 200. Mutations need Origin + session token. Image media stays under `~/.toris/android/`. `install` remains CLI-only. See `docs/STUDIO.md`.
 - **Studio `/brief`** — loopback read-only page for the same local secretary digest as `toris brief` (`GET /brief`, `GET /api/brief`). Spend, today's runs, daemon status/next due, knowledge headlines. Quiet empty sections. No mutations. See `docs/STUDIO.md`.
 - **`toris brief`** — local secretary digest for today: spend vs `maxDailyCostUsd`, bounded runs (id / goal / status / verify), daemon running + next schedule, and 3–5 tacit/node headlines. `--json` for machines. Knowledge is omitted when the store is missing. The daemon still only runs coding jobs — `daemon schedule add "09:00" "toris brief"` is refused; put `toris brief` on host cron. See `docs/BRIEF.md`.

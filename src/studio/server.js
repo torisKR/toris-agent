@@ -31,7 +31,11 @@ import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
 import { registerKnowledgeRoutes } from './knowledge-api.js';
 import { registerDaemonRoutes } from './daemon-api.js';
 import { registerBriefRoutes } from './brief-api.js';
-import { registerAndroidRoutes } from './android-api.js';
+import {
+  androidArtifactRels,
+  loadAndroidEvidence,
+  registerAndroidRoutes,
+} from './android-api.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
@@ -205,7 +209,11 @@ export async function createStudioServer(options) {
     requireJson(request);
     const body = await readJson(request, { limitBytes: 1024 * 1024 });
     const message = String(body.message ?? '').trim();
-    if (!message && !body.design && !body.designId && !body.tray && !body.designIds?.length && !body.designs?.length) {
+    const androidRels = androidArtifactRels(body);
+    const androidEvidence = androidRels.length
+      ? await loadAndroidEvidence(options.home, androidRels)
+      : [];
+    if (!message && !body.design && !body.designId && !body.tray && !body.designIds?.length && !body.designs?.length && androidEvidence.length === 0) {
       throw new HttpError(400, 'message is required');
     }
     let catalogue;
@@ -231,9 +239,13 @@ export async function createStudioServer(options) {
       designIds: body.designIds,
       designs: body.designs,
       tray: body.tray,
+      android: body.android,
+      androidArtifacts: body.androidArtifacts,
+      androidEvidence,
       loadDesign: (id) => designs.get(id),
       saveDesign: (capture) => designs.save(capture),
       loadTray: () => designs.getTray(),
+      loadAndroidEvidence: (rels) => loadAndroidEvidence(options.home, rels),
       signal: abort.signal,
     };
     if (!wantsEventStream(request)) {

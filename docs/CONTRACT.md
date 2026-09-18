@@ -484,5 +484,6 @@ Same optional adb helpers as `toris android`. No new on-disk format beyond `~/.t
 - `GET /api/android/artifacts` — newest ~20 files under `~/.toris/android/` (`name`, `bytes`, `mtime`)
 - `POST /api/android/screenshot` and `POST /api/android/logcat` — Origin + session token
 - Image media (`GET /api/android/media?path=`) stays inside `~/.toris/android/`; traversal is rejected
+- Selected artifacts attach to the existing `POST /api/agent/turn` (`android.artifacts` relative paths). Screenshot path + bounded logcat excerpt. Traversal is rejected. No second turn endpoint
 - `install` stays CLI-only. Missing `adb` is HTTP 200 on status, never 500. See `docs/STUDIO.md`.
 

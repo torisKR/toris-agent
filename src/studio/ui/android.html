@@ -38,7 +38,7 @@
           </div>
           <span class="queue-count" id="device-count">0</span>
         </div>
-        <p class="agent-lead">Same facts as <code>toris android status</code>. Screenshots land under <code>~/.toris/android/</code>. Install stays CLI-only.</p>
+        <p class="agent-lead">Same facts as <code>toris android status</code>. Select a local screenshot or logcat dump, write one instruction, and attach it to a Studio agent turn. Install stays CLI-only.</p>
         <section class="android-status" aria-label="adb and emulator status">
           <div class="android-status-top">
             <span class="badge" id="adb-badge">adb</span>
@@ -89,9 +89,18 @@
       <aside class="inspector" aria-label="Recent local Android artifacts">
         <section class="inspector-section">
           <div class="section-title"><span>01</span><h2>Recent artifacts</h2></div>
-          <p>Newest files under <code>~/.toris/android/</code>. Images are served only from that folder.</p>
+          <p>Newest files under <code>~/.toris/android/</code>. Click to select. Images are served only from that folder.</p>
           <div id="artifact-empty" class="android-empty">No local screenshots or logcat dumps yet.</div>
           <div id="artifact-list" class="android-hits" hidden></div>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title"><span>02</span><h2>Send to agent</h2></div>
+          <p>One instruction plus the selected artifacts, on the same <code>POST /api/agent/turn</code> Design Mode uses. Origin + session token.</p>
+          <form id="android-agent-form" class="stack">
+            <label class="field" for="android-note">Instruction<textarea id="android-note" name="message" maxlength="8000" required placeholder="The checkout CTA is clipped on this Pixel screenshot."></textarea></label>
+            <button class="button" id="android-send" type="submit" disabled>Send with evidence</button>
+          </form>
+          <p id="android-agent-status" class="android-hint">Select at least one local artifact.</p>
         </section>
       </aside>
     </div>
