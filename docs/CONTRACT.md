@@ -439,6 +439,8 @@ Additive reflect: `toris knowledge reflect [runId|--from-run <id>]` proposes a t
 
 Additive Studio reflect (same helper, same store): `GET /api/knowledge/reflect` is a same-origin read of the latest verified-run proposal. `POST /api/knowledge/reflect/accept` writes that one tacit note (`acceptReflections` → `KnowledgeStore.addTacit`) and requires Origin + session token. `POST /api/knowledge/reflect/dismiss` does not write. Failed or unverified receipts return `notable: false` with `proposal: null`.
 
+Additive Studio DAG read (same store): `GET /api/knowledge/domains/:slug/dag` returns `{ ok, slug, title, source, nodes: [{ id, title, kind, excerpt }], edges: [{ from, to, kind }], nodeCount, edgeCount }` from `inspectDomain`. Unknown domain is HTTP 404 (same as `GET /api/knowledge/domains/:slug`). Empty domains return empty arrays. The GET never calls `init` and does not write.
+
 ## Additive: project-local agent profiles (post-0.1)
 
 Not a breaking change to the frozen signatures above. The live catalogue is still

@@ -42,6 +42,7 @@ test('GET /knowledge is a standalone page that does not reuse app.js', async () 
     assert.equal(page.status, 200);
     const html = await page.text();
     assert.match(html, /id="knowledge-title"/);
+    assert.match(html, /id="knowledge-dag"/);
     assert.match(html, /\/assets\/knowledge\.js/);
     assert.doesNotMatch(html, /\/assets\/app\.js/);
     assert.equal((await fetch(`${base}/assets/knowledge.js`)).status, 200);
