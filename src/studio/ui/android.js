@@ -2,7 +2,9 @@ const state = {
   token: '',
   status: null,
   artifacts: [],
+  selected: new Set(),
   serial: '',
+  agentReady: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -88,17 +90,46 @@ function renderDevices() {
   }
 }
 
+function selectedRels() {
+  return [...state.selected].filter((rel) => state.artifacts.some((item) => item.rel === rel));
+}
+
+function syncSend() {
+  const selected = selectedRels();
+  const note = $('android-note').value.trim();
+  const ready = selected.length > 0 && Boolean(note) && state.agentReady;
+  $('android-send').disabled = !ready;
+  $('android-send').setAttribute('aria-disabled', String(!ready));
+  if (!state.agentReady) {
+    $('android-agent-status').textContent = 'Coding agent is not ready. Run `toris connect` in a terminal.';
+    return;
+  }
+  if (selected.length === 0) {
+    $('android-agent-status').textContent = 'Select at least one local artifact.';
+    return;
+  }
+  if (!note) {
+    $('android-agent-status').textContent = 'Write one instruction to send with the selected evidence.';
+    return;
+  }
+  $('android-agent-status').textContent = `${selected.length} artifact${selected.length === 1 ? '' : 's'} will attach to one agent turn.`;
+}
+
 function renderArtifacts() {
   const items = state.artifacts || [];
+  const known = new Set(items.map((item) => item.rel).filter(Boolean));
+  state.selected = new Set([...state.selected].filter((rel) => known.has(rel)));
   $('artifact-empty').hidden = items.length > 0;
   $('artifact-list').hidden = items.length === 0;
   const list = $('artifact-list');
   list.replaceChildren();
   for (const item of items) {
-    const row = document.createElement(item.image ? 'a' : 'div');
-    row.className = 'android-hit';
+    const row = document.createElement('button');
+    row.type = 'button';
+    const picked = Boolean(item.rel && state.selected.has(item.rel));
+    row.className = `android-hit${picked ? ' is-selected' : ''}`;
+    row.setAttribute('aria-pressed', String(picked));
     if (item.image && item.rel) {
-      row.href = mediaHref(item.rel);
       const img = document.createElement('img');
       img.className = 'android-thumb';
       img.alt = item.name;
@@ -110,17 +141,26 @@ function renderArtifacts() {
     const meta = document.createElement('small');
     meta.textContent = `${item.rel || item.name} · ${formatBytes(item.bytes)} · ${item.mtime || ''}`;
     row.append(title, meta);
+    row.addEventListener('click', () => {
+      if (!item.rel) return;
+      if (state.selected.has(item.rel)) state.selected.delete(item.rel);
+      else state.selected.add(item.rel);
+      renderArtifacts();
+    });
     list.append(row);
   }
+  syncSend();
 }
 
 async function refresh() {
-  const [status, artifacts] = await Promise.all([
+  const [status, artifacts, agent] = await Promise.all([
     api('/api/android'),
     api('/api/android/artifacts'),
+    api('/api/agent/status'),
   ]);
   state.status = status;
   state.artifacts = artifacts.items || [];
+  state.agentReady = Boolean(agent.ready);
   renderStatus();
   renderDevices();
   renderArtifacts();
@@ -170,6 +210,35 @@ $('capture-logcat').addEventListener('click', async () => {
     announce(error.message);
   } finally {
     button.disabled = false;
+  }
+});
+
+$('android-note').addEventListener('input', syncSend);
+
+$('android-agent-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const artifacts = selectedRels();
+  const message = $('android-note').value.trim();
+  if (!artifacts.length || !message || !state.agentReady) return;
+  const button = $('android-send');
+  button.disabled = true;
+  try {
+    const result = await api('/api/agent/turn', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        agent: 'implementer',
+        message,
+        android: { artifacts },
+      }),
+    });
+    announce(`${result.agent?.title || 'Agent'} received ${artifacts.length} Android artifact${artifacts.length === 1 ? '' : 's'}.`);
+    $('android-note').value = '';
+    state.selected.clear();
+    renderArtifacts();
+  } catch (error) {
+    announce(error.message);
+    syncSend();
   }
 });
 

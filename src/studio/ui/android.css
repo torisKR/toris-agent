@@ -58,9 +58,10 @@
   border-radius: var(--radius-control);
   background: var(--raised);
   color: inherit;
-  text-decoration: none;
   text-align: left;
+  cursor: pointer;
 }
+.android-hit.is-selected { border-color: var(--accent); background: var(--panel); }
 .android-hit strong { font-size: 13px; }
 .android-hit small { color: var(--quiet); font-size: 11px; }
 .android-thumb {

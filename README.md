@@ -124,7 +124,7 @@ toris android logcat         # dump under ~/.toris/android/logs/
 toris android install app.apk
 ```
 
-Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the model can attach device evidence before claiming a mobile UI fix. Studio `/android` is the same local evidence surface (status, devices, screenshot, recent artifacts). `install` stays CLI-only. No Android SDK is required for Studio, chat, or `toris run`.
+Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the model can attach device evidence before claiming a mobile UI fix. Studio `/android` is the same local evidence surface (status, devices, screenshot, recent artifacts) and can attach a selected screenshot and/or logcat excerpt to one `POST /api/agent/turn`. `install` stays CLI-only. No Android SDK is required for Studio, chat, or `toris run`.
 
 ### Secretary knowledge — domains, DAG, tacit memory
 

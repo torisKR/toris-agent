@@ -31,6 +31,7 @@ import {
   retrieveForTurn,
 } from '../core/knowledge/index.js';
 import { HttpError } from './http.js';
+import { composeAndroidTurnMessage, loadAndroidEvidence } from './android-api.js';
 import { composeDesignTurnMessage, listDesignCaptures, normalizeDesignCapture } from './design.js';
 import { formatPatchReviewMessage } from './patch-view.js';
 
@@ -169,11 +170,26 @@ async function resolveDesignCaptures(options) {
   return listDesignCaptures(captures);
 }
 
+async function resolveAndroidEvidence(options) {
+  if (Array.isArray(options.androidEvidence) && options.androidEvidence.length > 0) {
+    return options.androidEvidence.filter((item) => item && typeof item === 'object');
+  }
+  const rels = [
+    ...(Array.isArray(options.android?.artifacts) ? options.android.artifacts : []),
+    ...(Array.isArray(options.androidArtifacts) ? options.androidArtifacts : []),
+  ];
+  if (rels.length === 0) return [];
+  const load = options.loadAndroidEvidence || ((paths) => loadAndroidEvidence(options.home, paths));
+  return load(rels);
+}
+
 export async function runAgentTurn(options) {
   const message = String(options.message ?? '').trim();
   const hasDesign = Boolean(options.design || options.designId || options.tray || options.designIds?.length || options.designs?.length);
   const hasPatchReview = Boolean(options.patchReview);
-  if (!message && !hasDesign && !hasPatchReview) throw new HttpError(400, 'message is required');
+  const androidEvidence = await resolveAndroidEvidence(options);
+  const hasAndroid = androidEvidence.length > 0;
+  if (!message && !hasDesign && !hasPatchReview && !hasAndroid) throw new HttpError(400, 'message is required');
   if (message.length > MAX_MESSAGE_CHARS) throw new HttpError(400, 'message is too long');
 
   let catalogue = options.catalogue;
@@ -195,10 +211,12 @@ export async function runAgentTurn(options) {
   if (!status.ready || !status.config) throw new HttpError(409, status.reason);
 
   const captures = await resolveDesignCaptures(options);
-  const fallback = captures.length > 1
-    ? 'Inspect and fix the selected UI elements.'
-    : 'Inspect and fix the selected UI element.';
-  const composed = hasPatchReview
+  const fallback = hasAndroid && captures.length === 0
+    ? 'Inspect the attached Android device evidence.'
+    : captures.length > 1
+      ? 'Inspect and fix the selected UI elements.'
+      : 'Inspect and fix the selected UI element.';
+  let composed = hasPatchReview
     ? formatPatchReviewMessage({
         patch: options.patchReview.patch,
         diff: options.patchReview.diff,
@@ -206,7 +224,8 @@ export async function runAgentTurn(options) {
         hunk: options.patchReview.hunk,
       })
     : composeDesignTurnMessage(message || fallback, captures);
-  if (composed.length > MAX_TURN_CHARS) throw new HttpError(400, 'design attachment is too large');
+  if (hasAndroid) composed = composeAndroidTurnMessage(composed, androidEvidence);
+  if (composed.length > MAX_TURN_CHARS) throw new HttpError(400, 'attachment is too large');
 
   const config = status.config;
   const resolved = pickChatModel(config, options.profile);
@@ -287,6 +306,11 @@ export async function runAgentTurn(options) {
         url: item.url,
         selector: item.selector,
         note: item.note || '',
+      })),
+      android: androidEvidence.map((item) => ({
+        rel: item.rel || null,
+        path: item.path || null,
+        image: Boolean(item.image),
       })),
     };
   } finally {

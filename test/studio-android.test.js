@@ -4,7 +4,13 @@ import { mkdir, mkdtemp, realpath, rm, symlink, utimes, writeFile } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
-import { listAndroidArtifacts, resolveAndroidImage } from '../src/studio/android-api.js';
+import {
+  composeAndroidTurnMessage,
+  listAndroidArtifacts,
+  loadAndroidEvidence,
+  resolveAndroidArtifact,
+  resolveAndroidImage,
+} from '../src/studio/android-api.js';
 import { HttpError } from '../src/studio/http.js';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1, 2, 3]);
@@ -33,15 +39,20 @@ function mockExec() {
   };
 }
 
-async function withServer(fn, android = { detect: () => null }) {
+async function withServer(fn, extra = {}) {
   const home = await mkdtemp(join(tmpdir(), 'toris-studio-android-'));
+  const androidShaped = extra.detect || extra.exec || extra.status || extra.screenshot || extra.logcat || extra.listArtifacts;
+  const options = androidShaped && extra.android == null && extra.runAgentTurn == null
+    ? { android: extra }
+    : extra;
   const studio = await createStudioServer({
     home,
     cwd: home,
     host: '127.0.0.1',
     port: 0,
     token: 'test-token',
-    android,
+    ...options,
+    android: options.android || { detect: () => null },
   });
   await studio.listen();
   const base = `http://127.0.0.1:${studio.server.address().port}`;
@@ -74,6 +85,12 @@ test('GET /android is a standalone page that does not reuse app.js', async () =>
     assert.match(html, /\/assets\/android\.js/);
     assert.doesNotMatch(html, /\/assets\/app\.js/);
     assert.match(html, /href="\/android"/);
+    assert.match(html, /id="android-agent-form"/);
+    assert.match(html, /id="android-note"/);
+    assert.match(html, /id="android-send"/);
+    const script = await (await fetch(`${base}/assets/android.js`)).text();
+    assert.match(script, /\/api\/agent\/turn/);
+    assert.match(script, /android:\s*\{\s*artifacts/);
     assert.equal((await fetch(`${base}/assets/android.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/android.css`)).status, 200);
   });
@@ -291,6 +308,162 @@ test('android artifacts and media follow a symlinked toris home', async () => {
     const ok = await resolveAndroidImage(home, 'screenshots/ok.png');
     const androidRoot = await realpath(join(home, 'android'));
     assert.ok(ok.path === androidRoot || ok.path.startsWith(`${androidRoot}${sep}`));
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+    await rm(realHome, { recursive: true, force: true });
+  }
+});
+
+test('composeAndroidTurnMessage attaches a screenshot path and a log excerpt', async () => {
+  const composed = composeAndroidTurnMessage('CTA is clipped on Pixel 5.', [
+    {
+      rel: 'screenshots/scr_pixel.png',
+      path: '/tmp/home/android/screenshots/scr_pixel.png',
+      image: true,
+    },
+    {
+      rel: 'logs/log_crash.log',
+      path: '/tmp/home/android/logs/log_crash.log',
+      image: false,
+      excerpt: 'E AndroidRuntime: FATAL EXCEPTION: main',
+    },
+  ]);
+  assert.match(composed, /CTA is clipped on Pixel 5/);
+  assert.match(composed, /Android evidence \(2\)/);
+  assert.match(composed, /screenshots\/scr_pixel\.png/);
+  assert.match(composed, /Screenshot: \/tmp\/home\/android\/screenshots\/scr_pixel\.png/);
+  assert.match(composed, /FATAL EXCEPTION: main/);
+});
+
+test('POST /api/agent/turn with android artifacts requires Origin and session token', async () => {
+  await withServer(async ({ base, home }) => {
+    await mkdir(join(home, 'android', 'screenshots'), { recursive: true });
+    await writeFile(join(home, 'android', 'screenshots', 'ok.png'), PNG);
+
+    const denied = await fetch(`${base}/api/agent/turn`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        message: 'look at this shot',
+        android: { artifacts: ['screenshots/ok.png'] },
+      }),
+    });
+    assert.equal(denied.status, 403);
+
+    const badToken = await fetch(`${base}/api/agent/turn`, {
+      method: 'POST',
+      headers: {
+        origin: base,
+        'x-toris-studio-token': 'wrong',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: 'look at this shot',
+        android: { artifacts: ['screenshots/ok.png'] },
+      }),
+    });
+    assert.equal(badToken.status, 403);
+  }, {
+    runAgentTurn: async () => {
+      throw new Error('runner must not be called without studio auth');
+    },
+  });
+});
+
+test('POST /api/agent/turn references the selected android artifact on the turn', async () => {
+  let received;
+  await withServer(async ({ base, home }) => {
+    await mkdir(join(home, 'android', 'screenshots'), { recursive: true });
+    await mkdir(join(home, 'android', 'logs'), { recursive: true });
+    await writeFile(join(home, 'android', 'screenshots', 'ok.png'), PNG);
+    await writeFile(join(home, 'android', 'logs', 'note.log'), 'I toris: hello from device\n');
+
+    const response = await fetch(
+      `${base}/api/agent/turn`,
+      mutation(base, {
+        agent: 'implementer',
+        message: 'CTA is clipped on this screenshot.',
+        android: { artifacts: ['screenshots/ok.png', 'logs/note.log'] },
+      }),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(received.message, 'CTA is clipped on this screenshot.');
+    assert.equal(received.androidEvidence.length, 2);
+    assert.equal(received.androidEvidence[0].rel, 'screenshots/ok.png');
+    assert.equal(received.androidEvidence[0].image, true);
+    assert.match(received.androidEvidence[0].path, /screenshots\/ok\.png$/);
+    assert.equal(received.androidEvidence[1].rel, 'logs/note.log');
+    assert.match(received.androidEvidence[1].excerpt, /hello from device/);
+    const composed = composeAndroidTurnMessage(received.message, received.androidEvidence);
+    assert.match(composed, /CTA is clipped on this screenshot/);
+    assert.match(composed, /screenshots\/ok\.png/);
+    assert.match(composed, /Screenshot:/);
+    assert.match(composed, /hello from device/);
+  }, {
+    runAgentTurn: async (input) => {
+      received = input;
+      return { ok: true, text: 'will inspect the shot', agent: { id: 'implementer', title: 'Implementer' } };
+    },
+  });
+});
+
+test('POST /api/agent/turn rejects android artifact traversal', async () => {
+  await withServer(async ({ base, home }) => {
+    await mkdir(join(home, 'android', 'screenshots'), { recursive: true });
+    await writeFile(join(home, 'android', 'screenshots', 'ok.png'), PNG);
+    await writeFile(join(home, 'secret.png'), PNG);
+
+    const traversal = await fetch(
+      `${base}/api/agent/turn`,
+      mutation(base, {
+        agent: 'implementer',
+        message: 'exfiltrate',
+        android: { artifacts: ['../secret.png'] },
+      }),
+    );
+    assert.equal(traversal.status, 400);
+
+    const encoded = await fetch(
+      `${base}/api/agent/turn`,
+      mutation(base, {
+        agent: 'implementer',
+        message: 'exfiltrate',
+        android: { artifacts: ['%2e%2e/secret.png'] },
+      }),
+    );
+    assert.equal(encoded.status, 400);
+
+    await assert.rejects(
+      () => loadAndroidEvidence(home, ['../secret.png']),
+      (error) => error instanceof HttpError && error.status === 400,
+    );
+    await assert.rejects(
+      () => resolveAndroidArtifact(home, '../secret.png'),
+      (error) => error instanceof HttpError && error.status === 400,
+    );
+  }, {
+    runAgentTurn: async () => {
+      throw new Error('runner must not be called for a traversal path');
+    },
+  });
+});
+
+test('android evidence follows a symlinked toris home via realpath', async () => {
+  const realHome = await mkdtemp(join(tmpdir(), 'toris-android-turn-real-'));
+  const parent = await mkdtemp(join(tmpdir(), 'toris-android-turn-link-'));
+  const home = join(parent, 'home-link');
+  try {
+    await symlink(realHome, home);
+    await mkdir(join(home, 'android', 'screenshots'), { recursive: true });
+    await writeFile(join(home, 'android', 'screenshots', 'ok.png'), PNG);
+    const evidence = await loadAndroidEvidence(home, ['screenshots/ok.png']);
+    assert.equal(evidence.length, 1);
+    assert.equal(evidence[0].rel, 'screenshots/ok.png');
+    const androidRoot = await realpath(join(home, 'android'));
+    assert.ok(evidence[0].path === join(androidRoot, 'screenshots', 'ok.png') || evidence[0].path.startsWith(`${androidRoot}${sep}`));
+    const composed = composeAndroidTurnMessage('fix the CTA', evidence);
+    assert.match(composed, /screenshots\/ok\.png/);
+    assert.match(composed, /Screenshot:/);
   } finally {
     await rm(parent, { recursive: true, force: true });
     await rm(realHome, { recursive: true, force: true });
