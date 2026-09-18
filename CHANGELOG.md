@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `toris --help` now reports the real default autonomy (**L3**), matching `defaultAutonomy` in `src/core/config.js`.
 
+### Fixed
+
+- Studio `POST /api/daemon/run` attaches the registered project for Studio's cwd (same checks as `toris daemon run`) and rejects unknown autonomy levels with HTTP 400 instead of queueing a job that later fails.
+
 ## [0.4.0] - 2026-09-08
 
 ### Added
