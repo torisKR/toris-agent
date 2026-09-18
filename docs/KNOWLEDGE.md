@@ -146,6 +146,8 @@ Optional GUI: `http://127.0.0.1:5824/knowledge`. Browse domains, nodes, and DAG 
 
 The selected domain also has a **read-only DAG panel** (plain nested list — no graph library). Nodes show title and kind; edges nest under the source node. Click a node for its short body. A domain with no nodes stays quiet. `GET /api/knowledge/domains/:slug/dag` is the same-origin JSON read (`inspectDomain` slimmed to nodes + edges). It never calls `knowledge init` and does not write.
 
+The same page has a small **add node** form for the selected domain: title, kind (only kinds `KnowledgeStore` already accepts: `node` plus DAG edge kinds), short body, and an optional link to an existing node id in that domain. **Save node** writes exactly one node through `KnowledgeStore.addNode`. If a valid link target is chosen, it also writes one edge through `KnowledgeStore.link` using an existing DAG kind (`supports` when the kind is `node`). Invalid kind or unknown target is HTTP 400 and writes nothing. Unknown domain is HTTP 404, same as the inspect route. Duplicate ids are HTTP 409 — the store does not overwrite. Same Origin + session token gate as Accept. Nothing is written until you submit.
+
 The same page can show the latest **verified-run** proposal (goal, short outcome, domain guess) — the Studio equivalent of `toris knowledge reflect` / `/reflect`. **Accept** writes that one tacit note through `KnowledgeStore.addTacit` (same path as `--write` / `/reflect accept`). **Dismiss** does not write. Failed or unverified receipts stay hidden. Nothing is written until you click Accept.
 
 ## Grow a domain
