@@ -1,3 +1,5 @@
+import { consumeKnowledgePinAfterAccept, withStoredKnowledgePin } from './knowledge-pin-client.js';
+
 const state = {
   token: '',
   status: null,
@@ -243,15 +245,17 @@ $('android-agent-form').addEventListener('submit', async (event) => {
   const button = $('android-send');
   button.disabled = true;
   try {
+    const { payload, knowledge } = withStoredKnowledgePin({
+      agent: 'implementer',
+      message,
+      android: { artifacts },
+    });
     const result = await api('/api/agent/turn', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        agent: 'implementer',
-        message,
-        android: { artifacts },
-      }),
+      body: JSON.stringify(payload),
     });
+    consumeKnowledgePinAfterAccept(knowledge);
     announce(`${result.agent?.title || 'Agent'} received ${artifacts.length} Android artifact${artifacts.length === 1 ? '' : 's'}.`);
     $('android-note').value = '';
     state.selected.clear();

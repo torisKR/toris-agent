@@ -1,4 +1,4 @@
-const PIN_KEY = 'toris.studio.knowledge.pin';
+import { knowledgePinFromStorage, writeKnowledgePin } from './knowledge-pin-client.js';
 
 const state = {
   token: '',
@@ -77,23 +77,12 @@ function selectedDagNode() {
 }
 
 function readPin() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(PIN_KEY) || 'null');
-    if (!raw || typeof raw !== 'object') return null;
-    const domain = String(raw.domain || '').trim();
-    const nodeId = String(raw.nodeId || raw.id || '').trim();
-    return domain && nodeId ? { domain, nodeId } : null;
-  } catch {
-    return null;
-  }
+  return knowledgePinFromStorage();
 }
 
 function writePin(pin) {
   state.pin = pin;
-  try {
-    if (pin) localStorage.setItem(PIN_KEY, JSON.stringify(pin));
-    else localStorage.removeItem(PIN_KEY);
-  } catch { /* private mode */ }
+  writeKnowledgePin(pin);
 }
 
 function isPinned(node) {

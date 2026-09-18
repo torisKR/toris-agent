@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Studio knowledge pin on `/android`** — a pin set on `/knowledge` is now read, forwarded, and consumed by the `/android` turn client (same `localStorage` key and `{ domain, nodeId }` shape as `/agent` and Design Mode). A failed send leaves the pin in place.
+
 ### Added
 
 - **Studio `/knowledge` pin-to-turn** — each DAG node has **use on next turn**. The next `POST /api/agent/turn` sends that domain + node id; the server prepends a capped title/kind/excerpt block from `KnowledgeStore`. Unknown id is HTTP 400 (no model, no write). Unchecked turns are unchanged. Auto-retrieve ranking is unchanged. See `docs/KNOWLEDGE.md` and `docs/STUDIO.md`.

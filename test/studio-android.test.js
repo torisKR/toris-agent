@@ -93,8 +93,12 @@ test('GET /android is a standalone page that does not reuse app.js', async () =>
     const script = await (await fetch(`${base}/assets/android.js`)).text();
     assert.match(script, /\/api\/agent\/turn/);
     assert.match(script, /android:\s*\{\s*artifacts/);
+    assert.match(script, /knowledge-pin-client\.js/);
+    assert.match(script, /withStoredKnowledgePin/);
+    assert.match(script, /consumeKnowledgePinAfterAccept/);
     assert.equal((await fetch(`${base}/assets/android.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/android.css`)).status, 200);
+    assert.equal((await fetch(`${base}/assets/knowledge-pin-client.js`)).status, 200);
     const js = await readFile(join(repoRoot, 'src/studio/ui/android.js'), 'utf8');
     assert.match(js, /api\('\/api\/android\/artifacts'\)/);
     assert.match(js, /then\(\(artifacts\) => \{[\s\S]*renderArtifacts\(\)/);

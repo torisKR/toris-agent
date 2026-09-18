@@ -188,13 +188,23 @@ test('GET /knowledge ships one use-on-next-turn control without changing the DAG
 
     const script = await (await fetch(`${base}/assets/knowledge.js`)).text();
     assert.match(script, /use on next turn/);
-    assert.match(script, /toris\.studio\.knowledge\.pin/);
+    assert.match(script, /knowledge-pin-client\.js/);
     assert.match(script, /nodeId/);
     assert.match(script, /\/api\/knowledge\/domains\/\$\{encodeURIComponent\(slug\)\}\/dag/);
 
+    const pinClient = await (await fetch(`${base}/assets/knowledge-pin-client.js`)).text();
+    assert.match(pinClient, /toris\.studio\.knowledge\.pin/);
+    assert.equal((await fetch(`${base}/assets/knowledge-pin-client.js`)).status, 200);
+
     const agent = await (await fetch(`${base}/assets/app.js`)).text();
-    assert.match(agent, /payload\.knowledge/);
+    assert.match(agent, /withStoredKnowledgePin/);
+    assert.match(agent, /consumeKnowledgePinAfterAccept/);
     assert.match(agent, /\/api\/agent\/turn/);
+
+    const android = await (await fetch(`${base}/assets/android.js`)).text();
+    assert.match(android, /withStoredKnowledgePin/);
+    assert.match(android, /consumeKnowledgePinAfterAccept/);
+    assert.match(android, /\/api\/agent\/turn/);
 
     const dag = await (await fetch(`${base}/api/knowledge/domains/toris-ops/dag`)).json();
     assert.deepEqual(Object.keys(dag.nodes[0]).sort(), ['excerpt', 'id', 'kind', 'title']);
