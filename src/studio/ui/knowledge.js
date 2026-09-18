@@ -3,6 +3,7 @@ const state = {
   domains: [],
   selected: null,
   detail: null,
+  dag: null,
   nodeId: null,
   reflect: null,
   reflectHidden: false,
@@ -68,18 +69,15 @@ function selectedNode() {
   return state.detail?.nodes?.find((node) => node.id === state.nodeId) || null;
 }
 
-function renderDetail() {
-  const detail = state.detail;
-  $('knowledge-empty').hidden = Boolean(detail);
-  $('knowledge-detail').hidden = !detail;
-  if (!detail) return;
-  $('detail-slug').textContent = detail.slug;
-  $('detail-title').textContent = detail.title;
-  $('detail-source').textContent = detail.source;
-  $('detail-when').textContent = detail.when || detail.anti || '';
-  const node = selectedNode();
-  $('node-body').textContent = node ? node.body : detail.body || '';
+function selectedDagNode() {
+  return state.dag?.nodes?.find((node) => node.id === state.nodeId) || null;
+}
 
+function dagTitle(id) {
+  return state.dag?.nodes?.find((node) => node.id === id)?.title || id;
+}
+
+function renderNodes(detail) {
   const nodes = $('node-list');
   nodes.replaceChildren();
   for (const item of detail.nodes || []) {
@@ -97,7 +95,9 @@ function renderDetail() {
     });
     nodes.append(button);
   }
+}
 
+function renderEdges(detail) {
   const edges = $('edge-list');
   edges.replaceChildren();
   for (const edge of detail.edges || []) {
@@ -118,10 +118,93 @@ function renderDetail() {
   }
 }
 
+function renderDag() {
+  const panel = $('knowledge-dag');
+  const list = $('dag-nodes');
+  const excerpt = $('dag-excerpt');
+  const nodes = state.dag?.nodes || [];
+  list.replaceChildren();
+  panel.hidden = nodes.length === 0;
+  excerpt.hidden = true;
+  excerpt.textContent = '';
+  if (!nodes.length) return;
+
+  const outgoing = new Map();
+  for (const edge of state.dag.edges || []) {
+    if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+    outgoing.get(edge.from).push(edge);
+  }
+
+  for (const node of nodes) {
+    const item = document.createElement('li');
+    item.className = 'knowledge-dag-node';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `knowledge-hit${node.id === state.nodeId ? ' is-selected' : ''}`;
+    const title = document.createElement('strong');
+    title.textContent = node.title;
+    const kind = document.createElement('small');
+    kind.textContent = node.kind || 'node';
+    button.append(title, kind);
+    button.addEventListener('click', () => {
+      state.nodeId = node.id;
+      renderDetail();
+    });
+    item.append(button);
+    const links = outgoing.get(node.id) || [];
+    if (links.length) {
+      const nest = document.createElement('ul');
+      nest.className = 'knowledge-dag-edges';
+      for (const edge of links) {
+        const row = document.createElement('li');
+        row.textContent = `${edge.kind} → ${dagTitle(edge.to)}`;
+        nest.append(row);
+      }
+      item.append(nest);
+    }
+    list.append(item);
+  }
+
+  const selected = selectedDagNode();
+  if (selected?.excerpt) {
+    excerpt.hidden = false;
+    excerpt.textContent = selected.excerpt;
+  }
+}
+
+function renderDetail() {
+  const detail = state.detail;
+  $('knowledge-empty').hidden = Boolean(detail);
+  $('knowledge-detail').hidden = !detail;
+  if (!detail) {
+    state.dag = null;
+    renderDag();
+    return;
+  }
+  $('detail-slug').textContent = detail.slug;
+  $('detail-title').textContent = detail.title;
+  $('detail-source').textContent = detail.source;
+  $('detail-when').textContent = detail.when || detail.anti || '';
+  const node = selectedNode();
+  $('node-body').textContent = node ? node.body : detail.body || '';
+  renderNodes(detail);
+  renderEdges(detail);
+  renderDag();
+}
+
+async function loadDag(slug) {
+  try {
+    return await api(`/api/knowledge/domains/${encodeURIComponent(slug)}/dag`);
+  } catch {
+    return { ok: true, slug, nodes: [], edges: [], nodeCount: 0, edgeCount: 0 };
+  }
+}
+
 async function selectDomain(slug) {
   state.selected = slug;
   state.detail = await api(`/api/knowledge/domains/${encodeURIComponent(slug)}`);
-  state.nodeId = state.detail.nodes?.[0]?.id || null;
+  state.dag = await loadDag(slug);
+  state.nodeId = state.detail.nodes?.[0]?.id || state.dag.nodes?.[0]?.id || null;
   renderDomains();
   renderDetail();
 }

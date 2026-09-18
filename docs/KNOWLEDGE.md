@@ -144,6 +144,8 @@ A tacit note is “how we actually do X **here**”. A skill under `skills/` is 
 
 Optional GUI: `http://127.0.0.1:5824/knowledge`. Browse domains, nodes, and DAG edges; add a node or edge. It is a **separate page** (`knowledge.html` + `knowledge.js`) so it does not share the review-room client with Design Mode or the agent room.
 
+The selected domain also has a **read-only DAG panel** (plain nested list — no graph library). Nodes show title and kind; edges nest under the source node. Click a node for its short body. A domain with no nodes stays quiet. `GET /api/knowledge/domains/:slug/dag` is the same-origin JSON read (`inspectDomain` slimmed to nodes + edges). It never calls `knowledge init` and does not write.
+
 The same page can show the latest **verified-run** proposal (goal, short outcome, domain guess) — the Studio equivalent of `toris knowledge reflect` / `/reflect`. **Accept** writes that one tacit note through `KnowledgeStore.addTacit` (same path as `--write` / `/reflect accept`). **Dismiss** does not write. Failed or unverified receipts stay hidden. Nothing is written until you click Accept.
 
 ## Grow a domain

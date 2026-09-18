@@ -37,6 +37,27 @@
 .knowledge-hit strong { font-size: 13px; }
 .knowledge-hit small { color: var(--quiet); font-size: 11px; }
 .knowledge-add { margin: 16px 0; padding-top: 16px; border-top: 1px solid var(--border); }
+.knowledge-dag { display: grid; gap: 12px; }
+.knowledge-dag-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.knowledge-dag-node { display: grid; gap: 6px; }
+.knowledge-dag-edges {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 1px solid var(--border);
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1.5;
+  list-style: none;
+}
+.knowledge-dag-edges li { padding: 2px 0; }
 .knowledge-reflect {
   margin: 0 18px 16px;
   padding: 14px;

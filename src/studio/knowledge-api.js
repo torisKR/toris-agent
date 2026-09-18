@@ -1,5 +1,6 @@
 import { KnowledgeStore, searchIndex, STARTER_DOMAIN_SLUGS } from '../core/knowledge/index.js';
 import { HttpError, readJson } from './http.js';
+import { loadKnowledgeDag } from './knowledge-dag.js';
 import { acceptReflect, loadReflect } from './knowledge-reflect.js';
 
 function storeOf(options) {
@@ -51,6 +52,15 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
     const store = storeOf(options);
     try {
       sendJson(response, 200, await store.inspectDomain(params.slug));
+    } catch (error) {
+      throw new HttpError(error.code === 'E_UNKNOWN_DOMAIN' ? 404 : 400, error.message);
+    }
+  });
+
+  router.add('GET', '/api/knowledge/domains/:slug/dag', async (_request, response, params) => {
+    const store = storeOf(options);
+    try {
+      sendJson(response, 200, await loadKnowledgeDag(store, params.slug));
     } catch (error) {
       throw new HttpError(error.code === 'E_UNKNOWN_DOMAIN' ? 404 : 400, error.message);
     }
