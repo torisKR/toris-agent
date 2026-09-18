@@ -9,6 +9,7 @@ import {
   proposeFromRun,
   looksLikeRunId,
   renderReflection,
+  acceptReflections,
   STARTER_DOMAIN_SLUGS,
   EDGE_KINDS,
 } from '../../core/knowledge/index.js';
@@ -363,18 +364,7 @@ async function cmdReflect(ctx, store, rest, flags) {
     line(renderReflection(result));
     return EXIT.OK;
   }
-  const written = [];
-  for (const proposal of result.proposals) {
-    written.push(
-      await store.addTacit(proposal.domain, {
-        id: proposal.id,
-        title: proposal.title,
-        tags: proposal.tags,
-        body: proposal.body,
-        inbox: !proposal.domain,
-      }),
-    );
-  }
+  const written = await acceptReflections(store, result);
   if (ctx.json) {
     printJson({ ok: true, written: true, notes: written, ...result });
     return EXIT.OK;

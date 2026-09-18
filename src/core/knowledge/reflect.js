@@ -154,3 +154,24 @@ export function renderReflection(result) {
   });
   return [`${result.reason}`, '', ...blocks, '', accept].join('\n');
 }
+
+/**
+ * Write proposed tacit notes. Same path as `--write` / `/reflect accept`.
+ * Callers must only pass a result the operator opted into.
+ */
+export async function acceptReflections(store, result) {
+  if (!result?.proposals?.length) return [];
+  const written = [];
+  for (const proposal of result.proposals) {
+    written.push(
+      await store.addTacit(proposal.domain, {
+        id: proposal.id,
+        title: proposal.title,
+        tags: proposal.tags,
+        body: proposal.body,
+        inbox: !proposal.domain,
+      }),
+    );
+  }
+  return written;
+}

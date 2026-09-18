@@ -8,6 +8,7 @@ import { Store } from '../src/core/store.js';
 import { KnowledgeStore } from '../src/core/knowledge/store.js';
 import { buildReceipt } from '../src/core/receipt.js';
 import {
+  acceptReflections,
   guessDomain,
   isVerifiedSuccess,
   looksLikeRunId,
@@ -79,6 +80,8 @@ test('a verified receipt proposes one tacit draft with goal, plan, and exits', (
   assert.match(draft.body, /flutter test` exit 0/);
   assert.match(draft.body, /npm test` exit 0/);
   assert.match(draft.body, /Opposite review passed/);
+  assert.equal(draft.goal, 'Fix Flutter jank on a mid-range Android phone');
+  assert.match(draft.outcome, /verification passed|checks passed|Opposite review passed/i);
   assert.match(result.reason, /Do not write it silently/);
 });
 
@@ -162,4 +165,24 @@ test('short chat turns still refuse to invent tacit', () => {
   const result = proposeReflections({ user: 'ok', assistant: 'done' });
   assert.equal(result.notable, false);
   assert.equal(result.proposals.length, 0);
+});
+
+test('acceptReflections writes proposed notes and empty results write nothing', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'toris-reflect-accept-'));
+  const knowledge = new KnowledgeStore({ home });
+  await knowledge.init({ seed: true });
+  const inboxBefore = await knowledge.listInbox();
+  try {
+    const empty = await acceptReflections(knowledge, { notable: false, proposals: [] });
+    assert.deepEqual(empty, []);
+    assert.equal((await knowledge.listInbox()).length, inboxBefore.length);
+
+    const receipt = proposeReflectionsFromReceipt(buildReceipt(verifiedRun(), []));
+    const written = await acceptReflections(knowledge, receipt);
+    assert.equal(written.length, 1);
+    const tacit = await knowledge.listTacit('flutter-android');
+    assert.ok(tacit.some((note) => note.id === written[0].id));
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });

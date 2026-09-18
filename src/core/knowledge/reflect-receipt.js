@@ -38,6 +38,8 @@ export function proposeReflectionsFromReceipt(receipt = {}, options = {}) {
         tags: ['tacit', 'reflect', 'receipt'],
         body: renderReceiptDraft({ receipt, title, goal }),
         runId,
+        goal,
+        outcome: outcomeNotes(receipt),
       },
     ],
     source,

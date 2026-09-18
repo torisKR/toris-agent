@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Studio `/knowledge` reflect accept** — the latest verified-run tacit proposal (goal, short outcome, domain guess) on `/knowledge`. `GET /api/knowledge/reflect` is read-only. Authenticated **Accept** writes that one note via the existing `acceptReflections` / `addTacit` path (`toris knowledge reflect --write` / `/reflect accept`). **Dismiss** does not write. Failed or unverified receipts stay hidden. See `docs/KNOWLEDGE.md` and `docs/STUDIO.md`.
 - **Studio `/android` attach-to-turn** — select recent files under `~/.toris/android/` and send one instruction on the existing `POST /api/agent/turn` (canonical screenshot path and/or a short logcat excerpt). Same Origin + session token as Design Mode. Traversal is rejected. No second turn endpoint.
 - **Studio `/android`** — loopback device-evidence page for the same optional adb helpers as `toris android` (`GET /android`, `GET /api/android`, artifacts, screenshot/logcat). Missing adb is a quiet 200. Mutations need Origin + session token. Image media stays under `~/.toris/android/`. `install` remains CLI-only. See `docs/STUDIO.md`.
 - **Studio `/brief`** — loopback read-only page for the same local secretary digest as `toris brief` (`GET /brief`, `GET /api/brief`). Spend, today's runs, daemon status/next due, knowledge headlines. Quiet empty sections. No mutations. See `docs/STUDIO.md`.

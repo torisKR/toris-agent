@@ -1,15 +1,22 @@
 import { KnowledgeStore, searchIndex, STARTER_DOMAIN_SLUGS } from '../core/knowledge/index.js';
 import { HttpError, readJson } from './http.js';
+import { acceptReflect, loadReflect } from './knowledge-reflect.js';
 
 function storeOf(options) {
   return new KnowledgeStore({ home: options.home, projectPath: options.cwd });
+}
+
+function optionalRunId(value) {
+  if (value == null) return undefined;
+  const runId = String(value).trim();
+  return runId || undefined;
 }
 
 /**
  * Additive Studio routes for /api/knowledge. Does not touch review, agent, or
  * design handlers — those stay in server.js.
  */
-export function registerKnowledgeRoutes(router, { sendJson, requireJson, options }) {
+export function registerKnowledgeRoutes(router, { sendJson, requireJson, options, store }) {
   router.add('GET', '/api/knowledge', async (_request, response) => {
     const store = storeOf(options);
     const status = await store.status();
@@ -98,5 +105,29 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
     } catch (error) {
       throw new HttpError(400, error.message);
     }
+  });
+
+  router.add('GET', '/api/knowledge/reflect', async (request, response) => {
+    const url = new URL(request.url || '/', 'http://127.0.0.1');
+    const runId = optionalRunId(url.searchParams.get('runId') || url.searchParams.get('from-run'));
+    const { presented } = await loadReflect(store, storeOf(options), runId);
+    sendJson(response, 200, presented);
+  });
+
+  router.add('POST', '/api/knowledge/reflect/accept', async (request, response) => {
+    requireJson(request);
+    const body = await readJson(request);
+    try {
+      sendJson(response, 201, await acceptReflect(store, storeOf(options), optionalRunId(body.runId)));
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(error.code === 'E_NODE_EXISTS' ? 409 : 400, error.message);
+    }
+  });
+
+  router.add('POST', '/api/knowledge/reflect/dismiss', async (request, response) => {
+    requireJson(request);
+    await readJson(request);
+    sendJson(response, 200, { ok: true, written: false });
   });
 }

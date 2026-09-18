@@ -39,6 +39,22 @@
           <span class="queue-count" id="domain-count">0</span>
         </div>
         <p class="agent-lead">Plain files under <code>~/.toris/knowledge</code>. Same store as <code>toris knowledge</code>.</p>
+        <section class="knowledge-reflect" id="reflect-panel" aria-label="Verified-run reflect">
+          <div class="knowledge-reflect-head">
+            <p class="kicker">Reflect</p>
+            <span class="badge" id="reflect-badge">opt-in</span>
+          </div>
+          <p id="reflect-empty" class="knowledge-reflect-empty">No verified-run proposal.</p>
+          <div id="reflect-card" hidden>
+            <p class="kicker" id="reflect-domain"></p>
+            <strong id="reflect-goal"></strong>
+            <p id="reflect-outcome" class="knowledge-when"></p>
+            <div class="knowledge-reflect-actions">
+              <button class="button" id="reflect-accept" type="button">Accept</button>
+              <button class="button secondary" id="reflect-dismiss" type="button">Dismiss</button>
+            </div>
+          </div>
+        </section>
         <div id="domain-list" class="review-queue" role="listbox" aria-label="Domains"></div>
       </aside>
 
