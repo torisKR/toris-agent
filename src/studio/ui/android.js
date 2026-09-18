@@ -156,21 +156,33 @@ function renderArtifacts() {
 }
 
 async function refresh() {
-  const [statusResult, artifactsResult, agentResult] = await Promise.allSettled([
-    api('/api/android'),
-    api('/api/android/artifacts'),
-    api('/api/agent/status'),
-  ]);
   const errors = [];
-  if (statusResult.status === 'fulfilled') state.status = statusResult.value;
-  else errors.push(statusResult.reason?.message || 'status failed');
-  if (artifactsResult.status === 'fulfilled') state.artifacts = artifactsResult.value.items || [];
-  else errors.push(artifactsResult.reason?.message || 'artifacts failed');
-  if (agentResult.status === 'fulfilled') state.agentReady = Boolean(agentResult.value.ready);
-  else errors.push(agentResult.reason?.message || 'agent status failed');
-  renderStatus();
-  renderDevices();
-  renderArtifacts();
+  const statusDone = api('/api/android')
+    .then((status) => {
+      state.status = status;
+      renderStatus();
+      renderDevices();
+    })
+    .catch((error) => {
+      errors.push(error.message || 'status failed');
+    });
+  const artifactsDone = api('/api/android/artifacts')
+    .then((artifacts) => {
+      state.artifacts = artifacts.items || [];
+      renderArtifacts();
+    })
+    .catch((error) => {
+      errors.push(error.message || 'artifacts failed');
+    });
+  const agentDone = api('/api/agent/status')
+    .then((agent) => {
+      state.agentReady = Boolean(agent.ready);
+      syncSend();
+    })
+    .catch((error) => {
+      errors.push(error.message || 'agent status failed');
+    });
+  await Promise.all([statusDone, artifactsDone, agentDone]);
   if (errors.length) throw new Error(errors.join(' · '));
 }
 

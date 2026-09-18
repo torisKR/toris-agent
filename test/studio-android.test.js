@@ -96,7 +96,8 @@ test('GET /android is a standalone page that does not reuse app.js', async () =>
     assert.equal((await fetch(`${base}/assets/android.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/android.css`)).status, 200);
     const js = await readFile(join(repoRoot, 'src/studio/ui/android.js'), 'utf8');
-    assert.match(js, /Promise\.allSettled/);
+    assert.match(js, /api\('\/api\/android\/artifacts'\)/);
+    assert.match(js, /then\(\(artifacts\) => \{[\s\S]*renderArtifacts\(\)/);
     assert.match(js, /refresh\(\)\.catch/);
   });
 });
