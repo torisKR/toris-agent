@@ -9,6 +9,7 @@ import {
   studioKnowledgeUrl,
   studioDaemonUrl,
   studioBriefUrl,
+  studioAndroidUrl,
   studioOrigin,
   renderStudioAccess,
   tuiAgentHint,
@@ -25,6 +26,7 @@ test('studio URLs stay on loopback and name the agent room', () => {
   assert.equal(studioKnowledgeUrl(), 'http://127.0.0.1:5824/knowledge');
   assert.equal(studioDaemonUrl(), 'http://127.0.0.1:5824/daemon');
   assert.equal(studioBriefUrl(), 'http://127.0.0.1:5824/brief');
+  assert.equal(studioAndroidUrl(), 'http://127.0.0.1:5824/android');
   assert.equal(studioAgentUrl(0), 'http://127.0.0.1:0/agent');
 });
 
@@ -36,6 +38,7 @@ test('TUI and GUI directions name both doors onto the same agent', () => {
   assert.match(idle, /http:\/\/127\.0\.0\.1:5824\/knowledge/);
   assert.match(idle, /http:\/\/127\.0\.0\.1:5824\/daemon/);
   assert.match(idle, /http:\/\/127\.0\.0\.1:5824\/brief/);
+  assert.match(idle, /http:\/\/127\.0\.0\.1:5824\/android/);
   assert.match(idle, /TUI {2}toris/);
   assert.match(idle, /toris studio --open/);
 

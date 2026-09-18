@@ -42,7 +42,7 @@ test('health and session are local-only and emit no CORS headers', async () => {
     assert.equal(healthBody.name, 'Toris Studio');
     assert.equal(healthBody.localOnly, true);
     assert.equal(healthBody.status, 'ready');
-    assert.deepEqual(healthBody.surfaces, ['review', 'agent', 'design', 'patches', 'knowledge', 'daemon', 'brief']);
+    assert.deepEqual(healthBody.surfaces, ['review', 'agent', 'design', 'patches', 'knowledge', 'daemon', 'brief', 'android']);
     assert.equal(healthBody.cost.spentUsd, 0);
     assert.equal(healthBody.cost.capUsd, 20);
     assert.match(healthBody.cost.day, /^\d{4}-\d{2}-\d{2}$/);

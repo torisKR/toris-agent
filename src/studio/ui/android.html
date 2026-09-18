@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local adb and emulator evidence: devices, screenshots, and recent artifacts in Toris Studio.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <title>Toris Studio · Android</title>
+  <link rel="stylesheet" href="/assets/tokens.css">
+  <link rel="stylesheet" href="/assets/components.css">
+  <link rel="stylesheet" href="/assets/studio.css">
+  <link rel="stylesheet" href="/assets/android.css">
+</head>
+<body>
+  <div class="studio-frame">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">T</span><span>Toris Studio</span></a>
+      <nav class="surface-nav" aria-label="Workspace">
+        <a class="tab" href="/">Review</a>
+        <a class="tab" href="/agent">Agent</a>
+        <a class="tab" href="/design">Design</a>
+        <a class="tab" href="/patches">Patches</a>
+        <a class="tab" href="/knowledge">Knowledge</a>
+        <a class="tab" href="/daemon">Daemon</a>
+        <a class="tab" href="/brief">Brief</a>
+        <a class="tab" href="/android" aria-current="page">Android</a>
+      </nav>
+      <div class="local-state"><span class="pulse" aria-hidden="true"></span><span>127.0.0.1 · local files</span></div>
+      <a class="system-link" href="/design-system">Design system</a>
+    </header>
+
+    <div class="studio-shell is-android">
+      <aside class="queue-panel" aria-labelledby="android-title">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">Device evidence</p>
+            <h1 id="android-title">Android</h1>
+          </div>
+          <span class="queue-count" id="device-count">0</span>
+        </div>
+        <p class="agent-lead">Same facts as <code>toris android status</code>. Screenshots land under <code>~/.toris/android/</code>. Install stays CLI-only.</p>
+        <section class="android-status" aria-label="adb and emulator status">
+          <div class="android-status-top">
+            <span class="badge" id="adb-badge">adb</span>
+            <button class="button quiet" id="refresh-android" type="button">Refresh</button>
+          </div>
+          <dl class="design-meta">
+            <div><dt>adb</dt><dd id="adb-path">—</dd></div>
+            <div><dt>emulator</dt><dd id="emulator-path">—</dd></div>
+            <div><dt>version</dt><dd id="adb-version">—</dd></div>
+          </dl>
+          <p id="adb-hint" class="android-hint">adb is optional. Missing platform-tools is a quiet warning, not a Studio failure.</p>
+        </section>
+        <section class="android-actions" aria-label="Capture evidence">
+          <button class="button" id="capture-screenshot" type="button">Screenshot</button>
+          <button class="button secondary" id="capture-logcat" type="button">Logcat</button>
+        </section>
+      </aside>
+
+      <main id="android-workspace" class="content-workspace" tabindex="-1">
+        <section class="workspace-empty" id="device-empty">
+          <span class="empty-orbit" aria-hidden="true"></span>
+          <p class="kicker">adb devices</p>
+          <h2>No devices yet.</h2>
+          <p>Connect a phone or start an emulator, then refresh. Same list as <code>toris android devices</code>.</p>
+        </section>
+        <section class="workspace-detail" id="device-list" hidden>
+          <div class="workspace-header">
+            <div>
+              <p class="kicker">Devices</p>
+              <h2>Connected</h2>
+            </div>
+          </div>
+          <div class="android-table-wrap">
+            <table class="android-table">
+              <thead>
+                <tr>
+                  <th scope="col">Serial</th>
+                  <th scope="col">State</th>
+                  <th scope="col">Model</th>
+                </tr>
+              </thead>
+              <tbody id="device-rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <aside class="inspector" aria-label="Recent local Android artifacts">
+        <section class="inspector-section">
+          <div class="section-title"><span>01</span><h2>Recent artifacts</h2></div>
+          <p>Newest files under <code>~/.toris/android/</code>. Images are served only from that folder.</p>
+          <div id="artifact-empty" class="android-empty">No local screenshots or logcat dumps yet.</div>
+          <div id="artifact-list" class="android-hits" hidden></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+  <div id="toast" class="sr-toast" aria-live="polite"></div>
+  <script type="module" src="/assets/android.js"></script>
+</body>
+</html>
