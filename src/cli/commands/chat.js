@@ -55,6 +55,7 @@ import {
   looksLikeRunId,
   proposeFromRun,
   proposeReflections,
+  acceptReflections,
   publicKnowledgeReceipt,
   renderReflection,
   retrieveForTurn,
@@ -573,14 +574,7 @@ export async function cmdChat(ctx, args, flags) {
         log(c.dim(result.reason));
         return;
       }
-      for (const proposal of result.proposals) {
-        const note = await knowledgeStore.addTacit(proposal.domain, {
-          id: proposal.id,
-          title: proposal.title,
-          tags: proposal.tags,
-          body: proposal.body,
-          inbox: !proposal.domain,
-        });
+      for (const note of await acceptReflections(knowledgeStore, result)) {
         log(`${c.green('+')} ${note.path}`);
       }
     },

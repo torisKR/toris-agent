@@ -23,6 +23,7 @@ export {
   guessDomain,
   isVerifiedSuccess,
   emptyReflection,
+  acceptReflections,
 } from './reflect.js';
 export { proposeReflectionsFromReceipt } from './reflect-receipt.js';
 export { looksLikeRunId, getRunFromStore, proposeFromRun } from './reflect-run.js';

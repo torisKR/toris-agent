@@ -48,6 +48,7 @@ export {
   proposeReflections,
   proposeReflectionsFromReceipt,
   proposeFromRun,
+  acceptReflections,
   looksLikeRunId,
   knowledgeDoctorCheck,
   createKnowledgeTools,

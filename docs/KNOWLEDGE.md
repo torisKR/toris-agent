@@ -144,6 +144,8 @@ A tacit note is “how we actually do X **here**”. A skill under `skills/` is 
 
 Optional GUI: `http://127.0.0.1:5824/knowledge`. Browse domains, nodes, and DAG edges; add a node or edge. It is a **separate page** (`knowledge.html` + `knowledge.js`) so it does not share the review-room client with Design Mode or the agent room.
 
+The same page can show the latest **verified-run** proposal (goal, short outcome, domain guess) — the Studio equivalent of `toris knowledge reflect` / `/reflect`. **Accept** writes that one tacit note through `KnowledgeStore.addTacit` (same path as `--write` / `/reflect accept`). **Dismiss** does not write. Failed or unverified receipts stay hidden. Nothing is written until you click Accept.
+
 ## Grow a domain
 
 1. `toris knowledge domains add checkout --title "Checkout"`

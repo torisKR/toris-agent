@@ -486,6 +486,10 @@ export function proposeFromRun(
 }>;
 export function looksLikeRunId(value?: string): boolean;
 export function isVerifiedSuccess(receiptOrRun?: { verification?: { passed?: boolean | null } }): boolean;
+export function acceptReflections(
+  store: KnowledgeStore,
+  result: { proposals?: Array<Record<string, unknown>> },
+): Promise<Array<Record<string, unknown>>>;
 export function knowledgeDoctorCheck(options?: { home?: string; projectPath?: string }): Promise<DoctorCheck>;
 export function createKnowledgeTools(options?: {
   home?: string;

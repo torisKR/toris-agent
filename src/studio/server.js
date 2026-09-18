@@ -496,7 +496,7 @@ export async function createStudioServer(options) {
     sendJson(response, 200, job);
   });
 
-  registerKnowledgeRoutes(router, { sendJson, requireJson, options });
+  registerKnowledgeRoutes(router, { sendJson, requireJson, options, store });
   registerDaemonRoutes(router, { sendJson, requireJson, options, store });
   registerBriefRoutes(router, { sendJson, options, store });
   registerAndroidRoutes(router, { sendJson, requireJson, options });

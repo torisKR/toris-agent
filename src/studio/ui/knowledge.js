@@ -4,6 +4,8 @@ const state = {
   selected: null,
   detail: null,
   nodeId: null,
+  reflect: null,
+  reflectHidden: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -124,9 +126,30 @@ async function selectDomain(slug) {
   renderDetail();
 }
 
+function renderReflect() {
+  const proposal = !state.reflectHidden && state.reflect?.notable ? state.reflect.proposal : null;
+  $('reflect-empty').hidden = Boolean(proposal);
+  $('reflect-card').hidden = !proposal;
+  $('reflect-badge').textContent = proposal ? 'verified' : 'opt-in';
+  if (!proposal) return;
+  $('reflect-domain').textContent = proposal.domain || 'inbox';
+  $('reflect-goal').textContent = proposal.goal || proposal.title || '';
+  $('reflect-outcome').textContent = proposal.outcome || '';
+}
+
+async function refreshReflect() {
+  try {
+    state.reflect = await api('/api/knowledge/reflect');
+  } catch {
+    state.reflect = { notable: false, proposal: null };
+  }
+  renderReflect();
+}
+
 async function refresh() {
   const overview = await api('/api/knowledge');
   state.domains = overview.domains || [];
+  await refreshReflect();
   if (!overview.ok) {
     state.detail = null;
     renderDomains();
@@ -202,6 +225,36 @@ $('add-node-form').addEventListener('submit', async (event) => {
     $('add-node-form').reset();
     announce('Node saved.');
     await selectDomain(state.selected);
+  } catch (error) {
+    announce(error.message);
+  }
+});
+
+$('reflect-accept').addEventListener('click', async () => {
+  try {
+    const runId = state.reflect?.proposal?.runId;
+    const result = await api('/api/knowledge/reflect/accept', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(runId ? { runId } : {}),
+    });
+    announce(result.note?.path ? `Wrote ${result.note.path}` : 'Wrote tacit note.');
+    await refresh();
+  } catch (error) {
+    announce(error.message);
+  }
+});
+
+$('reflect-dismiss').addEventListener('click', async () => {
+  try {
+    await api('/api/knowledge/reflect/dismiss', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    state.reflectHidden = true;
+    renderReflect();
+    announce('Dismissed. Nothing written.');
   } catch (error) {
     announce(error.message);
   }

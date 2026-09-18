@@ -437,6 +437,8 @@ Additive chat behaviour (does not change frozen signatures): `toris chat` and St
 
 Additive reflect: `toris knowledge reflect [runId|--from-run <id>]` proposes a tacit draft from a verified run receipt (or the latest verified run). Receipt JSON may include `reflectHint`. Schema version stays `1`. No silent USER.md / MEMORY.md / tacit writes.
 
+Additive Studio reflect (same helper, same store): `GET /api/knowledge/reflect` is a same-origin read of the latest verified-run proposal. `POST /api/knowledge/reflect/accept` writes that one tacit note (`acceptReflections` → `KnowledgeStore.addTacit`) and requires Origin + session token. `POST /api/knowledge/reflect/dismiss` does not write. Failed or unverified receipts return `notable: false` with `proposal: null`.
+
 ## Additive: project-local agent profiles (post-0.1)
 
 Not a breaking change to the frozen signatures above. The live catalogue is still
