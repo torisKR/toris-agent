@@ -21,6 +21,16 @@ function inside(root, candidate) {
   return value === base || value.startsWith(`${base}${sep}`);
 }
 
+/** `realpath` when the path exists; `null` for a missing path. */
+async function realpathIfExists(path) {
+  try {
+    return await realpath(path);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 function androidCoreOptions(options, extra = {}) {
   const android = options.android || {};
   const core = { home: options.home, ...extra };
@@ -72,14 +82,17 @@ function androidHttpError(error) {
  * outside the Toris home. Missing directory is an empty list.
  */
 export async function listAndroidArtifacts(home, { limit = ARTIFACT_LIMIT } = {}) {
-  const torisHome = resolve(home);
+  const torisHome = await realpathIfExists(home);
+  if (!torisHome) return { ok: true, items: [] };
   const root = resolve(androidHome(torisHome));
-  if (!inside(torisHome, root)) {
+  const canonicalRoot = await realpathIfExists(root);
+  if (!canonicalRoot) return { ok: true, items: [] };
+  if (!inside(torisHome, canonicalRoot)) {
     throw new HttpError(400, 'android artifact root escaped home');
   }
   let entries;
   try {
-    entries = await readdir(root, { recursive: true, withFileTypes: true });
+    entries = await readdir(canonicalRoot, { recursive: true, withFileTypes: true });
   } catch (error) {
     if (error.code === 'ENOENT') return { ok: true, items: [] };
     throw error;
@@ -92,7 +105,6 @@ export async function listAndroidArtifacts(home, { limit = ARTIFACT_LIMIT } = {}
     const dir = entry.parentPath || entry.path;
     if (!dir) continue;
     const abs = join(dir, entry.name);
-    if (!inside(root, abs) || !inside(torisHome, abs)) continue;
     let info;
     let canonical;
     try {
@@ -101,8 +113,8 @@ export async function listAndroidArtifacts(home, { limit = ARTIFACT_LIMIT } = {}
       continue;
     }
     if (!info.isFile()) continue;
-    if (!inside(root, canonical) || !inside(torisHome, canonical)) continue;
-    const rel = relative(root, abs).split(sep).join('/');
+    if (!inside(canonicalRoot, canonical) || !inside(torisHome, canonical)) continue;
+    const rel = relative(canonicalRoot, canonical).split(sep).join('/');
     if (!rel || rel.startsWith('..') || rel.includes('\0')) continue;
     items.push({
       name: entry.name,
@@ -118,7 +130,8 @@ export async function listAndroidArtifacts(home, { limit = ARTIFACT_LIMIT } = {}
 
 /** Resolve an image under `~/.toris/android/` or throw. Rejects traversal. */
 export async function resolveAndroidImage(home, relPath) {
-  const torisHome = resolve(home);
+  const torisHome = await realpathIfExists(home);
+  if (!torisHome) throw new HttpError(404, 'android artifact not found');
   const root = resolve(androidHome(torisHome));
   if (!inside(torisHome, root)) throw new HttpError(400, 'invalid android artifact path');
   const candidate = resolveStaticFile(root, String(relPath || ''));

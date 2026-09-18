@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, symlink, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
 import { listAndroidArtifacts, resolveAndroidImage } from '../src/studio/android-api.js';
 import { HttpError } from '../src/studio/http.js';
@@ -155,8 +155,9 @@ test('listAndroidArtifacts never reports a path outside home', async () => {
     const listed = await listAndroidArtifacts(home);
     assert.equal(listed.items.length, 1);
     assert.equal(listed.items[0].rel, 'screenshots/ok.png');
-    const abs = resolve(home, 'android', listed.items[0].rel);
-    assert.ok(abs.startsWith(resolve(home)));
+    const androidRoot = await realpath(join(home, 'android'));
+    const abs = resolve(androidRoot, listed.items[0].rel);
+    assert.ok(abs === androidRoot || abs.startsWith(`${androidRoot}${sep}`));
   } finally {
     await rm(home, { recursive: true, force: true });
   }
@@ -271,8 +272,29 @@ test('android media rejects path traversal and non-image files', async () => {
       (error) => error instanceof HttpError && error.status === 400,
     );
     const ok = await resolveAndroidImage(home, 'screenshots/ok.png');
-    assert.ok(ok.path.startsWith(resolve(home, 'android')));
+    const androidRoot = await realpath(join(home, 'android'));
+    assert.ok(ok.path === androidRoot || ok.path.startsWith(`${androidRoot}${sep}`));
   });
+});
+
+test('android artifacts and media follow a symlinked toris home', async () => {
+  const realHome = await mkdtemp(join(tmpdir(), 'toris-android-real-'));
+  const parent = await mkdtemp(join(tmpdir(), 'toris-android-link-'));
+  const home = join(parent, 'home-link');
+  try {
+    await symlink(realHome, home);
+    await mkdir(join(home, 'android', 'screenshots'), { recursive: true });
+    await writeFile(join(home, 'android', 'screenshots', 'ok.png'), PNG);
+    const listed = await listAndroidArtifacts(home);
+    assert.equal(listed.items.length, 1);
+    assert.equal(listed.items[0].rel, 'screenshots/ok.png');
+    const ok = await resolveAndroidImage(home, 'screenshots/ok.png');
+    const androidRoot = await realpath(join(home, 'android'));
+    assert.ok(ok.path === androidRoot || ok.path.startsWith(`${androidRoot}${sep}`));
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+    await rm(realHome, { recursive: true, force: true });
+  }
 });
 
 test('Studio does not expose android install', async () => {
