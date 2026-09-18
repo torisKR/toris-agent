@@ -102,7 +102,21 @@
           <div id="edge-list" class="knowledge-hits"></div>
           <form id="add-node-form" class="stack knowledge-add">
             <label class="field" for="new-title">Add node<input id="new-title" name="title" maxlength="80" required placeholder="Title"></label>
-            <label class="field" for="new-body">Body<textarea id="new-body" name="body" maxlength="4000" placeholder="What this node is."></textarea></label>
+            <label class="field" for="new-kind">kind
+              <select id="new-kind" name="kind">
+                <option value="node">node</option>
+                <option value="supports">supports</option>
+                <option value="prerequisite">prerequisite</option>
+                <option value="conflicts">conflicts</option>
+                <option value="derived-from">derived-from</option>
+              </select>
+            </label>
+            <label class="field" for="new-body">Body<textarea id="new-body" name="body" maxlength="800" placeholder="Short body."></textarea></label>
+            <label class="field" for="new-target">Link to (optional)
+              <select id="new-target" name="target">
+                <option value="">None</option>
+              </select>
+            </label>
             <button class="button" type="submit">Save node</button>
           </form>
           <form id="add-edge-form" class="stack">

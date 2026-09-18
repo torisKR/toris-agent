@@ -2,6 +2,7 @@ import { KnowledgeStore, searchIndex, STARTER_DOMAIN_SLUGS } from '../core/knowl
 import { HttpError, readJson } from './http.js';
 import { loadKnowledgeDag } from './knowledge-dag.js';
 import { acceptReflect, loadReflect } from './knowledge-reflect.js';
+import { addStudioKnowledgeNode } from './knowledge-write.js';
 
 function storeOf(options) {
   return new KnowledgeStore({ home: options.home, projectPath: options.cwd });
@@ -88,9 +89,10 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
     const body = await readJson(request);
     const store = storeOf(options);
     try {
-      sendJson(response, 201, await store.addNode(params.slug, body));
+      sendJson(response, 201, await addStudioKnowledgeNode(store, params.slug, body));
     } catch (error) {
-      throw new HttpError(error.code === 'E_UNKNOWN_DOMAIN' ? 404 : 400, error.message);
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(error.code === 'E_UNKNOWN_DOMAIN' ? 404 : error.code === 'E_NODE_EXISTS' ? 409 : 400, error.message);
     }
   });
 

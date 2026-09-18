@@ -97,6 +97,26 @@ function renderNodes(detail) {
   }
 }
 
+function renderLinkTargets(detail) {
+  const select = $('new-target');
+  if (!select) return;
+  const current = select.value;
+  select.replaceChildren();
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = 'None';
+  select.append(none);
+  for (const item of detail.nodes || []) {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = `${item.title} (${item.id})`;
+    select.append(option);
+  }
+  if (current && [...select.options].some((option) => option.value === current)) {
+    select.value = current;
+  }
+}
+
 function renderEdges(detail) {
   const edges = $('edge-list');
   edges.replaceChildren();
@@ -189,6 +209,7 @@ function renderDetail() {
   $('node-body').textContent = node ? node.body : detail.body || '';
   renderNodes(detail);
   renderEdges(detail);
+  renderLinkTargets(detail);
   renderDag();
 }
 
@@ -299,14 +320,20 @@ $('add-node-form').addEventListener('submit', async (event) => {
     announce('Pick a domain first.');
     return;
   }
+  const target = $('new-target').value.trim();
   try {
-    await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}/nodes`, {
+    const result = await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}/nodes`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: $('new-title').value, body: $('new-body').value }),
+      body: JSON.stringify({
+        title: $('new-title').value,
+        kind: $('new-kind').value,
+        body: $('new-body').value,
+        ...(target ? { target } : {}),
+      }),
     });
     $('add-node-form').reset();
-    announce('Node saved.');
+    announce(result.edge ? 'Node and edge saved.' : 'Node saved.');
     await selectDomain(state.selected);
   } catch (error) {
     announce(error.message);
