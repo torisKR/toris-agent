@@ -6,6 +6,7 @@ import {
   androidLogcat,
   androidScreenshot,
   androidStatus,
+  inspectAndroidTools,
 } from '../core/android.js';
 import { TorisError } from '../core/errors.js';
 import { HttpError, readJson, resolveStaticFile } from './http.js';
@@ -78,21 +79,36 @@ function androidHttpError(error) {
 }
 
 /**
+ * Resolve `~/.toris` and `~/.toris/android` to real paths so a symlinked
+ * TORIS_HOME (or macOS /var → /private/var) still compares equal.
+ */
+export async function resolveAndroidRoots(home) {
+  const torisHome = await realpathIfExists(home);
+  if (!torisHome) {
+    return { torisHome: resolve(home), root: resolve(androidHome(resolve(home))), missing: true };
+  }
+  const homeRoot = resolve(androidHome(torisHome));
+  if (!inside(torisHome, homeRoot)) {
+    throw new HttpError(400, 'android artifact root escaped home');
+  }
+  const root = await realpathIfExists(homeRoot) || await realpathIfExists(resolve(androidHome(resolve(home))));
+  if (!root) return { torisHome, root: homeRoot, missing: true };
+  if (!inside(torisHome, root)) {
+    throw new HttpError(400, 'android artifact root escaped home');
+  }
+  return { torisHome, root, missing: false };
+}
+
+/**
  * Newest regular files under `~/.toris/android/`. Never reports a path
  * outside the Toris home. Missing directory is an empty list.
  */
 export async function listAndroidArtifacts(home, { limit = ARTIFACT_LIMIT } = {}) {
-  const torisHome = await realpathIfExists(home);
-  if (!torisHome) return { ok: true, items: [] };
-  const root = resolve(androidHome(torisHome));
-  const canonicalRoot = await realpathIfExists(root);
-  if (!canonicalRoot) return { ok: true, items: [] };
-  if (!inside(torisHome, canonicalRoot)) {
-    throw new HttpError(400, 'android artifact root escaped home');
-  }
+  const { torisHome, root, missing } = await resolveAndroidRoots(home);
+  if (missing) return { ok: true, items: [] };
   let entries;
   try {
-    entries = await readdir(canonicalRoot, { recursive: true, withFileTypes: true });
+    entries = await readdir(root, { recursive: true, withFileTypes: true });
   } catch (error) {
     if (error.code === 'ENOENT') return { ok: true, items: [] };
     throw error;
@@ -113,8 +129,8 @@ export async function listAndroidArtifacts(home, { limit = ARTIFACT_LIMIT } = {}
       continue;
     }
     if (!info.isFile()) continue;
-    if (!inside(canonicalRoot, canonical) || !inside(torisHome, canonical)) continue;
-    const rel = relative(canonicalRoot, canonical).split(sep).join('/');
+    if (!inside(root, canonical) || !inside(torisHome, canonical)) continue;
+    const rel = relative(root, canonical).split(sep).join('/');
     if (!rel || rel.startsWith('..') || rel.includes('\0')) continue;
     items.push({
       name: entry.name,
@@ -130,10 +146,8 @@ export async function listAndroidArtifacts(home, { limit = ARTIFACT_LIMIT } = {}
 
 /** Resolve an image under `~/.toris/android/` or throw. Rejects traversal. */
 export async function resolveAndroidImage(home, relPath) {
-  const torisHome = await realpathIfExists(home);
-  if (!torisHome) throw new HttpError(404, 'android artifact not found');
-  const root = resolve(androidHome(torisHome));
-  if (!inside(torisHome, root)) throw new HttpError(400, 'invalid android artifact path');
+  const { torisHome, root, missing } = await resolveAndroidRoots(home);
+  if (missing) throw new HttpError(404, 'android artifact not found');
   const candidate = resolveStaticFile(root, String(relPath || ''));
   const mime = IMAGE_TYPES.get(extname(candidate).toLowerCase());
   if (!mime) throw new HttpError(400, 'only image artifacts can be served');
@@ -161,8 +175,28 @@ export function registerAndroidRoutes(router, { sendJson, requireJson, options }
   const fns = androidFns(options);
 
   router.add('GET', '/api/android', async (_request, response) => {
-    const status = await fns.status(androidCoreOptions(options));
-    sendJson(response, 200, status);
+    const core = androidCoreOptions(options);
+    try {
+      sendJson(response, 200, await fns.status(core));
+    } catch (error) {
+      if (
+        error instanceof TorisError
+        && (error.code === 'E_ADB' || error.code === 'E_ADB_MISSING' || error.code === 'E_ADB_TIMEOUT')
+      ) {
+        const tools = inspectAndroidTools(core);
+        sendJson(response, 200, {
+          ok: false,
+          adb: tools.adb,
+          emulator: tools.emulator,
+          ready: false,
+          version: null,
+          devices: [],
+          error: error.message,
+        });
+        return;
+      }
+      throw error;
+    }
   });
 
   router.add('GET', '/api/android/artifacts', async (_request, response) => {
