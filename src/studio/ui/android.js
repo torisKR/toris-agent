@@ -42,17 +42,20 @@ function mediaHref(rel) {
 
 function renderStatus() {
   const status = state.status;
-  const ready = Boolean(status?.ready || status?.adb);
+  const present = Boolean(status?.adb);
+  const ready = Boolean(status?.ok && present);
   const badge = $('adb-badge');
-  badge.textContent = ready ? 'adb ready' : 'adb optional';
+  badge.textContent = ready ? 'adb ready' : present ? 'adb error' : 'adb optional';
   badge.className = `badge${ready ? ' pass' : ''}`;
   $('adb-path').textContent = status?.adb || 'not on PATH';
   $('emulator-path').textContent = status?.emulator || 'not on PATH';
   $('adb-version').textContent = status?.version || '—';
   $('device-count').textContent = String(status?.devices?.length || 0);
-  $('adb-hint').textContent = ready
-    ? 'Local-only. Screenshot and logcat write under ~/.toris/android/. Install stays on the CLI.'
-    : 'adb is optional. Install Android platform-tools, or skip — the rest of Studio does not need it.';
+  $('adb-hint').textContent = status?.error
+    ? status.error
+    : ready
+      ? 'Local-only. Screenshot and logcat write under ~/.toris/android/. Install stays on the CLI.'
+      : 'adb is optional. Install Android platform-tools, or skip — the rest of Studio does not need it.';
 }
 
 function renderDevices() {
@@ -153,17 +156,34 @@ function renderArtifacts() {
 }
 
 async function refresh() {
-  const [status, artifacts, agent] = await Promise.all([
-    api('/api/android'),
-    api('/api/android/artifacts'),
-    api('/api/agent/status'),
-  ]);
-  state.status = status;
-  state.artifacts = artifacts.items || [];
-  state.agentReady = Boolean(agent.ready);
-  renderStatus();
-  renderDevices();
-  renderArtifacts();
+  const errors = [];
+  const statusDone = api('/api/android')
+    .then((status) => {
+      state.status = status;
+      renderStatus();
+      renderDevices();
+    })
+    .catch((error) => {
+      errors.push(error.message || 'status failed');
+    });
+  const artifactsDone = api('/api/android/artifacts')
+    .then((artifacts) => {
+      state.artifacts = artifacts.items || [];
+      renderArtifacts();
+    })
+    .catch((error) => {
+      errors.push(error.message || 'artifacts failed');
+    });
+  const agentDone = api('/api/agent/status')
+    .then((agent) => {
+      state.agentReady = Boolean(agent.ready);
+      syncSend();
+    })
+    .catch((error) => {
+      errors.push(error.message || 'agent status failed');
+    });
+  await Promise.all([statusDone, artifactsDone, agentDone]);
+  if (errors.length) throw new Error(errors.join(' · '));
 }
 
 async function capture(path) {
@@ -244,7 +264,7 @@ $('android-agent-form').addEventListener('submit', async (event) => {
 
 const session = await api('/api/session');
 state.token = session.token;
-await refresh();
+refresh().catch((error) => announce(error.message));
 window.setInterval(() => {
   refresh().catch(() => undefined);
 }, 15000);

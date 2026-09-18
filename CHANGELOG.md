@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Studio `GET /api/android` stays HTTP 200 when `adb devices` fails, and `/android` loads artifacts independently of status so local screenshots remain browsable.
 - Studio `POST /api/daemon/run` attaches the registered project for Studio's cwd (same checks as `toris daemon run`) and rejects unknown autonomy levels with HTTP 400 instead of queueing a job that later fails.
 
 ## [0.4.0] - 2026-09-08

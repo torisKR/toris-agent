@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve, sep } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createStudioServer } from '../src/studio/server.js';
 import {
   composeAndroidTurnMessage,
@@ -13,6 +14,7 @@ import {
 } from '../src/studio/android-api.js';
 import { HttpError } from '../src/studio/http.js';
 
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1, 2, 3]);
 
 function mockExec() {
@@ -93,6 +95,10 @@ test('GET /android is a standalone page that does not reuse app.js', async () =>
     assert.match(script, /android:\s*\{\s*artifacts/);
     assert.equal((await fetch(`${base}/assets/android.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/android.css`)).status, 200);
+    const js = await readFile(join(repoRoot, 'src/studio/ui/android.js'), 'utf8');
+    assert.match(js, /api\('\/api\/android\/artifacts'\)/);
+    assert.match(js, /then\(\(artifacts\) => \{[\s\S]*renderArtifacts\(\)/);
+    assert.match(js, /refresh\(\)\.catch/);
   });
 });
 
@@ -106,6 +112,36 @@ test('GET /api/android is 200 when adb is missing', async () => {
     assert.equal(body.ready, false);
     assert.equal(body.version, null);
     assert.deepEqual(body.devices, []);
+  });
+});
+
+test('GET /api/android stays 200 when adb devices fails', async () => {
+  await withServer(async ({ base, home }) => {
+    await mkdir(join(home, 'android', 'screenshots'), { recursive: true });
+    await writeFile(join(home, 'android', 'screenshots', 'ok.png'), PNG);
+    const response = await fetch(`${base}/api/android`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.ok, false);
+    assert.equal(body.adb, '/mock/adb');
+    assert.equal(body.ready, false);
+    assert.deepEqual(body.devices, []);
+    assert.match(body.error, /cannot start/);
+    const artifacts = await (await fetch(`${base}/api/android/artifacts`)).json();
+    assert.equal(artifacts.ok, true);
+    assert.equal(artifacts.items.length, 1);
+    assert.equal(artifacts.items[0].name, 'ok.png');
+  }, {
+    detect: (bin) => (bin === 'adb' ? '/mock/adb' : null),
+    exec: async (_bin, args) => {
+      if (args.includes('version')) {
+        return { exitCode: 0, stdout: 'Android Debug Bridge version 1.0.41\n', stderr: '', timedOut: false };
+      }
+      if (args.includes('devices')) {
+        return { exitCode: 1, stdout: '', stderr: 'adb: cannot start server', timedOut: false };
+      }
+      return { exitCode: 1, stdout: '', stderr: 'unexpected', timedOut: false };
+    },
   });
 });
 
