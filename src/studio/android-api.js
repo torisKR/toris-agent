@@ -6,6 +6,7 @@ import {
   androidLogcat,
   androidScreenshot,
   androidStatus,
+  inspectAndroidTools,
 } from '../core/android.js';
 import { TorisError } from '../core/errors.js';
 import { HttpError, readJson, resolveStaticFile } from './http.js';
@@ -245,8 +246,28 @@ export function registerAndroidRoutes(router, { sendJson, requireJson, options }
   const fns = androidFns(options);
 
   router.add('GET', '/api/android', async (_request, response) => {
-    const status = await fns.status(androidCoreOptions(options));
-    sendJson(response, 200, status);
+    const core = androidCoreOptions(options);
+    try {
+      sendJson(response, 200, await fns.status(core));
+    } catch (error) {
+      if (
+        error instanceof TorisError
+        && (error.code === 'E_ADB' || error.code === 'E_ADB_MISSING' || error.code === 'E_ADB_TIMEOUT')
+      ) {
+        const tools = inspectAndroidTools(core);
+        sendJson(response, 200, {
+          ok: false,
+          adb: tools.adb,
+          emulator: tools.emulator,
+          ready: false,
+          version: null,
+          devices: [],
+          error: error.message,
+        });
+        return;
+      }
+      throw error;
+    }
   });
 
   router.add('GET', '/api/android/artifacts', async (_request, response) => {
