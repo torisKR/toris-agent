@@ -94,6 +94,7 @@ toris studio --open       # http://127.0.0.1:5824
                           # knowledge   /knowledge
                           # daemon      /daemon
                           # brief       /brief
+                          # android     /android
 ```
 
 ### Design Mode — UI evidence on the agent turn
@@ -123,7 +124,7 @@ toris android logcat         # dump under ~/.toris/android/logs/
 toris android install app.apk
 ```
 
-Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the model can attach device evidence before claiming a mobile UI fix. `install` stays CLI-only. No Android SDK is required for Studio, chat, or `toris run`.
+Chat gets an `android` tool (`status`, `devices`, `screenshot`, `logcat`) so the model can attach device evidence before claiming a mobile UI fix. Studio `/android` is the same local evidence surface (status, devices, screenshot, recent artifacts). `install` stays CLI-only. No Android SDK is required for Studio, chat, or `toris run`.
 
 ### Secretary knowledge — domains, DAG, tacit memory
 
@@ -470,7 +471,7 @@ autonomy                  Autonomy levels and what each permits
 daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
 daemon run "<goal>"       Queue a run while the daemon is up (exit 5 if down)
 daemon schedule           Local cron: list | add | remove | enable | disable
-studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge, /daemon, /brief)
+studio                    Local GUI on 127.0.0.1:5824 (review, /agent, /design, /patches, /knowledge, /daemon, /brief, /android)
 studio service <action>   macOS LaunchAgent: install | status | restart | uninstall
 android status|devices|screenshot|logcat|install
 knowledge                 Local secretary store: init, domains, node, tacit, search, reflect

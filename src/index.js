@@ -21,6 +21,7 @@ export {
   studioKnowledgeUrl,
   studioDaemonUrl,
   studioBriefUrl,
+  studioAndroidUrl,
   renderStudioAccess,
   tuiAgentHint,
   isLoopbackHttpUrl,

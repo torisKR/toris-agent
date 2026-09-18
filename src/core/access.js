@@ -16,6 +16,7 @@ export const STUDIO_PATCHES_PATH = '/patches';
 export const STUDIO_KNOWLEDGE_PATH = '/knowledge';
 export const STUDIO_DAEMON_PATH = '/daemon';
 export const STUDIO_BRIEF_PATH = '/brief';
+export const STUDIO_ANDROID_PATH = '/android';
 
 /** @param {number} [port] */
 export const studioOrigin = (port = STUDIO_PORT) => `http://${STUDIO_HOST}:${port}`;
@@ -38,6 +39,9 @@ export const studioDaemonUrl = (port = STUDIO_PORT) => `${studioOrigin(port)}${S
 /** @param {number} [port] */
 export const studioBriefUrl = (port = STUDIO_PORT) => `${studioOrigin(port)}${STUDIO_BRIEF_PATH}`;
 
+/** @param {number} [port] */
+export const studioAndroidUrl = (port = STUDIO_PORT) => `${studioOrigin(port)}${STUDIO_ANDROID_PATH}`;
+
 /**
  * One-screen directions for the `/studio` slash command and the GUI inspector.
  * @param {{running?:boolean, port?:number}} [info]
@@ -51,6 +55,7 @@ export function renderStudioAccess({ running = false, port = STUDIO_PORT } = {})
     `     ${studioKnowledgeUrl(port)}`,
     `     ${studioDaemonUrl(port)}`,
     `     ${studioBriefUrl(port)}`,
+    `     ${studioAndroidUrl(port)}`,
     'TUI  toris',
     running ? '     already running' : '     toris studio --open    start and open the local GUI',
   ].join('\n');

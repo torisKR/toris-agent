@@ -31,6 +31,7 @@ import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
 import { registerKnowledgeRoutes } from './knowledge-api.js';
 import { registerDaemonRoutes } from './daemon-api.js';
 import { registerBriefRoutes } from './brief-api.js';
+import { registerAndroidRoutes } from './android-api.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
@@ -41,6 +42,7 @@ const STATIC_ASSETS = new Map([
   ['/knowledge', ['knowledge.html', 'text/html; charset=utf-8']],
   ['/daemon', ['daemon.html', 'text/html; charset=utf-8']],
   ['/brief', ['brief.html', 'text/html; charset=utf-8']],
+  ['/android', ['android.html', 'text/html; charset=utf-8']],
   ['/design-system', ['design-system.html', 'text/html; charset=utf-8']],
   ['/design/sample', ['design-sample.html', 'text/html; charset=utf-8', SAMPLE_CSP]],
   ['/assets/tokens.css', ['tokens.css', 'text/css; charset=utf-8']],
@@ -53,6 +55,8 @@ const STATIC_ASSETS = new Map([
   ['/assets/daemon.css', ['daemon.css', 'text/css; charset=utf-8']],
   ['/assets/brief.js', ['brief.js', 'text/javascript; charset=utf-8']],
   ['/assets/brief.css', ['brief.css', 'text/css; charset=utf-8']],
+  ['/assets/android.js', ['android.js', 'text/javascript; charset=utf-8']],
+  ['/assets/android.css', ['android.css', 'text/css; charset=utf-8']],
   ['/assets/design-picker.js', ['design-picker.js', 'text/javascript; charset=utf-8']],
   ['/assets/favicon.svg', ['favicon.svg', 'image/svg+xml']],
 ]);
@@ -178,7 +182,7 @@ export async function createStudioServer(options) {
       name: 'Toris Studio',
       localOnly: true,
       status: 'ready',
-      surfaces: ['review', 'agent', 'design', 'patches', 'knowledge', 'daemon', 'brief'],
+      surfaces: ['review', 'agent', 'design', 'patches', 'knowledge', 'daemon', 'brief', 'android'],
       cost,
     });
   });
@@ -483,6 +487,7 @@ export async function createStudioServer(options) {
   registerKnowledgeRoutes(router, { sendJson, requireJson, options });
   registerDaemonRoutes(router, { sendJson, requireJson, options });
   registerBriefRoutes(router, { sendJson, options, store });
+  registerAndroidRoutes(router, { sendJson, requireJson, options });
 
   server = createServer({ maxHeaderSize: 16 * 1024, requireHostHeader: true }, async (request, response) => {
     try {

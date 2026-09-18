@@ -476,3 +476,13 @@ Read-only digest. No new on-disk format.
 - Knowledge headlines skip quietly when `~/.toris/knowledge/` is not initialized
 - Not a daemon job type. `daemon schedule add` / `daemon run` refuse a goal that is only `brief` / `toris brief`. Host cron runs the CLI. See `docs/BRIEF.md`.
 
+## Additive: Studio Android evidence (post-0.1)
+
+Same optional adb helpers as `toris android`. No new on-disk format beyond `~/.toris/android/`.
+
+- Studio: `GET /android` page + `GET /api/android` (same shape as `androidStatus`)
+- `GET /api/android/artifacts` — newest ~20 files under `~/.toris/android/` (`name`, `bytes`, `mtime`)
+- `POST /api/android/screenshot` and `POST /api/android/logcat` — Origin + session token
+- Image media (`GET /api/android/media?path=`) stays inside `~/.toris/android/`; traversal is rejected
+- `install` stays CLI-only. Missing `adb` is HTTP 200 on status, never 500. See `docs/STUDIO.md`.
+

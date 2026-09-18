@@ -74,6 +74,14 @@ The page does **not** start or stop the worker — that stays on `toris daemon s
 
 `http://127.0.0.1:5824/brief` is a standalone read-only page for the same local secretary digest as `toris brief`: today's spend, today's runs, daemon running/next due, and 3–5 tacit/node headlines. Empty run and knowledge sections stay quiet. `GET /api/brief` is the same-origin JSON read (`buildBrief`). There is no send, enqueue, or start/stop from this page. See [BRIEF.md](./BRIEF.md).
 
+## Android
+
+`http://127.0.0.1:5824/android` is a standalone page for optional device evidence — the Studio counterpart of `toris android status|devices|screenshot|logcat`. It shows whether `adb` / `emulator` are on PATH, lists connected devices, captures a screenshot or a short logcat dump into `~/.toris/android/`, and browses the newest local artifacts.
+
+`GET /api/android` is the same shape as `androidStatus` (paths, version, device list). Missing `adb` is a quiet 200, not a 500. `GET /api/android/artifacts` lists the newest ~20 files under `~/.toris/android/` (`name`, `bytes`, `mtime`). Screenshot and logcat are mutations: current local `Origin` plus the in-memory session token. Image previews are served only from that folder (`GET /api/android/media?path=…`); path traversal is rejected. `install` stays CLI-only so Studio cannot be pointed at an APK path.
+
+Studio still binds only to `127.0.0.1`. No Android SDK is required to open the page.
+
 ## Review flow
 
 1. Save a post draft or import an MP4. The item enters `awaiting_review`.
