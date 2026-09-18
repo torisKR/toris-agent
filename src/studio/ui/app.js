@@ -1,5 +1,6 @@
 const AGENT_ID_KEY = 'toris.studio.agentId';
 const TRANSCRIPT_KEY = 'toris.studio.agent.transcripts';
+const KNOWLEDGE_PIN_KEY = 'toris.studio.knowledge.pin';
 const MAX_STORED_TURNS = 40;
 
 const state = {
@@ -428,9 +429,27 @@ async function readSse(response, onEvent) {
   }
 }
 
+function knowledgePinFromStorage() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(KNOWLEDGE_PIN_KEY) || 'null');
+    if (!raw || typeof raw !== 'object') return null;
+    const domain = String(raw.domain || '').trim();
+    const nodeId = String(raw.nodeId || raw.id || '').trim();
+    return domain && nodeId ? { domain, nodeId } : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearKnowledgePin() {
+  try { localStorage.removeItem(KNOWLEDGE_PIN_KEY); } catch { /* private mode */ }
+}
+
 async function streamAgentTurn({ agent, message, history, tray, signal, onEvent }) {
   const payload = { agent, message, history };
   if (tray) payload.tray = true;
+  const knowledge = knowledgePinFromStorage();
+  if (knowledge) payload.knowledge = knowledge;
   const response = await fetch('/api/agent/turn', {
     method: 'POST',
     headers: {
@@ -446,6 +465,7 @@ async function streamAgentTurn({ agent, message, history, tray, signal, onEvent 
   if (!type.includes('text/event-stream')) {
     const body = type.includes('application/json') ? await response.json() : await response.text();
     if (!response.ok) throw new Error(body?.error?.message || `요청 실패 (${response.status})`);
+    if (knowledge) clearKnowledgePin();
     return body;
   }
   let result = null;
@@ -457,6 +477,7 @@ async function streamAgentTurn({ agent, message, history, tray, signal, onEvent 
   });
   if (streamError) throw streamError;
   if (!result) throw new Error('응답이 끝나기 전에 연결이 끊겼습니다.');
+  if (knowledge) clearKnowledgePin();
   return result;
 }
 

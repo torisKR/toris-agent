@@ -29,6 +29,7 @@ import {
 } from './patch-view.js';
 import { FRAME_CSP, SAMPLE_CSP, loadProxiedPage } from './design-proxy.js';
 import { registerKnowledgeRoutes } from './knowledge-api.js';
+import { knowledgePinOf, loadPinnedKnowledge } from './knowledge-pin.js';
 import { registerDaemonRoutes } from './daemon-api.js';
 import { registerBriefRoutes } from './brief-api.js';
 import {
@@ -36,6 +37,7 @@ import {
   loadAndroidEvidence,
   registerAndroidRoutes,
 } from './android-api.js';
+import { KnowledgeStore } from '../core/knowledge/index.js';
 
 const UI_ROOT = join(dirname(fileURLToPath(import.meta.url)), 'ui');
 const STATIC_ASSETS = new Map([
@@ -213,6 +215,10 @@ export async function createStudioServer(options) {
     const androidEvidence = androidRels.length
       ? await loadAndroidEvidence(options.home, androidRels)
       : [];
+    const knowledgePin = knowledgePinOf(body);
+    const pinnedKnowledge = knowledgePin
+      ? await loadPinnedKnowledge(new KnowledgeStore({ home: options.home, projectPath: options.cwd }), knowledgePin)
+      : null;
     if (!message && !body.design && !body.designId && !body.tray && !body.designIds?.length && !body.designs?.length && androidEvidence.length === 0) {
       throw new HttpError(400, 'message is required');
     }
@@ -242,6 +248,8 @@ export async function createStudioServer(options) {
       android: body.android,
       androidArtifacts: body.androidArtifacts,
       androidEvidence,
+      knowledge: knowledgePin,
+      pinnedKnowledge,
       loadDesign: (id) => designs.get(id),
       saveDesign: (capture) => designs.save(capture),
       loadTray: () => designs.getTray(),
