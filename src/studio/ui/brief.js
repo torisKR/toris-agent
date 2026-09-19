@@ -1,4 +1,5 @@
 const state = {
+  token: '',
   brief: null,
 };
 
@@ -11,8 +12,19 @@ function announce(message) {
   window.setTimeout(() => toast.classList.remove('is-visible'), 2200);
 }
 
-async function api(path) {
-  const response = await fetch(path);
+function showBudgetError(message) {
+  const node = $('budget-error');
+  node.hidden = !message;
+  node.textContent = message || '';
+}
+
+async function api(path, options = {}) {
+  const init = { ...options, headers: { ...(options.headers || {}) } };
+  if (init.method && init.method !== 'GET') {
+    init.headers.origin = location.origin;
+    init.headers['x-toris-studio-token'] = state.token;
+  }
+  const response = await fetch(path, init);
   const type = response.headers.get('content-type') || '';
   const body = type.includes('application/json') ? await response.json() : await response.text();
   if (!response.ok) throw new Error(body?.error?.message || `Request failed (${response.status})`);
@@ -20,9 +32,9 @@ async function api(path) {
 }
 
 function formatUsd(value) {
-  if (value == null) return 'unlimited';
+  if (value == null) return '';
   const amount = Number(value);
-  if (!Number.isFinite(amount)) return 'unlimited';
+  if (!Number.isFinite(amount)) return '';
   return `$${amount.toFixed(4)}`;
 }
 
@@ -37,14 +49,17 @@ function renderSpend() {
   $('brief-day').textContent = state.brief?.day || '—';
   if (!spend) {
     $('spend-today').textContent = '—';
-    $('spend-remaining').textContent = '—';
+    $('spend-budget').textContent = '';
+    $('spend-remaining').textContent = '';
     $('spend-runs').textContent = '—';
+    $('budget-usd').value = '';
     return;
   }
-  const cap = formatUsd(spend.capUsd);
-  $('spend-today').textContent = `${formatUsd(spend.spentUsd)} / ${cap}`;
+  $('spend-today').textContent = formatUsd(spend.spentUsd) || '—';
+  $('spend-budget').textContent = formatUsd(spend.capUsd);
   $('spend-remaining').textContent = formatUsd(spend.remainingUsd);
   $('spend-runs').textContent = String(spend.runCount ?? 0);
+  $('budget-usd').value = spend.capUsd == null ? '' : String(spend.capUsd);
 }
 
 function renderRuns() {
@@ -135,12 +150,40 @@ function renderKnowledge() {
   }
 }
 
-async function refresh() {
-  state.brief = await api('/api/brief');
+function render() {
   renderSpend();
   renderRuns();
   renderDaemon();
   renderKnowledge();
+}
+
+async function refresh() {
+  state.brief = await api('/api/brief');
+  render();
+}
+
+async function saveBudget(value) {
+  showBudgetError('');
+  const submit = $('budget-save');
+  const clear = $('budget-clear');
+  submit.disabled = true;
+  clear.disabled = true;
+  try {
+    state.brief = await api('/api/brief/budget', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ maxDailyCostUsd: value }),
+    });
+    render();
+    announce(value == null || value === '' ? 'Daily budget cleared.' : 'Daily budget saved.');
+  } catch (error) {
+    showBudgetError(error.message);
+    announce(error.message);
+    throw error;
+  } finally {
+    submit.disabled = false;
+    clear.disabled = false;
+  }
 }
 
 $('refresh-brief').addEventListener('click', async () => {
@@ -152,6 +195,30 @@ $('refresh-brief').addEventListener('click', async () => {
   }
 });
 
+$('budget-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const raw = $('budget-usd').value.trim();
+  if (!raw) {
+    showBudgetError('Enter a daily budget, or Clear.');
+    return;
+  }
+  try {
+    await saveBudget(Number(raw));
+  } catch {
+    // announced in saveBudget
+  }
+});
+
+$('budget-clear').addEventListener('click', async () => {
+  try {
+    await saveBudget(null);
+  } catch {
+    // announced in saveBudget
+  }
+});
+
+const session = await api('/api/session');
+state.token = session.token;
 await refresh();
 window.setInterval(() => {
   refresh().catch(() => undefined);

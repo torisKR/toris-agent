@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 
 import { withinBudget } from './autonomy.js';
+import { loadConfig, saveConfig, validateConfig } from './config.js';
 
 export const COST_LEDGER_VERSION = 1;
 export const COST_FILE = 'cost.json';
@@ -18,6 +19,44 @@ export function formatUsd(value, digits = 4) {
 /** A non-positive or non-numeric cap is unlimited, matching `withinBudget`. */
 export function positiveCap(value) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * Parse a daily ceiling for `config.maxDailyCostUsd`.
+ * `null` / `''` / missing clear the cap (`0` = unlimited, same as CLI).
+ * Invalid values throw so callers can 400 without writing.
+ */
+export function parseDailyBudgetUsd(value) {
+  if (value == null) return 0;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return 0;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      throw new Error(`maxDailyCostUsd must be a non-negative number, got ${JSON.stringify(value)}`);
+    }
+    return parsed;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`maxDailyCostUsd must be a non-negative number, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+/**
+ * Write `maxDailyCostUsd` on the same config `checkBudget` / orchestrator read.
+ * Does not touch `cost.json` spend entries.
+ */
+export async function setDailyBudget(home, value) {
+  const maxDailyCostUsd = parseDailyBudgetUsd(value);
+  const { config } = await loadConfig(home);
+  const next = { ...config, maxDailyCostUsd };
+  const problems = validateConfig(next);
+  if (problems.length > 0) {
+    throw new Error(problems.join('\n'));
+  }
+  await saveConfig(home, next);
+  return next;
 }
 
 /**

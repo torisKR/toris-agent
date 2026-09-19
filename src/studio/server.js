@@ -513,7 +513,7 @@ export async function createStudioServer(options) {
 
   registerKnowledgeRoutes(router, { sendJson, requireJson, options, store });
   registerDaemonRoutes(router, { sendJson, requireJson, options, store });
-  registerBriefRoutes(router, { sendJson, options, store });
+  registerBriefRoutes(router, { sendJson, requireJson, options, store });
   registerAndroidRoutes(router, { sendJson, requireJson, options });
 
   server = createServer({ maxHeaderSize: 16 * 1024, requireHostHeader: true }, async (request, response) => {

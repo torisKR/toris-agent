@@ -14,12 +14,15 @@ import {
   dayKey,
   formatUsd,
   loadCostLedger,
+  parseDailyBudgetUsd,
   recordRunCost,
   roundUsd,
+  setDailyBudget,
   summarizeCost,
   upsertLedgerEntry,
   emptyLedger,
 } from '../src/core/cost.js';
+import { loadConfig } from '../src/core/config.js';
 
 const withHome = async (fn) => {
   const home = await mkdtemp(join(tmpdir(), 'toris-cost-'));
@@ -166,4 +169,41 @@ test('dailySpendFromRuns ignores another run id and other days', () => {
 test('formatUsd and roundUsd stay at receipt precision', () => {
   assert.equal(formatUsd(1.2), '$1.2000');
   assert.equal(roundUsd(1.23456), 1.2346);
+});
+
+test('parseDailyBudgetUsd accepts a ceiling and treats empty as unlimited', () => {
+  assert.equal(parseDailyBudgetUsd(12.5), 12.5);
+  assert.equal(parseDailyBudgetUsd('7'), 7);
+  assert.equal(parseDailyBudgetUsd(null), 0);
+  assert.equal(parseDailyBudgetUsd(''), 0);
+  assert.throws(() => parseDailyBudgetUsd(-1), /non-negative/);
+  assert.throws(() => parseDailyBudgetUsd('nope'), /non-negative/);
+  assert.throws(() => parseDailyBudgetUsd({}), /non-negative/);
+});
+
+test('setDailyBudget writes config.maxDailyCostUsd without touching spend entries', async () => {
+  await withHome(async (home) => {
+    await recordRunCost(home, {
+      id: 'run_keep',
+      costUsd: 1.25,
+      goal: 'keep',
+      status: 'succeeded',
+      createdAt: '2026-09-17T00:00:00.000Z',
+      finishedAt: '2026-09-17T00:01:00.000Z',
+    });
+    const before = JSON.parse(await readFile(join(home, 'cost.json'), 'utf8'));
+    const next = await setDailyBudget(home, 8);
+    assert.equal(next.maxDailyCostUsd, 8);
+    const { config } = await loadConfig(home);
+    assert.equal(config.maxDailyCostUsd, 8);
+    assert.equal(checkBudget(8, undefined, config).ok, false);
+    assert.deepEqual(JSON.parse(await readFile(join(home, 'cost.json'), 'utf8')), before);
+
+    const cleared = await setDailyBudget(home, null);
+    assert.equal(cleared.maxDailyCostUsd, 0);
+    const after = await loadConfig(home);
+    assert.equal(after.config.maxDailyCostUsd, 0);
+    assert.equal(checkBudget(99, undefined, after.config).ok, true);
+    assert.deepEqual(JSON.parse(await readFile(join(home, 'cost.json'), 'utf8')), before);
+  });
 });

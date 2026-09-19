@@ -485,7 +485,8 @@ Not a breaking change to the frozen signatures above. Daily spend is local-only:
 Read-only digest. No new on-disk format.
 
 - CLI: `toris brief` | `toris brief today` | `toris brief --json`
-- Studio: `GET /brief` page + `GET /api/brief` (same-origin read; `{ ok: true, ...buildBrief() }`)
+- Studio: `GET /brief` page + `GET /api/brief` (same-origin read; `{ ok: true, ...buildBrief() }`). GET never writes.
+- Additive Studio budget write: `POST /api/brief/budget` sets or clears `config.maxDailyCostUsd` via `setDailyBudget` (same field `checkBudget` / a later `toris run` already enforce). Body `{ maxDailyCostUsd }` (`null` / `''` / `0` clears). Invalid numbers are HTTP 400 and write nothing. Missing Origin/session token is HTTP 403 and writes nothing. Response is `{ ok: true, ...buildBrief() }`.
 - Reuses `summarizeCost`, `Store.listRuns`, `readDaemonStatus`, and the knowledge `index.json`
 - Knowledge headlines skip quietly when `~/.toris/knowledge/` is not initialized
 - Not a daemon job type. `daemon schedule add` / `daemon run` refuse a goal that is only `brief` / `toris brief`. Host cron runs the CLI. See `docs/BRIEF.md`.
