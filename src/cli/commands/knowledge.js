@@ -469,7 +469,7 @@ async function cmdPack(ctx, store, rest, flags) {
   if (sub === 'install') {
     const slug = rest[1];
     if (!slug) throw new UsageError('Usage: toris knowledge pack install <slug> [--force]');
-    const result = await installKnowledgePack(store, slug, { force: Boolean(flags.force) });
+    const result = await installKnowledgePack(store, slug, { force: flags.force === true });
     if (ctx.json) {
       printJson(result);
       return EXIT.OK;

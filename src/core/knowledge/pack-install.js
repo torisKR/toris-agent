@@ -110,7 +110,6 @@ async function homeDomainExists(store, slug) {
  * @param {import('./store.js').KnowledgeStore} store
  */
 export async function listKnowledgePacks(store) {
-  const installed = new Set((await store.listDomains()).map((domain) => domain.slug));
   const packs = [];
   for (const slug of KNOWLEDGE_PACK_SLUGS) {
     const pack = await loadKnowledgePack(slug);
@@ -120,7 +119,7 @@ export async function listKnowledgePacks(store) {
       description: pack.description,
       nodeCount: pack.nodes.length,
       edgeCount: pack.edges.length,
-      installed: installed.has(pack.slug),
+      installed: await homeDomainExists(store, pack.slug),
       dir: pack.dir,
     });
   }

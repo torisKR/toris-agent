@@ -133,6 +133,11 @@ test('knowledge pack install writes one domain and --force replaces it', async (
     assert.equal(forced.code, EXIT.OK);
     assert.equal(forced.body.forced, true);
     assert.equal((await knowledge.inspectDomain('flutter-expo-android')).nodeCount, domain.nodeCount);
+
+    await assert.rejects(
+      () => cmdKnowledge(ctx(home), ['pack', 'install', 'flutter-expo-android'], { force: 'false' }),
+      /already exists/,
+    );
   });
 });
 

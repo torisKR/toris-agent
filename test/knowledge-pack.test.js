@@ -129,6 +129,23 @@ test('duplicate install without force does not overwrite', async () => {
   });
 });
 
+test('list and install use the home domain, not a project overlay', async () => {
+  await withHome(async (store) => {
+    await store.addDomain({
+      slug: 'product-growth',
+      title: 'Project overlay only',
+      source: 'project',
+    });
+    const listed = await listKnowledgePacks(store);
+    assert.equal(listed.packs.find((pack) => pack.slug === 'product-growth')?.installed, false);
+    const installed = await installKnowledgePack(store, 'product-growth');
+    assert.equal(installed.slug, 'product-growth');
+    assert.equal(installed.domain.source, 'home');
+    const again = await listKnowledgePacks(store);
+    assert.equal(again.packs.find((pack) => pack.slug === 'product-growth')?.installed, true);
+  });
+});
+
 test('unknown pack writes nothing', async () => {
   await withHome(async (store, home) => {
     await assert.rejects(() => installKnowledgePack(store, 'not-a-real-pack'), { code: 'E_UNKNOWN_PACK' });
