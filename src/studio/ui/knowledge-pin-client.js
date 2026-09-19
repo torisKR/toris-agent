@@ -1,6 +1,6 @@
 /**
  * Shared Studio client pin — one localStorage key for /knowledge, /agent,
- * Design Mode, and /android. Shape stays { domain, nodeId }.
+ * Design Mode, /android, and Patch Review. Shape stays { domain, nodeId }.
  */
 export const KNOWLEDGE_PIN_KEY = 'toris.studio.knowledge.pin';
 

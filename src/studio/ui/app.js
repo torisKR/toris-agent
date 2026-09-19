@@ -893,11 +893,13 @@ elements['patch-review-form'].addEventListener('submit', async (event) => {
   }
   elements['patch-review-send'].disabled = true;
   try {
+    const { payload, knowledge } = withStoredKnowledgePin({ agent: 'implementer', note, hunk: state.selectedHunk });
     const result = await api(`/api/patches/${encodeURIComponent(state.selectedPatchId)}/review`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ agent: 'implementer', note, hunk: state.selectedHunk }),
+      body: JSON.stringify(payload),
     });
+    consumeKnowledgePinAfterAccept(knowledge);
     announce(`${result.agent?.title || '에이전트'}가 패치 리뷰를 받았습니다.`);
     elements['patch-note'].value = '';
     state.selectedHunk = '';

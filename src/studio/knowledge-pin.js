@@ -2,8 +2,9 @@ import { excerptBody } from './knowledge-dag.js';
 import { HttpError } from './http.js';
 
 /**
- * Optional pin on POST /api/agent/turn: { knowledge: { domain, nodeId } }.
- * Omitted / null is "no pin". A present object with a missing id is 400.
+ * Optional pin on POST /api/agent/turn and POST /api/patches/:id/review:
+ * { knowledge: { domain, nodeId } }. Omitted / null is "no pin".
+ * A present object with a missing id is 400.
  */
 export function knowledgePinOf(input = {}) {
   if (!Object.hasOwn(input, 'knowledge') || input.knowledge == null) return null;
