@@ -1,4 +1,4 @@
-import { EDGE_KINDS } from '../core/knowledge/index.js';
+import { EDGE_KINDS, isSafeSlug } from '../core/knowledge/index.js';
 import { HttpError } from './http.js';
 
 function text(value) {
@@ -35,6 +35,28 @@ async function requireDomain(store, slug) {
   } catch (error) {
     if (error.code === 'E_UNKNOWN_DOMAIN') throw new HttpError(404, error.message);
     throw error;
+  }
+}
+
+/**
+ * Opt-in Studio write: one `addDomain` (DOMAIN.md, empty dag.json, folders).
+ * Invalid slug / duplicate write nothing. Does not seed starter packs or
+ * write USER.md / MEMORY.md.
+ */
+export async function createStudioKnowledgeDomain(store, input = {}) {
+  const slug = text(input.slug);
+  if (!isSafeSlug(slug)) {
+    throw new HttpError(400, `Invalid domain "${input.slug ?? ''}". Use letters, numbers, and hyphens.`);
+  }
+  try {
+    return await store.addDomain({
+      slug,
+      title: text(input.title) || undefined,
+      body: text(input.description ?? input.body) || undefined,
+    });
+  } catch (error) {
+    if (error.code === 'E_DOMAIN_EXISTS') throw new HttpError(409, error.message);
+    throw new HttpError(400, error.message);
   }
 }
 
