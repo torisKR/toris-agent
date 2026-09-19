@@ -75,6 +75,30 @@ export async function addStudioKnowledgeNode(store, slug, input = {}) {
 }
 
 /**
+ * Opt-in Studio write: one `updateNode` for title and/or body. Kind and id
+ * stay as stored. Empty title / unknown domain / unknown node write nothing.
+ */
+export async function updateStudioKnowledgeNode(store, slug, nodeId, input = {}) {
+  const domain = await requireDomain(store, slug);
+  if (Object.hasOwn(input, 'title') && !text(input.title)) {
+    throw new HttpError(400, 'Title is required.');
+  }
+  try {
+    const node = await store.updateNode(domain.slug, nodeId, {
+      title: Object.hasOwn(input, 'title') ? text(input.title) : undefined,
+      body: Object.hasOwn(input, 'body') ? String(input.body ?? '') : undefined,
+      source: domain.source,
+    });
+    return { ...node, written: true };
+  } catch (error) {
+    if (error.code === 'E_UNKNOWN_NODE' || error.code === 'E_UNKNOWN_DOMAIN') {
+      throw new HttpError(404, error.message);
+    }
+    throw new HttpError(400, error.message);
+  }
+}
+
+/**
  * Opt-in Studio write: one `removeNode`. Unknown domain / node are 404 and
  * the store does not write.
  */

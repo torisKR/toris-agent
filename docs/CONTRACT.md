@@ -443,6 +443,8 @@ Additive Studio DAG read (same store): `GET /api/knowledge/domains/:slug/dag` re
 
 Additive Studio knowledge remove (same store): `POST /api/knowledge/domains/:slug/nodes/:id/remove` deletes that node via `KnowledgeStore.removeNode` and drops `dag.json` edges that touch it. Unknown domain or unknown node is HTTP 404 (same as inspect) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
 
+Additive Studio knowledge edit (same store): `POST /api/knowledge/domains/:slug/nodes/:id/update` updates that node's title and/or body via `KnowledgeStore.updateNode`. Kind and node id are unchanged. Empty title is HTTP 400 and writes nothing. Unknown domain or unknown node is HTTP 404 (same as inspect) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
+
 Additive Studio knowledge pin (same store, same turn): optional `knowledge: { domain, nodeId }` on the existing `POST /api/agent/turn`. The server loads that node from `KnowledgeStore` and prepends a capped title/kind/excerpt `[pinned knowledge]` block. Unknown id is HTTP 400 (no model call, no write, no fabricated text). Omitted pin is unchanged. Auto-retrieve ranking is unchanged. No second turn endpoint. See `docs/KNOWLEDGE.md`.
 
 ## Additive: project-local agent profiles (post-0.1)

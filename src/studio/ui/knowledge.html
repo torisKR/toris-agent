@@ -81,6 +81,12 @@
             <article id="dag-excerpt" class="knowledge-body" hidden></article>
           </section>
           <article id="node-body" class="knowledge-body"></article>
+          <form id="edit-node-form" class="stack" hidden>
+            <label class="field" for="edit-title">Title<input id="edit-title" name="title" maxlength="80" required placeholder="Title"></label>
+            <p class="knowledge-when">kind <span id="edit-kind">node</span></p>
+            <label class="field" for="edit-body">Body<textarea id="edit-body" name="body" placeholder="Body"></textarea></label>
+            <button class="button" id="edit-save" type="submit">Save</button>
+          </form>
         </section>
       </main>
 

@@ -354,6 +354,29 @@ export class KnowledgeStore {
   }
 
   /**
+   * Rewrite one existing node markdown file (title and/or body). Id, tags,
+   * and dag.json stay as they are. Unknown domain / node / empty title throw
+   * before any write.
+   */
+  async updateNode(slug, nodeId, { title, body, source = 'home' } = {}) {
+    const domain = requireSlug(slug, 'domain');
+    const root = this.resolveRoot(source);
+    if (!(await exists(join(domainDir(root, domain), DOMAIN_FILE)))) {
+      throw new TorisError(`Unknown domain "${domain}".`, 'E_UNKNOWN_DOMAIN');
+    }
+    const current = await this.getNode(domain, nodeId, source);
+    const nextTitle = title !== undefined ? String(title).trim() : current.title;
+    if (!nextTitle) {
+      throw new TorisError('Title is required.', 'E_INVALID_KNOWLEDGE');
+    }
+    const nextBody = body !== undefined ? String(body) : current.body;
+    const markdown = renderFrontmatter({ ...current.meta, id: current.id, title: nextTitle }, nextBody);
+    await atomicWrite(current.path, markdown);
+    await this.rebuildIndex();
+    return this.getNode(domain, current.id, source);
+  }
+
+  /**
    * Delete one node markdown file and drop dag.json edges that touch it.
    * Unknown domain / node throw before any write.
    */
