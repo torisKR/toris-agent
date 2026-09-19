@@ -386,6 +386,10 @@ export async function createStudioServer(options) {
   router.add('POST', '/api/patches/:id/review', async (request, response, params) => {
     requireJson(request);
     const body = await readJson(request);
+    const knowledgePin = knowledgePinOf(body);
+    const pinnedKnowledge = knowledgePin
+      ? await loadPinnedKnowledge(new KnowledgeStore({ home: options.home, projectPath: options.cwd }), knowledgePin)
+      : null;
     const record = await getPatch(store, params.id);
     if (!record) throw new HttpError(404, 'patch not found');
     if (record.status !== 'pending') throw new HttpError(409, `Patch ${record.id} is already ${record.status}.`);
@@ -414,6 +418,8 @@ export async function createStudioServer(options) {
         message: note || 'Fix the selected hunk on this isolated patch.',
         patchReview: { patch: record, diff: bounded.diff, hunk },
         history: [],
+        knowledge: knowledgePin,
+        pinnedKnowledge,
         signal: abort.signal,
       });
       const refreshed = await refreshSavedPatchDiff(store, record.id);

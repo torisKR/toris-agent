@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStudioServer } from '../src/studio/server.js';
@@ -8,6 +8,7 @@ import { Store } from '../src/core/store.js';
 import { git } from '../src/core/git.js';
 import { createWorktree, worktreeDiff } from '../src/core/worktree.js';
 import { savePatch, readPatchDiff, getPatch } from '../src/core/patches.js';
+import { KnowledgeStore } from '../src/core/knowledge/store.js';
 
 const DIFF = `diff --git a/README.md b/README.md
 --- a/README.md
@@ -78,6 +79,31 @@ async function seedIsolated(home) {
     patch: diff.patch,
   });
   return { origin, record, session };
+}
+
+async function snapshotKnowledgeFiles(home) {
+  const root = join(home, 'knowledge');
+  const files = [];
+  async function walk(dir) {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (error) {
+      if (error.code === 'ENOENT') return;
+      throw error;
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+        continue;
+      }
+      const info = await stat(path);
+      files.push({ rel: path.slice(root.length), size: info.size, text: await readFile(path, 'utf8') });
+    }
+  }
+  await walk(root);
+  return files;
 }
 
 async function seed(home, extra = {}) {
@@ -203,6 +229,8 @@ test('patch review runs in the isolated worktree and refreshes the stored diff',
         const body = await response.json();
         assert.equal(received.cwd, record.worktreePath);
         assert.equal(received.message, 'Keep the CTA at 44px.');
+        assert.equal(received.knowledge, null);
+        assert.equal(received.pinnedKnowledge, null);
         assert.match(received.patchReview.diff, /keep this button at 44px/);
         assert.ok(received.message.length < 200);
         assert.match(body.patch.diff, /\+from review/);
@@ -224,6 +252,55 @@ test('patch review runs in the isolated worktree and refreshes the stored diff',
         received = input;
         await writeFile(join(input.cwd, 'REVIEW.md'), 'from review\n');
         return { ok: true, text: 'fixed in isolation', agent: { id: 'implementer', title: 'Implementer' } };
+      },
+    },
+  );
+});
+
+test('POST /api/patches/:id/review with a pin includes the real excerpt and does not write knowledge', async () => {
+  let received;
+  await withServer(
+    async ({ home, base }) => {
+      const knowledge = new KnowledgeStore({ home, projectPath: home });
+      await knowledge.init({ seed: true });
+      const longBody = `Always measure the reviewed hunk. ${'z'.repeat(280)}`;
+      const node = await knowledge.addNode('flutter-android', {
+        title: 'Mid-device pin',
+        body: longBody,
+      });
+      const before = await snapshotKnowledgeFiles(home);
+      const { origin, record } = await seedIsolated(home);
+      try {
+        const response = await fetch(
+          `${base}/api/patches/${record.id}/review`,
+          mutation(base, {
+            agent: 'implementer',
+            note: 'Keep the CTA at 44px.',
+            hunk: '@@ -0,0 +1 @@',
+            knowledge: { domain: 'flutter-android', nodeId: node.id },
+          }),
+        );
+        assert.equal(response.status, 200);
+        assert.equal(received.cwd, record.worktreePath);
+        assert.equal(received.knowledge.domain, 'flutter-android');
+        assert.equal(received.knowledge.nodeId, node.id);
+        assert.equal(received.pinnedKnowledge.id, node.id);
+        assert.equal(received.pinnedKnowledge.title, 'Mid-device pin');
+        assert.equal(received.pinnedKnowledge.kind, 'node');
+        assert.match(received.pinnedKnowledge.excerpt, /Always measure the reviewed hunk/);
+        assert.ok(received.pinnedKnowledge.excerpt.endsWith('…'));
+        assert.ok(received.pinnedKnowledge.excerpt.length <= 180);
+        assert.ok(!received.pinnedKnowledge.excerpt.includes('z'.repeat(200)));
+        assert.deepEqual(await snapshotKnowledgeFiles(home), before);
+      } finally {
+        await rm(origin, { recursive: true, force: true });
+      }
+    },
+    {
+      applyPatchFn: null,
+      runAgentTurn: async (input) => {
+        received = input;
+        return { ok: true, text: 'will measure', agent: { id: 'implementer', title: 'Implementer' } };
       },
     },
   );

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Studio knowledge pin on Patch Review** — a pin set on `/knowledge` is now read, forwarded, and consumed by `POST /api/patches/:id/review` (same `localStorage` key and `{ domain, nodeId }` shape as `/agent`, Design Mode, and `/android`). Unknown pin is HTTP 400 (no model, no write). A failed send leaves the pin in place.
 - **Studio knowledge pin on `/android`** — a pin set on `/knowledge` is now read, forwarded, and consumed by the `/android` turn client (same `localStorage` key and `{ domain, nodeId }` shape as `/agent` and Design Mode). A failed send leaves the pin in place.
 
 ### Added

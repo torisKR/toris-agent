@@ -200,6 +200,8 @@ test('GET /knowledge ships one use-on-next-turn control without changing the DAG
     assert.match(agent, /withStoredKnowledgePin/);
     assert.match(agent, /consumeKnowledgePinAfterAccept/);
     assert.match(agent, /\/api\/agent\/turn/);
+    assert.match(agent, /\/api\/patches\/\$\{encodeURIComponent\(state\.selectedPatchId\)\}\/review/);
+    assert.match(agent, /withStoredKnowledgePin\(\{ agent: 'implementer', note, hunk: state\.selectedHunk \}\)/);
 
     const android = await (await fetch(`${base}/assets/android.js`)).text();
     assert.match(android, /withStoredKnowledgePin/);
@@ -302,6 +304,39 @@ test('POST /api/agent/turn with an unknown pin is 400, does not call the model, 
         mutation(base, {
           agent: 'implementer',
           message: 'use a ghost note',
+          knowledge: { domain: 'toris-ops', nodeId: 'definitely-missing-node' },
+        }),
+      );
+      assert.equal(response.status, 400);
+      assert.equal(called, false);
+      const body = await response.json();
+      assert.match(body.error.message, /Unknown node "toris-ops\/definitely-missing-node"/);
+      assert.doesNotMatch(JSON.stringify(body), /\[pinned knowledge\]/);
+      assert.doesNotMatch(body.error.message, /Receipts, not vibes/);
+      assert.deepEqual(await snapshotKnowledge(home), before);
+    },
+    {
+      runAgentTurn: async () => {
+        called = true;
+        throw new Error('runner must not be called for an unknown knowledge pin');
+      },
+    },
+  );
+});
+
+test('POST /api/patches/:id/review with an unknown pin is 400, does not call the model, and does not fabricate text', async () => {
+  let called = false;
+  await withServer(
+    async ({ base, home }) => {
+      const knowledge = new KnowledgeStore({ home, projectPath: home });
+      await knowledge.init({ seed: true });
+      const before = await snapshotKnowledge(home);
+
+      const response = await fetch(
+        `${base}/api/patches/any-id/review`,
+        mutation(base, {
+          agent: 'implementer',
+          note: 'use a ghost note',
           knowledge: { domain: 'toris-ops', nodeId: 'definitely-missing-node' },
         }),
       );
