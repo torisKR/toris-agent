@@ -252,7 +252,19 @@ function renderDetail() {
   $('detail-source').textContent = detail.source;
   $('detail-when').textContent = detail.when || detail.anti || '';
   const node = selectedNode();
-  $('node-body').textContent = node ? node.body : detail.body || '';
+  const dagNode = selectedDagNode();
+  const form = $('edit-node-form');
+  if (node || dagNode) {
+    $('node-body').hidden = true;
+    form.hidden = false;
+    $('edit-title').value = node?.title || dagNode?.title || '';
+    $('edit-kind').textContent = node?.kind || dagNode?.kind || 'node';
+    $('edit-body').value = node?.body ?? '';
+  } else {
+    form.hidden = true;
+    $('node-body').hidden = false;
+    $('node-body').textContent = detail.body || '';
+  }
   renderNodes(detail);
   renderEdges(detail);
   renderLinkTargets(detail);
@@ -355,6 +367,31 @@ $('search-form').addEventListener('submit', async (event) => {
       empty.textContent = 'No hits.';
       box.append(empty);
     }
+  } catch (error) {
+    announce(error.message);
+  }
+});
+
+$('edit-node-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.selected || !state.nodeId) {
+    announce('Pick a node first.');
+    return;
+  }
+  try {
+    await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}/nodes/${encodeURIComponent(state.nodeId)}/update`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: $('edit-title').value,
+        body: $('edit-body').value,
+      }),
+    });
+    announce('Node saved.');
+    state.detail = await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}`);
+    state.dag = await loadDag(state.selected);
+    renderDomains();
+    renderDetail();
   } catch (error) {
     announce(error.message);
   }

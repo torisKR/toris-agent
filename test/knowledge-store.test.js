@@ -57,6 +57,55 @@ test('starter domains have real nodes, tacit notes, and a DAG', async () => {
   });
 });
 
+test('updateNode rewrites title and body without changing the node id', async () => {
+  await withStore(async (store, home) => {
+    const node = await store.addNode('toris-ops', {
+      title: 'Temporary edit target',
+      tags: 'studio, edit',
+      body: 'Original body.',
+    });
+    await store.link('toris-ops', {
+      from: 'receipts-not-vibes',
+      to: node.id,
+      kind: 'supports',
+    });
+    const beforeDag = await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8');
+    const updated = await store.updateNode('toris-ops', node.id, {
+      title: 'Edited studio title',
+      body: 'Edited body.',
+    });
+    assert.equal(updated.id, node.id);
+    assert.equal(updated.title, 'Edited studio title');
+    assert.equal(updated.body, 'Edited body.');
+    assert.deepEqual(updated.tags, ['studio', 'edit']);
+    const ids = (await store.listNodes('toris-ops')).map((item) => item.id);
+    assert.equal(ids.filter((id) => id === node.id).length, 1);
+    assert.equal(await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8'), beforeDag);
+    const markdown = await readFile(join(home, 'knowledge/domains/toris-ops/nodes', `${node.id}.md`), 'utf8');
+    assert.match(markdown, /id: temporary-edit-target/);
+    assert.match(markdown, /title: Edited studio title/);
+    assert.match(markdown, /Edited body\./);
+  });
+});
+
+test('updateNode unknown domain, unknown node, or empty title writes nothing', async () => {
+  await withStore(async (store, home) => {
+    const beforeDag = await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8');
+    const beforeNode = await readFile(join(home, 'knowledge/domains/toris-ops/nodes/receipts-not-vibes.md'), 'utf8');
+    await assert.rejects(() => store.updateNode('no-such-domain', 'receipts-not-vibes', { title: 'Nope' }), {
+      code: 'E_UNKNOWN_DOMAIN',
+    });
+    await assert.rejects(() => store.updateNode('toris-ops', 'no-such-node', { title: 'Nope' }), {
+      code: 'E_UNKNOWN_NODE',
+    });
+    await assert.rejects(() => store.updateNode('toris-ops', 'receipts-not-vibes', { title: '   ' }), {
+      code: 'E_INVALID_KNOWLEDGE',
+    });
+    assert.equal(await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8'), beforeDag);
+    assert.equal(await readFile(join(home, 'knowledge/domains/toris-ops/nodes/receipts-not-vibes.md'), 'utf8'), beforeNode);
+  });
+});
+
 test('removeNode deletes the markdown file and drops edges that touch it', async () => {
   await withStore(async (store, home) => {
     const node = await store.addNode('toris-ops', {

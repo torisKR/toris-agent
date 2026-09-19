@@ -2,7 +2,7 @@ import { KnowledgeStore, searchIndex, STARTER_DOMAIN_SLUGS } from '../core/knowl
 import { HttpError, readJson } from './http.js';
 import { loadKnowledgeDag } from './knowledge-dag.js';
 import { acceptReflect, loadReflect } from './knowledge-reflect.js';
-import { addStudioKnowledgeNode, removeStudioKnowledgeNode } from './knowledge-write.js';
+import { addStudioKnowledgeNode, removeStudioKnowledgeNode, updateStudioKnowledgeNode } from './knowledge-write.js';
 
 function storeOf(options) {
   return new KnowledgeStore({ home: options.home, projectPath: options.cwd });
@@ -93,6 +93,18 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(error.code === 'E_UNKNOWN_DOMAIN' ? 404 : error.code === 'E_NODE_EXISTS' ? 409 : 400, error.message);
+    }
+  });
+
+  router.add('POST', '/api/knowledge/domains/:slug/nodes/:id/update', async (request, response, params) => {
+    requireJson(request);
+    const body = await readJson(request);
+    const store = storeOf(options);
+    try {
+      sendJson(response, 200, await updateStudioKnowledgeNode(store, params.slug, params.id, body));
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(error.code === 'E_UNKNOWN_DOMAIN' || error.code === 'E_UNKNOWN_NODE' ? 404 : 400, error.message);
     }
   });
 
