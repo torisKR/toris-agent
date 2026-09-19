@@ -1,10 +1,11 @@
-import { KnowledgeStore, searchIndex, STARTER_DOMAIN_SLUGS } from '../core/knowledge/index.js';
+import { KnowledgeStore, listKnowledgePacks, searchIndex, STARTER_DOMAIN_SLUGS } from '../core/knowledge/index.js';
 import { HttpError, readJson } from './http.js';
 import { loadKnowledgeDag } from './knowledge-dag.js';
 import { acceptReflect, loadReflect } from './knowledge-reflect.js';
 import {
   addStudioKnowledgeNode,
   createStudioKnowledgeDomain,
+  installStudioKnowledgePack,
   linkStudioKnowledgeNodes,
   removeStudioKnowledgeNode,
   unlinkStudioKnowledgeEdge,
@@ -41,6 +42,25 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
       return;
     }
     sendJson(response, 200, { ok: true, status, domains });
+  });
+
+  router.add('GET', '/api/knowledge/packs', async (_request, response) => {
+    const listed = await listKnowledgePacks(storeOf(options));
+    sendJson(response, 200, { ok: true, ...listed });
+  });
+
+  router.add('POST', '/api/knowledge/packs/:slug/install', async (request, response, params) => {
+    requireJson(request);
+    await readJson(request);
+    try {
+      sendJson(response, 201, await installStudioKnowledgePack(storeOf(options), params.slug));
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(
+        error.code === 'E_UNKNOWN_PACK' ? 404 : error.code === 'E_DOMAIN_EXISTS' ? 409 : 400,
+        error.message,
+      );
+    }
   });
 
   router.add('GET', '/api/knowledge/search', async (request, response) => {

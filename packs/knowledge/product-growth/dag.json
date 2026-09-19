@@ -1,0 +1,19 @@
+{
+  "edges": [
+    {
+      "from": "seo-geo-loop",
+      "to": "store-listing-evidence",
+      "kind": "supports"
+    },
+    {
+      "from": "store-listing-evidence",
+      "to": "shipping-loop",
+      "kind": "prerequisite"
+    },
+    {
+      "from": "seo-geo-loop",
+      "to": "shipping-loop",
+      "kind": "supports"
+    }
+  ]
+}

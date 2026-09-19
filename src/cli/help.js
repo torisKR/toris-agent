@@ -41,6 +41,8 @@ COMMANDS
                             Optional adb helpers for Android verify evidence
   knowledge                 Local secretary knowledge (domains, DAG, tacit)
   knowledge init            Create ~/.toris/knowledge and seed starter domains
+  knowledge pack list       List opt-in starter packs (does not write)
+  knowledge pack install    Copy one shipped pack into ~/.toris/knowledge
   knowledge search <query>  Keyword + tag recall across USER/MEMORY/domains
   knowledge reflect [runId] Propose a tacit note from a verified run (does not write)
   bot                       Listen for Slack and Telegram commands
@@ -77,6 +79,8 @@ EXAMPLES
   toris studio --open       # same, then open the loopback URL in the browser
   toris android status      # adb/emulator presence (optional)
   toris knowledge init      # USER.md, MEMORY.md, starter domain packs
+  toris knowledge pack list
+  toris knowledge pack install flutter-expo-android
   toris knowledge search flutter
   toris knowledge reflect run_abc123 --json
   toris init && toris doctor

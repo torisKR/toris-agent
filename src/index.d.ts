@@ -395,8 +395,19 @@ export type KnowledgeEdgeKind = 'prerequisite' | 'supports' | 'conflicts' | 'der
 
 export const EDGE_KINDS: readonly KnowledgeEdgeKind[];
 export const STARTER_DOMAIN_SLUGS: readonly string[];
+export const KNOWLEDGE_PACK_SLUGS: readonly string[];
 export const USER_MD_LIMIT: number;
 export const MEMORY_MD_LIMIT: number;
+
+export function listKnowledgePacks(store: KnowledgeStore): Promise<{
+  packs: Array<Record<string, unknown>>;
+  root: string;
+}>;
+export function installKnowledgePack(
+  store: KnowledgeStore,
+  slug: string,
+  options?: { force?: boolean },
+): Promise<Record<string, unknown>>;
 
 export interface KnowledgeEdge {
   from: string;

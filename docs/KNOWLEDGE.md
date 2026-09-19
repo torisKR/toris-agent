@@ -33,7 +33,7 @@ Toris stays local-first and zero-runtime-deps. There is no cloud memory, no tele
 
 Project overlay: `<repo>/.toris/knowledge/` with the same shape. Search merges both; writes default to the home store unless you pass `--project`.
 
-`toris init` and `toris knowledge init` seed the home store. Init is idempotent: existing USER.md / domains are left alone.
+`toris init` and `toris knowledge init` seed the home store. Init is idempotent: existing USER.md / domains are left alone. Init does **not** install the opt-in starter packs below.
 
 ## Starter domains
 
@@ -46,6 +46,20 @@ These ship in the package and copy into `~/.toris/knowledge/domains/` on first i
 5. **solo-revenue** — 1인 개발 수익화 루프: build → evidence → ship → list
 
 Each pack has a real `DOMAIN.md`, at least three nodes, a small `dag.json`, and one tacit note. Extend them; do not treat them as frozen product copy.
+
+## Opt-in starter packs
+
+A smaller catalog lives under `packs/knowledge/<slug>/` in the repo: `DOMAIN.md`, a few nodes, and `dag.json`. Install **one** pack with an explicit action — never on first run, never from a GET.
+
+```bash
+toris knowledge pack list
+toris knowledge pack install flutter-expo-android
+toris knowledge pack install product-growth --force
+```
+
+Shipped slugs: `product-growth`, `flutter-expo-android`, `solo-revenue`, `toris-ops`. The installer reuses `KnowledgeStore.addDomain` + `addNode` + `link` into `~/.toris/knowledge/domains/<slug>/`. It refuses if that domain already exists (`E_DOMAIN_EXISTS` / CLI error / HTTP 409) unless CLI `--force` replaces it. Studio has no force. After `toris knowledge init`, the overlapping seed slugs (`product-growth`, `solo-revenue`, `toris-ops`) already exist, so only a missing slug such as `flutter-expo-android` is installable without `--force`. List is read-only. Install does not write `USER.md` or `MEMORY.md`, and does not fetch the network.
+
+Studio `/knowledge` shows a quiet **Install starter pack** list with one **Install** button per pack that is not already installed (`GET /api/knowledge/packs`, `POST /api/knowledge/packs/:slug/install`). Origin + session token on the write. GET never writes.
 
 ## DAG
 
@@ -67,6 +81,8 @@ Ordering kinds (`prerequisite`, `supports`, `derived-from`) must stay a DAG. Tor
 
 ```bash
 toris knowledge init
+toris knowledge pack list
+toris knowledge pack install flutter-expo-android
 toris knowledge status
 toris knowledge domains list
 toris knowledge domains add my-app --title "My app"
@@ -147,6 +163,8 @@ Optional GUI: `http://127.0.0.1:5824/knowledge`. Browse domains, nodes, and DAG 
 The selected domain also has a **DAG panel** (plain nested list — no graph library). Nodes show title and kind; edges nest under the source node. Click a node for its short body. When a node is selected, the detail panel shows editable title and body; kind stays read-only. **Save** writes that one node through `KnowledgeStore.updateNode` (same markdown file and id — no second node). Empty title is HTTP 400 and writes nothing. Unknown domain or unknown node is HTTP 404, same as inspect, and writes nothing. Same Origin + session token gate as Accept. The panel then reloads the existing DAG GET. Nothing is written on GET or until you Save. Each node has one **use on next turn** control. Checking it pins that node's domain + id onto the next Studio `POST /api/agent/turn` (same attachment path Design Mode and Android already use). The server loads the node from `KnowledgeStore` and prepends a short `[pinned knowledge]` block — title, kind, and a capped excerpt only. An unknown id is HTTP 400: no model call, no write, no fabricated text. Unchecked turns do not include the node. Auto-retrieve ranking is unchanged. A domain with no nodes stays quiet. `GET /api/knowledge/domains/:slug/dag` is the same-origin JSON read (`inspectDomain` slimmed to nodes + edges). It never calls `knowledge init` and does not write.
 
 Each DAG node also has a quiet **Remove** control. Confirm before delete (browser confirm). **Remove** writes through `KnowledgeStore.removeNode`: the node markdown file is deleted and `dag.json` edges that touch it are dropped. Unknown domain or unknown node is HTTP 404, same as inspect, and writes nothing. Same Origin + session token gate as Accept. The panel then reloads the existing DAG GET. Nothing is written on GET or until you confirm.
+
+The same page has a quiet **Install starter pack** list: one **Install** per shipped pack that is not already a domain. **Install** writes that pack through `installKnowledgePack` (`addDomain` + nodes + `link`). Duplicate slug is HTTP 409 and writes nothing. Studio has no force. Unknown slug is HTTP 404. Same Origin + session token gate as Accept. After success the domain list refreshes and the new domain can be selected. `GET /api/knowledge/packs` is read-only and never writes. Does not write USER.md / MEMORY.md.
 
 The same page has a small **Create domain** form: required slug, optional short title and description. **Create** writes one domain through `KnowledgeStore.addDomain` — the same path as `toris knowledge domains add` (`DOMAIN.md`, empty `dag.json`, `nodes/` and `tacit/` folders) under the existing knowledge root. Invalid slug is HTTP 400 and writes nothing. Duplicate slug is HTTP 409 and writes nothing. Same Origin + session token gate as Accept. After success the domain list refreshes and the new (empty) domain can be selected so the existing DAG panel and add-node form work. Nothing is written on GET or until you Create. Does not seed starter packs or write USER.md / MEMORY.md.
 

@@ -1,0 +1,19 @@
+{
+  "edges": [
+    {
+      "from": "performance-budget",
+      "to": "device-evidence",
+      "kind": "prerequisite"
+    },
+    {
+      "from": "device-evidence",
+      "to": "play-release",
+      "kind": "supports"
+    },
+    {
+      "from": "performance-budget",
+      "to": "play-release",
+      "kind": "supports"
+    }
+  ]
+}

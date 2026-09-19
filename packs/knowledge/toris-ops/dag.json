@@ -1,0 +1,19 @@
+{
+  "edges": [
+    {
+      "from": "autonomy-ladder",
+      "to": "receipts-not-vibes",
+      "kind": "supports"
+    },
+    {
+      "from": "ask-before-writes",
+      "to": "receipts-not-vibes",
+      "kind": "supports"
+    },
+    {
+      "from": "autonomy-ladder",
+      "to": "ask-before-writes",
+      "kind": "supports"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "edges": [
+    {
+      "from": "one-person-loop",
+      "to": "build-evidence-ship-list",
+      "kind": "supports"
+    },
+    {
+      "from": "build-evidence-ship-list",
+      "to": "listing-as-product",
+      "kind": "prerequisite"
+    },
+    {
+      "from": "one-person-loop",
+      "to": "listing-as-product",
+      "kind": "supports"
+    }
+  ]
+}

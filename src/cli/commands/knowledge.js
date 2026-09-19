@@ -12,6 +12,8 @@ import {
   acceptReflections,
   STARTER_DOMAIN_SLUGS,
   EDGE_KINDS,
+  listKnowledgePacks,
+  installKnowledgePack,
 } from '../../core/knowledge/index.js';
 import { printJson, line, table, keyValues, c } from '../output.js';
 
@@ -26,6 +28,7 @@ const ACTIONS = new Set([
   'reflect',
   'memory',
   'user',
+  'pack',
 ]);
 
 function storeOf(ctx, flags) {
@@ -75,7 +78,7 @@ export async function cmdKnowledge(ctx, positionals, flags) {
   const action = positionals[0] || 'status';
   if (!ACTIONS.has(action)) {
     throw new UsageError(
-      `Unknown knowledge subcommand "${action}". Use init|status|domains|node|tacit|search|reflect|memory.`,
+      `Unknown knowledge subcommand "${action}". Use init|status|domains|node|tacit|search|reflect|memory|pack.`,
     );
   }
   const store = storeOf(ctx, flags);
@@ -89,6 +92,7 @@ export async function cmdKnowledge(ctx, positionals, flags) {
   if (action === 'search') return cmdSearch(ctx, store, rest, flags);
   if (action === 'reflect') return cmdReflect(ctx, store, rest, flags);
   if (action === 'memory' || action === 'user') return cmdMemory(ctx, store, action, rest, flags);
+  if (action === 'pack') return cmdPack(ctx, store, rest, flags);
   throw new UsageError(`Unknown knowledge subcommand "${action}".`);
 }
 
@@ -436,6 +440,44 @@ async function cmdMemory(ctx, store, which, rest, flags) {
     return EXIT.OK;
   }
   throw new UsageError(`Usage: toris knowledge ${which} get|append|set`);
+}
+
+async function cmdPack(ctx, store, rest, flags) {
+  const sub = rest[0] || 'list';
+  if (sub === 'list') {
+    const listed = await listKnowledgePacks(store);
+    if (ctx.json) {
+      printJson({ ok: true, ...listed });
+      return EXIT.OK;
+    }
+    line(c.bold(`Starter packs (${listed.packs.length})`));
+    line();
+    table(
+      ['SLUG', 'INSTALLED', 'NODES', 'EDGES', 'TITLE'],
+      listed.packs.map((pack) => [
+        pack.slug,
+        pack.installed ? 'yes' : 'no',
+        pack.nodeCount,
+        pack.edgeCount,
+        pack.title,
+      ]),
+    );
+    line();
+    line(`Install one: ${c.cyan('toris knowledge pack install <slug>')}`);
+    return EXIT.OK;
+  }
+  if (sub === 'install') {
+    const slug = rest[1];
+    if (!slug) throw new UsageError('Usage: toris knowledge pack install <slug> [--force]');
+    const result = await installKnowledgePack(store, slug, { force: flags.force === true });
+    if (ctx.json) {
+      printJson(result);
+      return EXIT.OK;
+    }
+    line(`${c.green('+')} Pack ${c.bold(result.slug)} (${result.nodeCount} nodes, ${result.edgeCount} edges)`);
+    return EXIT.OK;
+  }
+  throw new UsageError('Usage: toris knowledge pack list|install');
 }
 
 cmdKnowledge.handlesFirstRun = true;

@@ -1,4 +1,4 @@
-import { EDGE_KINDS, isSafeSlug } from '../core/knowledge/index.js';
+import { EDGE_KINDS, installKnowledgePack, isSafeSlug } from '../core/knowledge/index.js';
 import { HttpError } from './http.js';
 
 function text(value) {
@@ -180,6 +180,24 @@ export async function unlinkStudioKnowledgeEdge(store, slug, input = {}) {
     if (error.code === 'E_UNKNOWN_EDGE' || error.code === 'E_UNKNOWN_DOMAIN') {
       throw new HttpError(404, error.message);
     }
+    throw new HttpError(400, error.message);
+  }
+}
+
+/**
+ * Opt-in Studio write: one shipped pack via addDomain + addNode + link.
+ * Duplicate slug is 409. Studio has no force. Does not write USER.md / MEMORY.md.
+ */
+export async function installStudioKnowledgePack(store, slug) {
+  const id = text(slug);
+  if (!isSafeSlug(id)) {
+    throw new HttpError(400, `Invalid pack "${slug ?? ''}". Use letters, numbers, and hyphens.`);
+  }
+  try {
+    return await installKnowledgePack(store, id, { force: false });
+  } catch (error) {
+    if (error.code === 'E_UNKNOWN_PACK') throw new HttpError(404, error.message);
+    if (error.code === 'E_DOMAIN_EXISTS') throw new HttpError(409, error.message);
     throw new HttpError(400, error.message);
   }
 }
