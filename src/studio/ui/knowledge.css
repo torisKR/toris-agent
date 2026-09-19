@@ -76,6 +76,16 @@
 .knowledge-reflect #reflect-goal { display: block; color: var(--text); font-size: 14px; line-height: 1.45; }
 .knowledge-reflect #reflect-outcome { margin: 8px 0 0; }
 .knowledge-reflect-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.knowledge-packs { display: grid; gap: 8px; }
+.knowledge-pack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+}
+.knowledge-pack strong { font-size: 13px; line-height: 1.4; }
+.knowledge-pack small { color: var(--quiet); font-size: 11px; line-height: 1.45; }
+.knowledge-pack .button { min-height: 36px; padding: 0 10px; font-size: 12px; }
 .workspace-empty .button { margin-top: 18px; }
 @media (max-width: 1279px) {
   .is-knowledge .inspector { grid-template-columns: repeat(3, minmax(0, 1fr)); }

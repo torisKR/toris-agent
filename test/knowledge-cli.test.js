@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 import { cmdKnowledge } from '../src/cli/commands/knowledge.js';
 import { EXIT } from '../src/core/errors.js';
-import { proposeReflections } from '../src/core/knowledge/index.js';
+import { proposeReflections, KNOWLEDGE_PACK_SLUGS } from '../src/core/knowledge/index.js';
 import { createDefaultTools } from '../src/core/tools.js';
 import { Store } from '../src/core/store.js';
 import { KnowledgeStore } from '../src/core/knowledge/store.js';
@@ -89,6 +89,50 @@ test('node add + link + search round-trip through the CLI', async () => {
       cmdKnowledge(ctx(home), ['search', 'session continuity'], {}),
     );
     assert.ok(found.body.hits.some((hit) => hit.id === 'session-continuity'));
+  });
+});
+
+test('knowledge pack list is json-scriptable and does not write', async () => {
+  await withHome(async (home) => {
+    const { code, body } = await captureJson(() => cmdKnowledge(ctx(home), ['pack', 'list'], {}));
+    assert.equal(code, EXIT.OK);
+    assert.equal(body.ok, true);
+    assert.equal(body.packs.length, KNOWLEDGE_PACK_SLUGS.length);
+    assert.equal(
+      body.packs.every((pack) => pack.installed === false),
+      true,
+    );
+    const knowledge = new KnowledgeStore({ home });
+    assert.equal((await knowledge.status()).ok, false);
+  });
+});
+
+test('knowledge pack install writes one domain and --force replaces it', async () => {
+  await withHome(async (home) => {
+    const installed = await captureJson(() =>
+      cmdKnowledge(ctx(home), ['pack', 'install', 'flutter-expo-android'], {}),
+    );
+    assert.equal(installed.code, EXIT.OK);
+    assert.equal(installed.body.slug, 'flutter-expo-android');
+    assert.equal(installed.body.written, true);
+
+    const knowledge = new KnowledgeStore({ home });
+    const domain = await knowledge.inspectDomain('flutter-expo-android');
+    assert.ok(domain.nodeCount >= 3);
+    assert.equal((await knowledge.status()).userBytes, 0);
+    assert.equal((await knowledge.status()).memoryBytes, 0);
+
+    await assert.rejects(
+      () => cmdKnowledge(ctx(home), ['pack', 'install', 'flutter-expo-android'], {}),
+      /already exists/,
+    );
+
+    const forced = await captureJson(() =>
+      cmdKnowledge(ctx(home), ['pack', 'install', 'flutter-expo-android'], { force: true }),
+    );
+    assert.equal(forced.code, EXIT.OK);
+    assert.equal(forced.body.forced, true);
+    assert.equal((await knowledge.inspectDomain('flutter-expo-android')).nodeCount, domain.nodeCount);
   });
 });
 

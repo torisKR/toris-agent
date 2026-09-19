@@ -52,3 +52,10 @@ export {
   PACKS_DIR,
   STARTER_DOMAIN_SLUGS,
 } from './paths.js';
+export {
+  KNOWLEDGE_PACKS_DIR,
+  KNOWLEDGE_PACK_SLUGS,
+  loadKnowledgePack,
+  listKnowledgePacks,
+  installKnowledgePack,
+} from './pack-install.js';

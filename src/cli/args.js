@@ -15,6 +15,7 @@ const KNOWN_BOOLEANS = new Set([
   'no-knowledge',
   'no-tools',
   'no-skills',
+  'force',
 ]);
 const ALIASES = { p: 'project', f: 'follow', h: 'help', v: 'version', s: 'status', n: 'limit' };
 

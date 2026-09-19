@@ -10,6 +10,7 @@ const state = {
   pin: null,
   reflect: null,
   reflectHidden: false,
+  packs: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -333,9 +334,62 @@ async function refreshReflect() {
   renderReflect();
 }
 
+function availablePacks() {
+  return (state.packs || []).filter((pack) => !pack.installed);
+}
+
+function renderPacks() {
+  const panel = $('pack-panel');
+  const list = $('pack-list');
+  const packs = availablePacks();
+  list.replaceChildren();
+  panel.hidden = packs.length === 0;
+  for (const pack of packs) {
+    const row = document.createElement('div');
+    row.className = 'knowledge-pack';
+    const copy = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = pack.title || pack.slug;
+    const meta = document.createElement('small');
+    meta.textContent = pack.slug;
+    copy.append(title, meta);
+    const install = document.createElement('button');
+    install.type = 'button';
+    install.className = 'button secondary';
+    install.textContent = 'Install';
+    install.addEventListener('click', async () => {
+      try {
+        const result = await api(`/api/knowledge/packs/${encodeURIComponent(pack.slug)}/install`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        });
+        state.selected = result.slug;
+        announce(`Installed ${result.slug}.`);
+        await refresh();
+      } catch (error) {
+        announce(error.message);
+      }
+    });
+    row.append(copy, install);
+    list.append(row);
+  }
+}
+
+async function refreshPacks() {
+  try {
+    const listed = await api('/api/knowledge/packs');
+    state.packs = listed.packs || [];
+  } catch {
+    state.packs = [];
+  }
+  renderPacks();
+}
+
 async function refresh() {
   const overview = await api('/api/knowledge');
   state.domains = overview.domains || [];
+  await refreshPacks();
   await refreshReflect();
   renderDomains();
   if (state.selected && state.domains.some((domain) => domain.slug === state.selected)) {
