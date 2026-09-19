@@ -25,7 +25,7 @@
         <a class="tab" href="/brief" aria-current="page">Brief</a>
         <a class="tab" href="/android">Android</a>
       </nav>
-      <div class="local-state"><span class="pulse" aria-hidden="true"></span><span>127.0.0.1 · local files</span></div>
+      <div class="local-state"><a id="spend-chip" class="spend-chip" href="/brief" hidden></a><span class="pulse" aria-hidden="true"></span><span>127.0.0.1 · local files</span></div>
       <a class="system-link" href="/design-system">Design system</a>
     </header>
 
@@ -101,6 +101,7 @@
     </div>
   </div>
   <div id="toast" class="sr-toast" aria-live="polite"></div>
+  <script type="module" src="/assets/spend-chip.js"></script>
   <script type="module" src="/assets/brief.js"></script>
 </body>
 </html>

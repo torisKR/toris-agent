@@ -63,6 +63,7 @@ const STATIC_ASSETS = new Map([
   ['/assets/brief.css', ['brief.css', 'text/css; charset=utf-8']],
   ['/assets/android.js', ['android.js', 'text/javascript; charset=utf-8']],
   ['/assets/knowledge-pin-client.js', ['knowledge-pin-client.js', 'text/javascript; charset=utf-8']],
+  ['/assets/spend-chip.js', ['spend-chip.js', 'text/javascript; charset=utf-8']],
   ['/assets/android.css', ['android.css', 'text/css; charset=utf-8']],
   ['/assets/design-picker.js', ['design-picker.js', 'text/javascript; charset=utf-8']],
   ['/assets/favicon.svg', ['favicon.svg', 'image/svg+xml']],
