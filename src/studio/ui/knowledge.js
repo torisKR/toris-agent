@@ -196,7 +196,27 @@ function renderDag() {
       renderDag();
     });
     pin.append(box, document.createTextNode(' use on next turn'));
-    item.append(button, pin);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'button quiet';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!window.confirm(`Remove ${node.title || node.id}?`)) return;
+      try {
+        await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}/nodes/${encodeURIComponent(node.id)}/remove`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        });
+        announce(`Removed ${node.id}.`);
+        await selectDomain(state.selected);
+      } catch (error) {
+        announce(error.message);
+      }
+    });
+    item.append(button, pin, remove);
     const links = outgoing.get(node.id) || [];
     if (links.length) {
       const nest = document.createElement('ul');
