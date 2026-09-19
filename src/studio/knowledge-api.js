@@ -5,6 +5,7 @@ import { acceptReflect, loadReflect } from './knowledge-reflect.js';
 import {
   addStudioKnowledgeNode,
   createStudioKnowledgeDomain,
+  linkStudioKnowledgeNodes,
   removeStudioKnowledgeNode,
   updateStudioKnowledgeNode,
 } from './knowledge-write.js';
@@ -136,9 +137,17 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
     const body = await readJson(request);
     const store = storeOf(options);
     try {
-      sendJson(response, 201, await store.link(params.slug, body));
+      sendJson(response, 201, await linkStudioKnowledgeNodes(store, params.slug, body));
     } catch (error) {
-      throw new HttpError(error.code === 'E_DAG_CYCLE' || error.code === 'E_UNKNOWN_NODE' ? 400 : 400, error.message);
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(
+        error.code === 'E_UNKNOWN_DOMAIN' || error.code === 'E_UNKNOWN_NODE'
+          ? 404
+          : error.code === 'E_DAG_DUPLICATE'
+            ? 409
+            : 400,
+        error.message,
+      );
     }
   });
 
