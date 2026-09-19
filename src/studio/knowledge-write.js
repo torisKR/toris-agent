@@ -73,3 +73,19 @@ export async function addStudioKnowledgeNode(store, slug, input = {}) {
 
   return { ...node, written: true, edge };
 }
+
+/**
+ * Opt-in Studio write: one `removeNode`. Unknown domain / node are 404 and
+ * the store does not write.
+ */
+export async function removeStudioKnowledgeNode(store, slug, nodeId) {
+  const domain = await requireDomain(store, slug);
+  try {
+    return await store.removeNode(domain.slug, nodeId, domain.source);
+  } catch (error) {
+    if (error.code === 'E_UNKNOWN_NODE' || error.code === 'E_UNKNOWN_DOMAIN') {
+      throw new HttpError(404, error.message);
+    }
+    throw new HttpError(400, error.message);
+  }
+}

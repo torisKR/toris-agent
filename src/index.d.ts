@@ -440,6 +440,7 @@ export class KnowledgeStore {
   addDomain(input: Record<string, unknown>): Promise<Record<string, unknown>>;
   inspectDomain(slug: string, source?: string): Promise<Record<string, unknown>>;
   addNode(slug: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+  removeNode(slug: string, id: string, source?: string): Promise<Record<string, unknown>>;
   getNode(slug: string, id: string, source?: string): Promise<Record<string, unknown>>;
   listNodes(slug: string, source?: string): Promise<Array<Record<string, unknown>>>;
   link(slug: string, input: { from: string; to: string; kind?: string; source?: string }): Promise<Record<string, unknown>>;

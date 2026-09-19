@@ -57,6 +57,45 @@ test('starter domains have real nodes, tacit notes, and a DAG', async () => {
   });
 });
 
+test('removeNode deletes the markdown file and drops edges that touch it', async () => {
+  await withStore(async (store, home) => {
+    const node = await store.addNode('toris-ops', {
+      title: 'Temporary receipt rule',
+      body: 'Delete me after the test.',
+    });
+    await store.link('toris-ops', {
+      from: 'receipts-not-vibes',
+      to: node.id,
+      kind: 'supports',
+    });
+    const other = await store.inspectDomain('flutter-android');
+    const removed = await store.removeNode('toris-ops', node.id);
+    assert.equal(removed.removed, true);
+    assert.equal(removed.id, node.id);
+    assert.ok(removed.droppedEdges.some((edge) => edge.to === node.id));
+    await assert.rejects(() => store.getNode('toris-ops', node.id), /Unknown node/);
+    const dag = JSON.parse(await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8'));
+    assert.equal(dag.edges.some((edge) => edge.from === node.id || edge.to === node.id), false);
+    const flutter = await store.inspectDomain('flutter-android');
+    assert.equal(flutter.nodeCount, other.nodeCount);
+    assert.deepEqual(flutter.edges, other.edges);
+  });
+});
+
+test('removeNode unknown domain or node writes nothing', async () => {
+  await withStore(async (store, home) => {
+    const before = await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8');
+    await assert.rejects(() => store.removeNode('no-such-domain', 'receipts-not-vibes'), {
+      code: 'E_UNKNOWN_DOMAIN',
+    });
+    await assert.rejects(() => store.removeNode('toris-ops', 'no-such-node'), {
+      code: 'E_UNKNOWN_NODE',
+    });
+    assert.equal(await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8'), before);
+    assert.ok(await store.getNode('toris-ops', 'receipts-not-vibes'));
+  });
+});
+
 test('adding a node and a DAG edge persists as markdown and json', async () => {
   await withStore(async (store, home) => {
     const node = await store.addNode('toris-ops', {

@@ -353,6 +353,29 @@ export class KnowledgeStore {
     return this.getNode(domain, nodeId, source);
   }
 
+  /**
+   * Delete one node markdown file and drop dag.json edges that touch it.
+   * Unknown domain / node throw before any write.
+   */
+  async removeNode(slug, nodeId, source = 'home') {
+    const domain = requireSlug(slug, 'domain');
+    const root = this.resolveRoot(source);
+    if (!(await exists(join(domainDir(root, domain), DOMAIN_FILE)))) {
+      throw new TorisError(`Unknown domain "${domain}".`, 'E_UNKNOWN_DOMAIN');
+    }
+    const id = requireSlug(nodeId, 'node');
+    const path = join(nodeDir(root, domain), `${id}.md`);
+    if (!(await exists(path))) throw new TorisError(`Unknown node "${domain}/${id}".`, 'E_UNKNOWN_NODE');
+    const dagPath = join(domainDir(root, domain), DAG_FILE);
+    const current = parseDagDocument((await readText(dagPath)) ?? '');
+    const remaining = current.edges.filter((edge) => edge.from !== id && edge.to !== id);
+    const droppedEdges = current.edges.filter((edge) => edge.from === id || edge.to === id);
+    await unlink(path);
+    await atomicWrite(dagPath, renderDagDocument(remaining));
+    await this.rebuildIndex();
+    return { ok: true, removed: true, domain, source, id, droppedEdges, edges: remaining };
+  }
+
   async link(slug, { from, to, kind = 'supports', source = 'home' } = {}) {
     const domain = requireSlug(slug, 'domain');
     const root = this.resolveRoot(source);
