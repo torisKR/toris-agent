@@ -24,7 +24,7 @@
         <a class="tab" id="nav-brief" href="/brief">브리프</a>
         <a class="tab" id="nav-android" href="/android">안드로이드</a>
       </nav>
-      <div class="local-state"><span class="pulse" aria-hidden="true"></span><span id="live-status">127.0.0.1:5824 · local</span></div>
+      <div class="local-state"><a id="spend-chip" class="spend-chip" href="/brief" hidden></a><span class="pulse" aria-hidden="true"></span><span id="live-status">127.0.0.1:5824 · local</span></div>
       <a class="system-link" href="/design-system">Design system</a>
     </header>
 
@@ -250,6 +250,7 @@
       <div class="row dialog-actions"><button class="button secondary" value="cancel">돌아가기</button><button id="publish-submit" class="button danger" type="button" disabled>차단 상태 확인</button></div>
     </form>
   </dialog>
+  <script type="module" src="/assets/spend-chip.js"></script>
   <script type="module" src="/assets/app.js"></script>
 </body>
 </html>
