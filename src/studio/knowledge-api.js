@@ -2,7 +2,12 @@ import { KnowledgeStore, searchIndex, STARTER_DOMAIN_SLUGS } from '../core/knowl
 import { HttpError, readJson } from './http.js';
 import { loadKnowledgeDag } from './knowledge-dag.js';
 import { acceptReflect, loadReflect } from './knowledge-reflect.js';
-import { addStudioKnowledgeNode, removeStudioKnowledgeNode, updateStudioKnowledgeNode } from './knowledge-write.js';
+import {
+  addStudioKnowledgeNode,
+  createStudioKnowledgeDomain,
+  removeStudioKnowledgeNode,
+  updateStudioKnowledgeNode,
+} from './knowledge-write.js';
 
 function storeOf(options) {
   return new KnowledgeStore({ home: options.home, projectPath: options.cwd });
@@ -22,11 +27,17 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
   router.add('GET', '/api/knowledge', async (_request, response) => {
     const store = storeOf(options);
     const status = await store.status();
+    const domains = await store.listDomains();
     if (!status.ok) {
-      sendJson(response, 200, { ok: false, status, starters: STARTER_DOMAIN_SLUGS, hint: 'toris knowledge init' });
+      sendJson(response, 200, {
+        ok: false,
+        status,
+        domains,
+        starters: STARTER_DOMAIN_SLUGS,
+        hint: 'toris knowledge init',
+      });
       return;
     }
-    const domains = await store.listDomains();
     sendJson(response, 200, { ok: true, status, domains });
   });
 
@@ -76,11 +87,11 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
     requireJson(request);
     const body = await readJson(request);
     const store = storeOf(options);
-    if (!(await store.status()).ok) await store.init({ seed: true });
     try {
-      sendJson(response, 201, await store.addDomain(body));
+      sendJson(response, 201, await createStudioKnowledgeDomain(store, body));
     } catch (error) {
-      throw new HttpError(400, error.message);
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(error.code === 'E_DOMAIN_EXISTS' ? 409 : 400, error.message);
     }
   });
 

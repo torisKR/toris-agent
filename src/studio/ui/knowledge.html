@@ -39,6 +39,14 @@
           <span class="queue-count" id="domain-count">0</span>
         </div>
         <p class="agent-lead">Plain files under <code>~/.toris/knowledge</code>. Same store as <code>toris knowledge</code>.</p>
+        <section class="knowledge-reflect" id="create-domain-panel" aria-label="Create domain">
+          <form id="create-domain-form" class="stack">
+            <label class="field" for="new-domain-slug">Create domain<input id="new-domain-slug" name="slug" maxlength="64" required placeholder="my-app"></label>
+            <label class="field" for="new-domain-title">Title (optional)<input id="new-domain-title" name="title" maxlength="80" placeholder="My app"></label>
+            <label class="field" for="new-domain-description">Description (optional)<textarea id="new-domain-description" name="description" maxlength="400" placeholder="What this domain is for."></textarea></label>
+            <button class="button" type="submit">Create</button>
+          </form>
+        </section>
         <section class="knowledge-reflect" id="reflect-panel" aria-label="Verified-run reflect">
           <div class="knowledge-reflect-head">
             <p class="kicker">Reflect</p>

@@ -41,7 +41,7 @@ function renderDomains() {
   if (state.domains.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'queue-empty';
-    empty.textContent = 'No domains yet. Seed the store from the inspector.';
+    empty.textContent = 'No domains yet. Create one, or seed the store.';
     list.append(empty);
     return;
   }
@@ -312,12 +312,6 @@ async function refresh() {
   const overview = await api('/api/knowledge');
   state.domains = overview.domains || [];
   await refreshReflect();
-  if (!overview.ok) {
-    state.detail = null;
-    renderDomains();
-    renderDetail();
-    return;
-  }
   renderDomains();
   if (state.selected && state.domains.some((domain) => domain.slug === state.selected)) {
     await selectDomain(state.selected);
@@ -328,6 +322,30 @@ async function refresh() {
     renderDetail();
   }
 }
+
+$('create-domain-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const slug = $('new-domain-slug').value.trim();
+  const title = $('new-domain-title').value.trim();
+  const body = $('new-domain-description').value.trim();
+  try {
+    const created = await api('/api/knowledge/domains', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        ...(title ? { title } : {}),
+        ...(body ? { body } : {}),
+      }),
+    });
+    $('create-domain-form').reset();
+    state.selected = created.slug;
+    announce(`Created ${created.slug}.`);
+    await refresh();
+  } catch (error) {
+    announce(error.message);
+  }
+});
 
 $('seed-store').addEventListener('click', async () => {
   try {
