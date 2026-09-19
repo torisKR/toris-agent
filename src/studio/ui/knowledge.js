@@ -488,8 +488,11 @@ $('add-edge-form').addEventListener('submit', async (event) => {
       }),
     });
     $('add-edge-form').reset();
-    announce('Edge saved.');
-    await selectDomain(state.selected);
+    announce('Linked.');
+    state.detail = await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}`);
+    state.dag = await loadDag(state.selected);
+    renderDomains();
+    renderDetail();
   } catch (error) {
     announce(error.message);
   }

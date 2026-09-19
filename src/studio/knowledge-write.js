@@ -121,6 +121,39 @@ export async function updateStudioKnowledgeNode(store, slug, nodeId, input = {})
 }
 
 /**
+ * Opt-in Studio write: one `link` between two existing nodes. Does not
+ * create a node. Unknown domain / from / to write nothing.
+ */
+export async function linkStudioKnowledgeNodes(store, slug, input = {}) {
+  const domain = await requireDomain(store, slug);
+  const from = text(input.from);
+  const to = text(input.to);
+  const kind = text(input.kind) || 'supports';
+  if (!from || !to) {
+    throw new HttpError(400, 'DAG edge needs from and to node ids.');
+  }
+  if (!EDGE_KINDS.includes(kind.toLowerCase())) {
+    throw new HttpError(400, `Unknown DAG edge kind "${input.kind}". Use one of: ${EDGE_KINDS.join(', ')}.`);
+  }
+  if (!domain.nodes.some((node) => node.id === from)) {
+    throw new HttpError(404, `Unknown node "${domain.slug}/${from}".`);
+  }
+  if (!domain.nodes.some((node) => node.id === to)) {
+    throw new HttpError(404, `Unknown node "${domain.slug}/${to}".`);
+  }
+  try {
+    const linked = await store.link(domain.slug, { from, to, kind: kind.toLowerCase() });
+    return { ...linked, written: true };
+  } catch (error) {
+    if (error.code === 'E_DAG_DUPLICATE') throw new HttpError(409, error.message);
+    if (error.code === 'E_UNKNOWN_NODE' || error.code === 'E_UNKNOWN_DOMAIN') {
+      throw new HttpError(404, error.message);
+    }
+    throw new HttpError(400, error.message);
+  }
+}
+
+/**
  * Opt-in Studio write: one `removeNode`. Unknown domain / node are 404 and
  * the store does not write.
  */
