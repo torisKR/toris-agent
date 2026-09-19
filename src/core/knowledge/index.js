@@ -8,6 +8,7 @@ export {
   detectCycles,
   wouldCreateCycle,
   addDagEdge,
+  removeDagEdge,
   canReach,
 } from './dag.js';
 export {

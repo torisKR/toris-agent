@@ -154,6 +154,8 @@ The same page has a small **add node** form for the selected domain: title, kind
 
 The same page has a small **link** form for the selected domain: from node id, to node id, and an existing DAG edge kind (`prerequisite`, `supports`, `conflicts`, `derived-from`). **Link** writes one edge through `KnowledgeStore.link`. It does not create a node. Unknown from/to is HTTP 404 — the store's `E_UNKNOWN_NODE` — and writes nothing. Duplicate edge is HTTP 409 (`E_DAG_DUPLICATE`) and writes nothing. Unknown domain is HTTP 404, same as inspect. Same Origin + session token gate as Accept. After success the panel reloads the existing DAG GET. Nothing is written on GET or until you Link.
 
+Each listed DAG edge also has a quiet **Unlink** control. Confirm before write (browser confirm). **Unlink** writes through `KnowledgeStore.unlink`: it drops exactly one matching `{ from, to, kind }` from `dag.json` and leaves both nodes on disk. Unknown edge is HTTP 404 and writes nothing. Same Origin + session token gate as Link. The panel then reloads the existing DAG GET. Nothing is written on GET or until you confirm.
+
 The same page can show the latest **verified-run** proposal (goal, short outcome, domain guess) — the Studio equivalent of `toris knowledge reflect` / `/reflect`. **Accept** writes that one tacit note through `KnowledgeStore.addTacit` (same path as `--write` / `/reflect accept`). **Dismiss** does not write. Failed or unverified receipts stay hidden. Nothing is written until you click Accept.
 
 ## Grow a domain

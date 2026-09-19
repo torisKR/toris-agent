@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, readdir, rename, cp, unlink } from 'node:fs
 import { join, basename, dirname } from 'node:path';
 
 import { TorisError } from '../errors.js';
-import { parseDagDocument, renderDagDocument, addDagEdge, detectCycles, EDGE_KINDS } from './dag.js';
+import { parseDagDocument, renderDagDocument, addDagEdge, removeDagEdge, detectCycles, EDGE_KINDS } from './dag.js';
 import { parseFrontmatter, renderFrontmatter, splitTags, requireSlug, slugify } from './markdown.js';
 import {
   knowledgeDir,
@@ -415,6 +415,26 @@ export class KnowledgeStore {
     await atomicWrite(path, renderDagDocument(edges));
     await this.rebuildIndex();
     return { domain, source, edges, added: { from: fromId, to: toId, kind } };
+  }
+
+  /**
+   * Drop exactly one matching `{ from, to, kind }` from dag.json. Nodes stay
+   * on disk. Unknown domain / unknown edge throw before any write.
+   */
+  async unlink(slug, { from, to, kind = 'supports', source = 'home' } = {}) {
+    const domain = requireSlug(slug, 'domain');
+    const root = this.resolveRoot(source);
+    const path = join(domainDir(root, domain), DAG_FILE);
+    if (!(await exists(join(domainDir(root, domain), DOMAIN_FILE)))) {
+      throw new TorisError(`Unknown domain "${domain}".`, 'E_UNKNOWN_DOMAIN');
+    }
+    const fromId = requireSlug(from, 'from');
+    const toId = requireSlug(to, 'to');
+    const current = parseDagDocument((await readText(path)) ?? '');
+    const edges = removeDagEdge(current.edges, { from: fromId, to: toId, kind });
+    await atomicWrite(path, renderDagDocument(edges));
+    await this.rebuildIndex();
+    return { domain, source, edges, removed: { from: fromId, to: toId, kind } };
   }
 
   async listTacit(slug, source = 'home') {

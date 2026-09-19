@@ -443,6 +443,8 @@ Additive Studio DAG read (same store): `GET /api/knowledge/domains/:slug/dag` re
 
 Additive Studio knowledge link (same store): `POST /api/knowledge/domains/:slug/edges` writes one edge via `KnowledgeStore.link` between two existing nodes. It does not create a node. Unknown domain or unknown from/to is HTTP 404 (same as inspect / `E_UNKNOWN_NODE`) and writes nothing. Duplicate edge is HTTP 409 (`E_DAG_DUPLICATE`) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
 
+Additive Studio knowledge unlink (same store): `POST /api/knowledge/domains/:slug/edges/unlink` drops exactly one matching `{ from, to, kind }` via `KnowledgeStore.unlink`. It does not delete nodes. Unknown domain or unknown edge is HTTP 404 and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
+
 Additive Studio knowledge remove (same store): `POST /api/knowledge/domains/:slug/nodes/:id/remove` deletes that node via `KnowledgeStore.removeNode` and drops `dag.json` edges that touch it. Unknown domain or unknown node is HTTP 404 (same as inspect) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
 
 Additive Studio knowledge edit (same store): `POST /api/knowledge/domains/:slug/nodes/:id/update` updates that node's title and/or body via `KnowledgeStore.updateNode`. Kind and node id are unchanged. Empty title is HTTP 400 and writes nothing. Unknown domain or unknown node is HTTP 404 (same as inspect) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.

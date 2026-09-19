@@ -7,6 +7,7 @@ import {
   createStudioKnowledgeDomain,
   linkStudioKnowledgeNodes,
   removeStudioKnowledgeNode,
+  unlinkStudioKnowledgeEdge,
   updateStudioKnowledgeNode,
 } from './knowledge-write.js';
 
@@ -146,6 +147,21 @@ export function registerKnowledgeRoutes(router, { sendJson, requireJson, options
           : error.code === 'E_DAG_DUPLICATE'
             ? 409
             : 400,
+        error.message,
+      );
+    }
+  });
+
+  router.add('POST', '/api/knowledge/domains/:slug/edges/unlink', async (request, response, params) => {
+    requireJson(request);
+    const body = await readJson(request);
+    const store = storeOf(options);
+    try {
+      sendJson(response, 200, await unlinkStudioKnowledgeEdge(store, params.slug, body));
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(
+        error.code === 'E_UNKNOWN_DOMAIN' || error.code === 'E_UNKNOWN_EDGE' ? 404 : 400,
         error.message,
       );
     }

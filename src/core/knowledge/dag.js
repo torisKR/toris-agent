@@ -157,3 +157,25 @@ export function addDagEdge(edges, input) {
   }
   return Object.freeze([...current, edge]);
 }
+
+function sameEdge(left, right) {
+  return left.from === right.from && left.to === right.to && left.kind === right.kind;
+}
+
+/**
+ * Drop exactly one matching `{ from, to, kind }` edge. Missing match throws
+ * before the caller writes. Duplicate matches drop the first only.
+ * @returns {ReadonlyArray<{from:string,to:string,kind:string}>}
+ */
+export function removeDagEdge(edges, input) {
+  const edge = normalizeEdge(input);
+  const current = edges.map(normalizeEdge);
+  const index = current.findIndex((item) => sameEdge(item, edge));
+  if (index === -1) {
+    throw new TorisError(
+      `Unknown edge ${edge.from} -[${edge.kind}]-> ${edge.to}.`,
+      'E_UNKNOWN_EDGE',
+    );
+  }
+  return Object.freeze([...current.slice(0, index), ...current.slice(index + 1)]);
+}
