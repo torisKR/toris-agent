@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   addDagEdge,
+  removeDagEdge,
   detectCycles,
   wouldCreateCycle,
   parseDagDocument,
@@ -48,4 +49,28 @@ test('dag.json parser accepts {edges} and a bare array', () => {
 test('unknown kinds are rejected', () => {
   assert.throws(() => addDagEdge([], { from: 'a', to: 'b', kind: 'related' }), /Unknown DAG edge kind/);
   assert.ok(EDGE_KINDS.includes('prerequisite'));
+});
+
+test('removeDagEdge drops exactly one matching edge', () => {
+  const once = addDagEdge([], { from: 'a', to: 'b', kind: 'supports' });
+  const twice = addDagEdge(once, { from: 'a', to: 'c', kind: 'supports' });
+  const remaining = removeDagEdge(twice, { from: 'a', to: 'b', kind: 'supports' });
+  assert.deepEqual(remaining, [{ from: 'a', to: 'c', kind: 'supports' }]);
+  assert.throws(
+    () => removeDagEdge(remaining, { from: 'a', to: 'b', kind: 'supports' }),
+    (error) => error.code === 'E_UNKNOWN_EDGE',
+  );
+});
+
+test('removeDagEdge drops only the first of duplicate matches', () => {
+  const duplicate = [
+    { from: 'a', to: 'b', kind: 'supports' },
+    { from: 'a', to: 'c', kind: 'prerequisite' },
+    { from: 'a', to: 'b', kind: 'supports' },
+  ];
+  const remaining = removeDagEdge(duplicate, { from: 'a', to: 'b', kind: 'supports' });
+  assert.deepEqual(remaining, [
+    { from: 'a', to: 'c', kind: 'prerequisite' },
+    { from: 'a', to: 'b', kind: 'supports' },
+  ]);
 });

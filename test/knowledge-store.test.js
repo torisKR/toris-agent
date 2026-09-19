@@ -164,6 +164,61 @@ test('adding a node and a DAG edge persists as markdown and json', async () => {
   });
 });
 
+test('unlink removes one matching edge and leaves both nodes', async () => {
+  await withStore(async (store, home) => {
+    const node = await store.addNode('toris-ops', {
+      title: 'Unlink keeps this node',
+      body: 'The edge goes away; the file stays.',
+    });
+    await store.link('toris-ops', {
+      from: 'receipts-not-vibes',
+      to: node.id,
+      kind: 'supports',
+    });
+    const beforeNode = await readFile(join(home, 'knowledge/domains/toris-ops/nodes', `${node.id}.md`), 'utf8');
+    const other = await store.inspectDomain('flutter-android');
+    const unlinked = await store.unlink('toris-ops', {
+      from: 'receipts-not-vibes',
+      to: node.id,
+      kind: 'supports',
+    });
+    assert.deepEqual(unlinked.removed, {
+      from: 'receipts-not-vibes',
+      to: node.id,
+      kind: 'supports',
+    });
+    const dag = JSON.parse(await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8'));
+    assert.equal(
+      dag.edges.some((edge) => edge.from === 'receipts-not-vibes' && edge.to === node.id && edge.kind === 'supports'),
+      false,
+    );
+    assert.ok(await store.getNode('toris-ops', 'receipts-not-vibes'));
+    assert.ok(await store.getNode('toris-ops', node.id));
+    assert.equal(await readFile(join(home, 'knowledge/domains/toris-ops/nodes', `${node.id}.md`), 'utf8'), beforeNode);
+    const flutter = await store.inspectDomain('flutter-android');
+    assert.deepEqual(flutter.edges, other.edges);
+    assert.equal(flutter.nodeCount, other.nodeCount);
+  });
+});
+
+test('unlink unknown domain or unknown edge writes nothing', async () => {
+  await withStore(async (store, home) => {
+    const before = await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8');
+    await assert.rejects(() => store.unlink('no-such-domain', {
+      from: 'receipts-not-vibes',
+      to: 'autonomy-ladder',
+      kind: 'supports',
+    }), { code: 'E_UNKNOWN_DOMAIN' });
+    await assert.rejects(() => store.unlink('toris-ops', {
+      from: 'receipts-not-vibes',
+      to: 'autonomy-ladder',
+      kind: 'supports',
+    }), { code: 'E_UNKNOWN_EDGE' });
+    assert.equal(await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8'), before);
+    assert.ok(await store.getNode('toris-ops', 'receipts-not-vibes'));
+  });
+});
+
 test('USER.md over the bound is compressed rather than rejected', async () => {
   await withStore(async (store) => {
     const bulky = `${'x'.repeat(USER_MD_LIMIT + 2000)}`;

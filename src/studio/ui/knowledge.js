@@ -223,7 +223,32 @@ function renderDag() {
       nest.className = 'knowledge-dag-edges';
       for (const edge of links) {
         const row = document.createElement('li');
-        row.textContent = `${edge.kind} → ${dagTitle(edge.to)}`;
+        const label = document.createElement('span');
+        label.textContent = `${edge.kind} → ${dagTitle(edge.to)}`;
+        const unlink = document.createElement('button');
+        unlink.type = 'button';
+        unlink.className = 'button quiet';
+        unlink.textContent = 'Unlink';
+        unlink.addEventListener('click', async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!window.confirm(`Unlink ${edge.from} -[${edge.kind}]-> ${edge.to}?`)) return;
+          try {
+            await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}/edges/unlink`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ from: edge.from, to: edge.to, kind: edge.kind }),
+            });
+            announce('Unlinked.');
+            state.detail = await api(`/api/knowledge/domains/${encodeURIComponent(state.selected)}`);
+            state.dag = await loadDag(state.selected);
+            renderDomains();
+            renderDetail();
+          } catch (error) {
+            announce(error.message);
+          }
+        });
+        row.append(label, unlink);
         nest.append(row);
       }
       item.append(nest);

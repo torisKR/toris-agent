@@ -154,6 +154,37 @@ export async function linkStudioKnowledgeNodes(store, slug, input = {}) {
 }
 
 /**
+ * Opt-in Studio write: one `unlink` for an existing `{ from, to, kind }`.
+ * Does not delete nodes. Unknown domain / unknown edge write nothing.
+ */
+export async function unlinkStudioKnowledgeEdge(store, slug, input = {}) {
+  const domain = await requireDomain(store, slug);
+  const from = text(input.from);
+  const to = text(input.to);
+  const kind = text(input.kind) || 'supports';
+  if (!from || !to) {
+    throw new HttpError(400, 'DAG edge needs from and to node ids.');
+  }
+  if (!EDGE_KINDS.includes(kind.toLowerCase())) {
+    throw new HttpError(400, `Unknown DAG edge kind "${input.kind}". Use one of: ${EDGE_KINDS.join(', ')}.`);
+  }
+  try {
+    const unlinked = await store.unlink(domain.slug, {
+      from,
+      to,
+      kind: kind.toLowerCase(),
+      source: domain.source,
+    });
+    return { ...unlinked, written: true };
+  } catch (error) {
+    if (error.code === 'E_UNKNOWN_EDGE' || error.code === 'E_UNKNOWN_DOMAIN') {
+      throw new HttpError(404, error.message);
+    }
+    throw new HttpError(400, error.message);
+  }
+}
+
+/**
  * Opt-in Studio write: one `removeNode`. Unknown domain / node are 404 and
  * the store does not write.
  */
