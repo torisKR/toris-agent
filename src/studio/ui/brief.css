@@ -24,6 +24,8 @@
   margin-bottom: 12px;
 }
 .brief-hint { margin: 12px 0 0; color: var(--quiet); font-size: 12px; line-height: 1.5; }
+.brief-card .stack { margin-top: 14px; }
+.brief-error { margin: 0; color: var(--failure); font-size: 12px; line-height: 1.5; }
 .brief-hint code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .brief-rows { display: grid; gap: 12px; }
 .brief-row {

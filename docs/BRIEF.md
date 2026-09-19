@@ -16,7 +16,7 @@ toris brief --json
 
 | Section | Source | Quiet when |
 | --- | --- | --- |
-| **Spend** | `~/.toris/cost.json` + run files via `summarizeCost` | never (today's `$0 / cap` is still the fact) |
+| **Spend** | `~/.toris/cost.json` + run files via `summarizeCost` | never (today's spend is still the fact; the cap line stays quiet when `maxDailyCostUsd` is unset / `0`) |
 | **Runs** | `~/.toris/runs/*.json` for the local calendar day | no runs today |
 | **Daemon** | `daemon.json` + `daemon/schedules/` | never for running/not; next-due line omitted if none |
 | **Knowledge** | keyword search over `index.json`, else latest tacit | store not initialized, or no headlines |
@@ -60,4 +60,4 @@ brief
 
 ## Studio
 
-The same digest is on the loopback GUI at `http://127.0.0.1:5824/brief` (`GET /api/brief`). Read-only — no Slack/Telegram send, no daemon start/stop, no enqueue. See [STUDIO.md](./STUDIO.md).
+The same digest is on the loopback GUI at `http://127.0.0.1:5824/brief` (`GET /api/brief`). Today's spend, the configured daily budget (`config.maxDailyCostUsd`, quiet when unset), and remaining come from `summarizeCost` / `buildBrief`. A small form **Save**s or **Clear**s that ceiling through the same `maxDailyCostUsd` field CLI `checkBudget` already enforces. Writes happen only on Save/Clear. GET never writes. Same Origin + session token as other Studio mutations. No Slack/Telegram send, no daemon start/stop, no enqueue. See [STUDIO.md](./STUDIO.md).
