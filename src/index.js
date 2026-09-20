@@ -13,6 +13,7 @@ export {
   parseAgentProfile,
   composeAgentCatalogue,
   loadAgentCatalogue,
+  agentSourceOf,
 } from './core/agents.js';
 export {
   studioAgentUrl,

@@ -1,5 +1,6 @@
 import { loadConfig } from '../core/config.js';
 import {
+  agentSourceOf,
   listSurfaceAgents,
   loadAgentCatalogue,
   resolveSurfaceAgent,
@@ -50,13 +51,18 @@ function sanitizeHistory(history) {
   });
 }
 
+function publicAgent(agent) {
+  if (!agent || typeof agent !== 'object') return agent;
+  return { ...agent, source: agentSourceOf(agent) };
+}
+
 export async function inspectAgentRuntime({ home, cwd, loadConfigFn = loadConfig } = {}) {
   const tui = 'toris';
   const gui = studioAgentUrl();
   let catalogue;
   let agentsError = null;
   try {
-    catalogue = await loadAgentCatalogue({ home, projectPath: cwd });
+    catalogue = await loadAgentCatalogue({ home, projectPath: cwd, skipInvalid: true });
   } catch (error) {
     agentsError = error.message;
     catalogue = undefined;
@@ -116,8 +122,8 @@ export function publicAgentStatus(status, agentId) {
     reason: status.reason,
     tui: tuiAgentHint(agent.id),
     gui: status.gui,
-    agent,
-    agents: status.agents,
+    agent: publicAgent(agent),
+    agents: (status.agents || []).map(publicAgent),
     ...(status.agentsError ? { agentsError: status.agentsError } : {}),
   };
 }
@@ -205,7 +211,11 @@ export async function runAgentTurn(options) {
   let catalogue = options.catalogue;
   if (!catalogue) {
     try {
-      catalogue = await loadAgentCatalogue({ home: options.home, projectPath: options.cwd });
+      catalogue = await loadAgentCatalogue({
+        home: options.home,
+        projectPath: options.cwd,
+        skipInvalid: true,
+      });
     } catch (error) {
       throw new HttpError(400, error.message);
     }

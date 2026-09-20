@@ -129,6 +129,22 @@ test('loadAgentCatalogue throws a clear error for a bad project file', async () 
   });
 });
 
+test('loadAgentCatalogue skipInvalid keeps valid siblings and drops the broken file', async () => {
+  await withRoot(async (root) => {
+    const dir = join(root, '.toris', 'agents');
+    await mkdir(dir, { recursive: true });
+    await writeProfile(dir, 'aso-specialist');
+    await writeFile(join(dir, 'broken-specialist.json'), '{', 'utf8');
+    await writeFile(join(dir, 'also-broken.json'), JSON.stringify({ id: 'also-broken' }), 'utf8');
+    const catalogue = await loadAgentCatalogue({ projectPath: root, skipInvalid: true });
+    const agents = listSurfaceAgents(undefined, catalogue);
+    assert.ok(agents.some((agent) => agent.id === 'aso-specialist'));
+    assert.equal(agents.some((agent) => agent.id === 'broken-specialist'), false);
+    assert.equal(agents.some((agent) => agent.id === 'also-broken'), false);
+    assert.ok(agents.some((agent) => agent.id === 'implementer'));
+  });
+});
+
 test('toris agents --json lists a project overlay with source=project', async () => {
   await withRoot(async (root) => {
     const home = join(root, 'home');

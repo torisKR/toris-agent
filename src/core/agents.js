@@ -261,9 +261,10 @@ function sourceForDir(dir, { home, projectPath } = {}) {
 /**
  * Read every `*.json` file in `dirs` (not recursive). Later directories win
  * on id, matching skills: builtin < home < project.
- * Missing directories are normal. A bad file throws TorisError, not a crash.
+ * Missing directories are normal. A bad file throws TorisError, not a crash,
+ * unless `skipInvalid` is set (Studio catalogue: keep the rest of the list).
  * @param {string[]} dirs
- * @param {{home?:string, projectPath?:string}} [roots]
+ * @param {{home?:string, projectPath?:string, skipInvalid?:boolean}} [roots]
  */
 export async function discoverAgentProfiles(dirs, roots = {}) {
   const byId = new Map();
@@ -273,6 +274,7 @@ export async function discoverAgentProfiles(dirs, roots = {}) {
       entries = await readdir(dir, { withFileTypes: true });
     } catch (err) {
       if (err && err.code === 'ENOENT') continue;
+      if (roots.skipInvalid) continue;
       throw invalidAgent(dir, `cannot read directory (${err.message}).`);
     }
     const files = entries
@@ -280,8 +282,13 @@ export async function discoverAgentProfiles(dirs, roots = {}) {
       .sort((a, b) => a.name.localeCompare(b.name));
     const source = sourceForDir(dir, roots);
     for (const entry of files) {
-      const profile = await loadAgentProfileFile(join(dir, entry.name), { source });
-      byId.set(profile.id, profile);
+      try {
+        const profile = await loadAgentProfileFile(join(dir, entry.name), { source });
+        byId.set(profile.id, profile);
+      } catch (err) {
+        if (roots.skipInvalid && err?.code === 'E_INVALID_AGENT') continue;
+        throw err;
+      }
     }
   }
   return [...byId.values()];
@@ -322,12 +329,19 @@ export function composeAgentCatalogue(overlays = []) {
 
 /**
  * Live catalogue for this home + project. No network. Absent dirs are empty.
- * @param {{home?:string, projectPath?:string}} [roots]
+ * Studio passes `skipInvalid: true` so one broken file cannot hide the rest.
+ * @param {{home?:string, projectPath?:string, skipInvalid?:boolean}} [roots]
  */
-export async function loadAgentCatalogue({ home, projectPath } = {}) {
+export async function loadAgentCatalogue({ home, projectPath, skipInvalid = false } = {}) {
   const overlays = await discoverAgentProfiles(agentSearchPaths({ home, projectPath }), {
     home,
     projectPath,
+    skipInvalid,
   });
   return composeAgentCatalogue(overlays);
+}
+
+/** `builtin` unless the profile came from a home or project overlay. */
+export function agentSourceOf(agent) {
+  return agent?.source === 'home' || agent?.source === 'project' ? agent.source : 'builtin';
 }

@@ -229,7 +229,11 @@ export async function createStudioServer(options) {
     }
     let catalogue;
     try {
-      catalogue = await loadAgentCatalogue({ home: options.home, projectPath: options.cwd });
+      catalogue = await loadAgentCatalogue({
+        home: options.home,
+        projectPath: options.cwd,
+        skipInvalid: true,
+      });
       resolveSurfaceAgent(body.agent, catalogue);
     } catch (error) {
       throw new HttpError(400, error.message);
@@ -402,7 +406,11 @@ export async function createStudioServer(options) {
     if (!note && !hunk) throw new HttpError(400, 'review note or hunk is required');
     if (note.length > PATCH_REVIEW_NOTE_LIMIT) throw new HttpError(400, 'review note is too long');
     try {
-      const catalogue = await loadAgentCatalogue({ home: options.home, projectPath: options.cwd });
+      const catalogue = await loadAgentCatalogue({
+        home: options.home,
+        projectPath: options.cwd,
+        skipInvalid: true,
+      });
       resolveSurfaceAgent(body.agent, catalogue);
     } catch (error) {
       throw new HttpError(400, error.message);
