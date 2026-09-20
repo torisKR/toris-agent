@@ -213,7 +213,7 @@ test('writeAgentProfile writes one valid project overlay and refuses duplicates'
       code: 'E_AGENT_EXISTS',
     });
     assert.equal(JSON.parse(await readFile(file, 'utf8')).title, 'ASO Specialist');
-    assert.equal((await readdir(join(home))).includes('agents'), false);
+    await assert.rejects(() => readdir(join(home, 'agents')), { code: 'ENOENT' });
   });
 });
 
