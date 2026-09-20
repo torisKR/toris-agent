@@ -10,7 +10,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('product shell contains queue, editor, media review, quality, guarded publish, and agent regions', async () => {
   const html = await readFile(join(root, 'src/studio/ui/index.html'), 'utf8');
-  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'spend-chip', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'nav-brief', 'nav-android', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
+  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'spend-chip', 'patches-chip', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'nav-brief', 'nav-android', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /id="agent-send"[^>]*disabled/);
@@ -77,6 +77,7 @@ test('root app and fixed product assets are served with CSP', async () => {
     assert.equal((await fetch(`${base}/design/sample`)).status, 200);
     assert.equal((await fetch(`${base}/assets/studio.css`)).status, 200);
     assert.equal((await fetch(`${base}/assets/spend-chip.js`)).status, 200);
+    assert.equal((await fetch(`${base}/assets/patches-chip.js`)).status, 200);
     assert.equal((await fetch(`${base}/assets/favicon.svg`)).status, 200);
   } finally {
     await studio.close();

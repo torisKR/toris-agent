@@ -40,8 +40,8 @@ body { overflow-x: hidden; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 760; text-decoration: none; }
 .brand-mark { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; color: var(--accent-ink); background: var(--accent); }
 .local-state { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.spend-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--quiet); font-size: 11px; font-variant-numeric: tabular-nums; text-decoration: none; white-space: nowrap; }
-.spend-chip:hover { color: var(--text); }
+.spend-chip, .patches-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--quiet); font-size: 11px; font-variant-numeric: tabular-nums; text-decoration: none; white-space: nowrap; }
+.spend-chip:hover, .patches-chip:hover { color: var(--text); }
 .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--verified); box-shadow: 0 0 0 4px rgb(114 214 160 / .1); }
 .system-link { color: var(--quiet); font-size: 12px; text-decoration: none; }
 .studio-shell { display: grid; grid-template-columns: 248px minmax(0, 1fr) 340px; min-height: calc(100vh - 64px); }

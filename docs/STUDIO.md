@@ -56,6 +56,8 @@ After Design Mode or an agent run leaves an isolated diff, open `http://127.0.0.
 3. **적용** and **폐기** call the same `applySavedPatch` / `discardSavedPatch` functions as the CLI. They are mutations: current local `Origin` plus the in-memory session token.
 4. Optionally select a hunk, write a short review note, and send it as an implementer turn (`POST /api/patches/:id/review`). The turn runs inside the isolated worktree (`record.worktreePath`), not the Studio process directory. After the turn, Studio restages that worktree and replaces `~/.toris/patches/<id>.diff`, so **적용** applies the reviewed diff. If the worktree is gone, review is rejected rather than writing the original checkout. A **use on next turn** pin from `/knowledge` is forwarded as `{ domain, nodeId }` on that same request (same localStorage key as `/agent`, Design Mode, and `/android`) and consumed only after the review is accepted. Unknown pin ids are HTTP 400 (no model call, no write). A failed send leaves the pin in place.
 
+A quiet read-only chip on the shared Studio chrome shows the pending count from that same `GET /api/patches?status=pending` list and links to `/patches`. Hidden when the count is 0. GET only; it never writes the patches store.
+
 CLI `toris patches`, `toris apply`, and `toris discard` are unchanged.
 
 ## Knowledge
