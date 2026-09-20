@@ -48,7 +48,9 @@ Unknown fields fail. Invalid JSON fails. The error names the file and the field 
 crash with a stack trace. `id` `toris` may only use `category: "core"`.
 
 Copy [docs/examples/agents/aso-specialist.json](examples/agents/aso-specialist.json) to
-`.toris/agents/aso-specialist.json` to try a specialist locally.
+`.toris/agents/aso-specialist.json` to try a specialist locally. Studio `/agent` can
+**Create** that same project-local file (`POST /api/agents` → `writeAgentProfile`).
+It does not write `~/.toris/agents/`. There is no edit/delete UI yet.
 
 ```bash
 toris agents

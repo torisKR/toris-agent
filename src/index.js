@@ -11,6 +11,8 @@ export {
   resolveSurfaceAgent,
   agentSearchPaths,
   parseAgentProfile,
+  serializeAgentProfile,
+  writeAgentProfile,
   composeAgentCatalogue,
   loadAgentCatalogue,
   agentSourceOf,

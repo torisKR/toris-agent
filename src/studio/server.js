@@ -11,6 +11,7 @@ import { mediaResponse, saveMp4Upload } from './media-store.js';
 import { RenderService } from './render-service.js';
 import { checkRelease, contentHash } from './release-guard.js';
 import { inspectAgentRuntime, publicAgentStatus, runAgentTurn } from './agent-runtime.js';
+import { createStudioAgentProfile } from './agent-write.js';
 import { loadAgentCatalogue, resolveSurfaceAgent } from '../core/agents.js';
 import { Store } from '../core/store.js';
 import { applySavedPatch, discardSavedPatch, getPatch, listPatches, readPatchDiff, refreshSavedPatchDiff } from '../core/patches.js';
@@ -206,6 +207,16 @@ export async function createStudioServer(options) {
   router.add('GET', '/api/agents', async (_request, response) => {
     const status = await inspectAgentRuntime({ home: options.home, cwd: options.cwd });
     sendJson(response, 200, publicAgentStatus(status));
+  });
+  router.add('POST', '/api/agents', async (request, response) => {
+    requireJson(request);
+    const body = await readJson(request);
+    try {
+      sendJson(response, 201, await createStudioAgentProfile(body, { projectPath: options.cwd }));
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(error.code === 'E_AGENT_EXISTS' ? 409 : 400, error.message);
+    }
   });
   router.add('GET', '/api/agent/status', async (request, response) => {
     const url = new URL(request.url || '/', origin());

@@ -28,7 +28,7 @@ const state = {
   selectedHunk: '',
 };
 const elementIds = [
-  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
+  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','create-agent-form','new-agent-id','new-agent-title','new-agent-category','new-agent-summary','new-agent-writes','new-agent-system','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
 ];
 const elements = Object.fromEntries(elementIds.map((id) => [id, document.getElementById(id)]));
 
@@ -418,6 +418,37 @@ async function loadAgents() {
   renderAgents();
   renderAgentWorkspace();
 }
+
+elements['create-agent-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const id = elements['new-agent-id'].value.trim();
+  const title = elements['new-agent-title'].value.trim();
+  const category = elements['new-agent-category'].value;
+  const summary = elements['new-agent-summary'].value.trim();
+  const system = elements['new-agent-system'].value.trim();
+  try {
+    const created = await api('/api/agents', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        title,
+        category,
+        writes: elements['new-agent-writes'].checked,
+        summary,
+        ...(system ? { system } : {}),
+      }),
+    });
+    elements['create-agent-form'].reset();
+    state.agentId = created.agent?.id || id;
+    rememberAgent(state.agentId);
+    announce(`Created ${state.agentId}.`);
+    await loadAgents();
+    showSurface('agent', { agentId: state.agentId });
+  } catch (error) {
+    announce(error.message);
+  }
+});
 
 async function readSse(response, onEvent) {
   const reader = response.body.getReader();

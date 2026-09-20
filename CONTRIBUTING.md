@@ -148,8 +148,9 @@ the prompt scaffolding it contributes. Add the profile, then add a test assertin
 catalog with the right `writes` flag — the flag is a safety boundary, not documentation.
 
 A solo builder can add a domain specialist without a fork: one JSON file per role at
-`<repo>/.toris/agents/<id>.json` (or `~/.toris/agents/<id>.json`). That path merges into the
-same catalogue — see [docs/AGENTS.md](docs/AGENTS.md).
+`<repo>/.toris/agents/<id>.json` (or `~/.toris/agents/<id>.json`), or **Create** the
+project-local file from Studio `/agent`. That path merges into the same catalogue —
+see [docs/AGENTS.md](docs/AGENTS.md).
 
 ## Adding a new provider
 

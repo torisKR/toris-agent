@@ -5,6 +5,8 @@ body { overflow-x: hidden; }
 .surface-nav .tab { min-height: 44px; padding: 0 10px; color: var(--quiet); text-decoration: none; }
 .surface-nav .tab[aria-current="page"] { border-bottom-color: var(--accent); color: var(--text); }
 .agent-lead { margin: 0 18px 12px; color: var(--quiet); font-size: 12px; line-height: 1.5; }
+.agent-create { margin: 0 18px 16px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--panel); }
+.agent-create .confirm-check { margin: 0; }
 .agent-lead code, .workspace-empty code, .access-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .chat-room { display: grid; grid-template-rows: minmax(220px, 1fr) auto; min-height: calc(100vh - 150px); gap: 16px; max-width: 880px; margin: 0 auto; }
 .chat-log { display: grid; align-content: start; gap: 12px; overflow: auto; min-height: 220px; padding-bottom: 8px; }

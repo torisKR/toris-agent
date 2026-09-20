@@ -471,6 +471,14 @@ Required fields: `id`, `title`, `category` (`core|plan|build|review|verify|ship`
 
 CLI: `toris agents` lists `source`. See `docs/AGENTS.md`.
 
+Additive Studio create (project-local only): `POST /api/agents` writes one
+`<cwd>/.toris/agents/<id>.json` through `writeAgentProfile` / `parseAgentProfile`
+(same on-disk shape as a hand-written overlay). Invalid id/schema is HTTP 400
+(`E_INVALID_AGENT`). Duplicate project file is HTTP 409 (`E_AGENT_EXISTS`).
+Missing Origin/session token is HTTP 403. None of those write. GET never writes.
+Does not write `torisHome()/agents/`. No edit/delete. See `docs/STUDIO.md` and
+`docs/AGENTS.md`.
+
 ## Additive: cross-run cost ledger (post-0.1)
 
 Not a breaking change to the frozen signatures above. Daily spend is local-only:

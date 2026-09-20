@@ -199,11 +199,18 @@ test('Studio agent picker labels custom profiles from source', async () => {
   const js = await readFile(join(repoRoot, 'src/studio/ui/app.js'), 'utf8');
   assert.match(html, /id="agent-list"/);
   assert.match(html, /\.toris\/agents/);
+  assert.match(html, /id="create-agent-form"/);
+  assert.match(html, /id="new-agent-id"/);
+  assert.match(html, /id="new-agent-title"/);
+  assert.match(html, /id="new-agent-system"/);
   assert.match(js, /function agentPickerBadge/);
   assert.match(js, /source === 'home' \|\| agent\?\.source === 'project'/);
   assert.match(js, /\$\{source\} · \$\{writes\}/);
   assert.match(js, /agent:\s*state\.agentId/);
-  assert.doesNotMatch(js, /\/api\/agents\/(?:create|update|delete)/);
+  assert.match(js, /\/api\/agents/);
+  assert.match(js, /await loadAgents\(\)/);
+  assert.doesNotMatch(js, /\/api\/agents\/(?:update|delete)/);
+  assert.doesNotMatch(js, /~\/\.toris\/agents/);
 });
 
 test('GET /api/agents lists the same catalogue the TUI picker uses', async () => {

@@ -92,6 +92,26 @@
       <aside class="queue-panel" aria-labelledby="agent-title">
         <div class="panel-heading"><div><p class="kicker">Local agent</p><h1 id="agent-title">에이전트</h1></div><span class="queue-count" id="agent-count">0</span></div>
         <p class="agent-lead">TUI의 <code>toris</code>와 같은 목록입니다. <code>.toris/agents</code>와 <code>~/.toris/agents</code> 프로필은 project / home으로 표시됩니다.</p>
+        <section class="agent-create" id="create-agent-panel" aria-label="Create profile">
+          <form id="create-agent-form" class="stack">
+            <label class="field" for="new-agent-id">Create profile<input id="new-agent-id" name="id" maxlength="64" required pattern="[a-z][a-z-]*" placeholder="aso-specialist"></label>
+            <label class="field" for="new-agent-title">Title<input id="new-agent-title" name="title" maxlength="80" required placeholder="ASO Specialist"></label>
+            <label class="field" for="new-agent-category">Category
+              <select id="new-agent-category" name="category" required>
+                <option value="plan">plan</option>
+                <option value="build">build</option>
+                <option value="review">review</option>
+                <option value="verify">verify</option>
+                <option value="ship">ship</option>
+                <option value="core">core</option>
+              </select>
+            </label>
+            <label class="field" for="new-agent-summary">Summary<input id="new-agent-summary" name="summary" minlength="11" maxlength="500" required placeholder="Turns a change into store listing copy."></label>
+            <label class="confirm-check agent-writes"><input id="new-agent-writes" type="checkbox"> May edit files</label>
+            <label class="field" for="new-agent-system">Instructions (optional)<textarea id="new-agent-system" name="system" maxlength="8000" placeholder="Specialist system prompt."></textarea></label>
+            <button class="button" type="submit">Create</button>
+          </form>
+        </section>
         <div id="agent-list" class="review-queue" role="listbox" aria-label="에이전트 프로필"></div>
       </aside>
       <main id="agent-workspace" class="content-workspace" tabindex="-1">

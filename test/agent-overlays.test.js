@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +11,9 @@ import {
   listSurfaceAgents,
   resolveSurfaceAgent,
   composeAgentCatalogue,
+  parseAgentProfile,
+  serializeAgentProfile,
+  writeAgentProfile,
 } from '../src/core/agents.js';
 import { normalizeTasks, buildPlanPrompt, validAgents } from '../src/core/planner.js';
 import { cmdAgents } from '../src/cli/commands/catalog.js';
@@ -179,4 +182,59 @@ test('toris agents fails with a field error when a project file is invalid', asy
 
 test('composeAgentCatalogue keeps builtin identity when nothing is overlaid', () => {
   assert.equal(composeAgentCatalogue([]).surface.id, 'toris');
+});
+
+test('writeAgentProfile writes one valid project overlay and refuses duplicates', async () => {
+  await withRoot(async (root) => {
+    const projectPath = join(root, 'repo');
+    const home = join(root, 'home');
+    const raw = {
+      id: 'aso-specialist',
+      title: 'ASO Specialist',
+      category: 'plan',
+      writes: false,
+      summary: 'Turns a change into store listing copy.',
+      system: 'Advise on listing copy. Do not invent rankings.',
+    };
+    const written = await writeAgentProfile(raw, { projectPath });
+    assert.equal(written.id, 'aso-specialist');
+    assert.equal(written.source, 'project');
+    const file = join(projectPath, '.toris', 'agents', 'aso-specialist.json');
+    assert.equal(written.file, file);
+    const onDisk = JSON.parse(await readFile(file, 'utf8'));
+    assert.deepEqual(onDisk, serializeAgentProfile(parseAgentProfile(raw)));
+    assert.equal(Object.hasOwn(onDisk, 'source'), false);
+
+    const catalogue = await loadAgentCatalogue({ home, projectPath });
+    assert.equal(resolveSurfaceAgent('aso-specialist', catalogue).title, 'ASO Specialist');
+
+    await assert.rejects(() => writeAgentProfile({ ...raw, title: 'Overwrite' }, { projectPath }), {
+      name: 'TorisError',
+      code: 'E_AGENT_EXISTS',
+    });
+    assert.equal(JSON.parse(await readFile(file, 'utf8')).title, 'ASO Specialist');
+    assert.equal((await readdir(join(home))).includes('agents'), false);
+  });
+});
+
+test('writeAgentProfile rejects a bad id before creating files', async () => {
+  await withRoot(async (root) => {
+    const projectPath = join(root, 'repo');
+    await assert.rejects(
+      () =>
+        writeAgentProfile(
+          {
+            id: 'ASO',
+            title: 'ASO Specialist',
+            category: 'plan',
+            writes: false,
+            summary: 'Turns a change into store listing copy.',
+          },
+          { projectPath },
+        ),
+      { name: 'TorisError', code: 'E_INVALID_AGENT' },
+    );
+    await assert.rejects(() => writeAgentProfile({ id: 'ok' }, {}), /project path/);
+    await assert.rejects(() => readdir(join(projectPath, '.toris')), { code: 'ENOENT' });
+  });
 });
