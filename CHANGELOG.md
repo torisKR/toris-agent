@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Studio android chip** — shared chrome shows a quiet read-only chip from `GET /api/android` (`androidStatus`) when at least one device is listed. Click opens `/android`. Hidden when adb is missing, failed, or reports zero devices. GET only; no screenshot/logcat/install. See `docs/STUDIO.md`.
 - **Studio daemon chip** — shared chrome shows a quiet read-only chip from `GET /api/daemon` (`presentDaemonSnapshot` / `readDaemonStatus`) when the worker is running. Click opens `/daemon`. Hidden when the worker is down. GET only; no start/stop/enqueue. See `docs/STUDIO.md`.
 - **Studio pending patches chip** — shared chrome shows a quiet read-only chip for pending records from `GET /api/patches?status=pending` (same `listPatches` / `presentPatch` path as `/patches`). Click opens `/patches`. Hidden when the count is 0. GET only; no write. See `docs/STUDIO.md`.
 - **Studio spend chip** — shared chrome shows a quiet read-only chip for today's spend from `buildBrief` / `GET /api/brief` (remaining when a daily budget is set). Click opens `/brief`. GET only; no write. See `docs/STUDIO.md`.
