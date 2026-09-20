@@ -10,7 +10,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('product shell contains queue, editor, media review, quality, guarded publish, and agent regions', async () => {
   const html = await readFile(join(root, 'src/studio/ui/index.html'), 'utf8');
-  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'spend-chip', 'patches-chip', 'daemon-chip', 'android-chip', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'nav-brief', 'nav-android', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
+  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'spend-chip', 'patches-chip', 'daemon-chip', 'android-chip', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'nav-brief', 'nav-android', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'create-agent-form', 'new-agent-id', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /id="agent-send"[^>]*disabled/);
@@ -30,7 +30,7 @@ test('product assets use only local API paths and define all responsive shells',
   const js = await readFile(join(root, 'src/studio/ui/app.js'), 'utf8');
   const components = await readFile(join(root, 'src/studio/ui/components.css'), 'utf8');
   const css = await readFile(join(root, 'src/studio/ui/studio.css'), 'utf8');
-  for (const path of ['/api/session', '/api/contents', '/api/renders', '/api/jobs', '/review', '/release-check', '/upload', '/media', '/api/agent/', '/api/design/', '/design/frame', '/api/patches', '/api/design/tray']) assert.match(js, new RegExp(path.replaceAll('/', '\\/')));
+  for (const path of ['/api/session', '/api/contents', '/api/renders', '/api/jobs', '/review', '/release-check', '/upload', '/media', '/api/agents', '/api/agent/', '/api/design/', '/design/frame', '/api/patches', '/api/design/tray']) assert.match(js, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(js, /event\.key !== 'Escape'/);
   assert.match(js, /setAttribute\('aria-pressed'/);
   assert.match(js, /function safeScreenshot/);

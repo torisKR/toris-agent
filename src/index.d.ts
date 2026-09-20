@@ -95,6 +95,26 @@ export function parseAgentProfile(
   meta?: { file?: string; source?: 'home' | 'project'; stem?: string },
 ): AgentProfile;
 
+/** JSON object written to `.toris/agents/<id>.json` — no runtime `source`. */
+export function serializeAgentProfile(profile: AgentProfile): {
+  id: string;
+  title: string;
+  category: AgentCategory;
+  writes: boolean;
+  summary: string;
+  system?: string;
+};
+
+/**
+ * Write one project-local overlay to `<projectPath>/.toris/agents/<id>.json`.
+ * Validates with `parseAgentProfile`. Duplicate file is `E_AGENT_EXISTS`.
+ * Does not write `~/.toris/agents/`.
+ */
+export function writeAgentProfile(
+  raw: unknown,
+  roots: { projectPath: string },
+): Promise<AgentProfile & { file: string }>;
+
 /** Merge overlays onto the built-in catalogue. Same id replaces the built-in. */
 export function composeAgentCatalogue(overlays?: readonly AgentProfile[]): AgentCatalogue;
 

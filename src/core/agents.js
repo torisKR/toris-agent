@@ -1,5 +1,5 @@
-import { readFile, readdir } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { access, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 
 import { TorisError, UsageError } from './errors.js';
 
@@ -233,6 +233,53 @@ export function parseAgentProfile(raw, { file = 'profile', source = 'project', s
     ...(raw.system ? { system: raw.system.trim() } : {}),
     source,
   });
+}
+
+/** On-disk JSON only — `source` is runtime metadata and is not written. */
+export function serializeAgentProfile(profile) {
+  if (!profile || typeof profile !== 'object') {
+    throw invalidAgent('profile', 'must be a JSON object with id, title, category, writes and summary.');
+  }
+  return {
+    id: profile.id,
+    title: profile.title,
+    category: profile.category,
+    writes: profile.writes,
+    summary: profile.summary,
+    ...(profile.system ? { system: profile.system } : {}),
+  };
+}
+
+async function atomicWrite(path, contents) {
+  await mkdir(dirname(path), { recursive: true });
+  const tmp = `${path}.${process.pid}.tmp`;
+  await writeFile(tmp, contents, 'utf8');
+  await rename(tmp, path);
+}
+
+/**
+ * Write one project-local overlay to `<projectPath>/.toris/agents/<id>.json`.
+ * Validates with `parseAgentProfile` first. Duplicate file is `E_AGENT_EXISTS`.
+ * Does not write `~/.toris/agents/`.
+ * @param {unknown} raw
+ * @param {{projectPath?:string}} [roots]
+ */
+export async function writeAgentProfile(raw, { projectPath } = {}) {
+  if (typeof projectPath !== 'string' || projectPath.trim() === '') {
+    throw invalidAgent('profile', 'project path is required to write a project-local agent profile.');
+  }
+  const parsed = parseAgentProfile(raw, { file: 'profile', source: 'project' });
+  const file = join(projectPath, '.toris', 'agents', `${parsed.id}.json`);
+  try {
+    await access(file);
+    throw new TorisError(`${file}: agent "${parsed.id}" already exists.`, 'E_AGENT_EXISTS');
+  } catch (err) {
+    if (err && err.code === 'E_AGENT_EXISTS') throw err;
+    if (!err || err.code !== 'ENOENT') throw err;
+  }
+  const disk = serializeAgentProfile(parsed);
+  await atomicWrite(file, `${JSON.stringify(disk, null, 2)}\n`);
+  return Object.freeze({ ...parsed, source: 'project', file });
 }
 
 /** Load and validate one `<id>.json` profile file. */

@@ -388,7 +388,7 @@ Agent profiles (12)
 
 Filter with `toris agents --category build`.
 
-Add a domain specialist without forking Toris: drop one JSON file per role in **`.toris/agents/<id>.json`**. The same id replaces a built-in; a new id appears in `toris agents`, `/agent`, `--agent`, Studio, and planner assignment. Optional overlay: `~/.toris/agents/` (home, then project wins — same order as skills). Bad files fail with a path and a field error, not a stack trace. See [docs/AGENTS.md](docs/AGENTS.md).
+Add a domain specialist without forking Toris: drop one JSON file per role in **`.toris/agents/<id>.json`**, or **Create** that same file from Studio `/agent`. The same id replaces a built-in; a new id appears in `toris agents`, `/agent`, `--agent`, Studio, and planner assignment. Optional overlay: `~/.toris/agents/` (home, then project wins — same order as skills). Studio create is project-local only. Bad files fail with a path and a field error, not a stack trace. See [docs/AGENTS.md](docs/AGENTS.md).
 
 ---
 
