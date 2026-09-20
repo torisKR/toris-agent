@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AGENT_PROFILES, AGENT_CATEGORIES, BUILTIN_CATALOGUE, listAgents, getAgent, listSurfaceAgents, SURFACE_AGENT, resolveSurfaceAgent, matchSurfaceAgents, agentRolePrompt, withAgentPrompt, renderAgentCatalog, composeAgentCatalogue, parseAgentProfile, agentSearchPaths } from '../src/core/agents.js';
+import { AGENT_PROFILES, AGENT_CATEGORIES, BUILTIN_CATALOGUE, listAgents, getAgent, listSurfaceAgents, SURFACE_AGENT, resolveSurfaceAgent, matchSurfaceAgents, agentRolePrompt, withAgentPrompt, renderAgentCatalog, composeAgentCatalogue, parseAgentProfile, agentSearchPaths, agentSourceOf } from '../src/core/agents.js';
 
 test('every profile is complete enough to show in a picker', () => {
   // Arrange / Act / Assert
@@ -171,6 +171,14 @@ test('parseAgentProfile rejects unknown keys, bad ids and non-boolean writes', (
   );
   assert.throws(() => parseAgentProfile(base, { file: 'x.json', stem: 'other' }), /filename/);
   assert.throws(() => parseAgentProfile([]), /JSON object/);
+});
+
+test('agentSourceOf labels overlays and defaults builtins', () => {
+  assert.equal(agentSourceOf({ source: 'project' }), 'project');
+  assert.equal(agentSourceOf({ source: 'home' }), 'home');
+  assert.equal(agentSourceOf({ source: 'builtin' }), 'builtin');
+  assert.equal(agentSourceOf(SURFACE_AGENT), 'builtin');
+  assert.equal(agentSourceOf(null), 'builtin');
 });
 
 test('agentSearchPaths orders home then project, like skills', () => {

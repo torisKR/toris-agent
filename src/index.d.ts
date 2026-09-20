@@ -99,7 +99,14 @@ export function parseAgentProfile(
 export function composeAgentCatalogue(overlays?: readonly AgentProfile[]): AgentCatalogue;
 
 /** Load `<repo>/.toris/agents/*.json` and `~/.toris/agents/*.json` into the live catalogue. */
-export function loadAgentCatalogue(roots?: { home?: string; projectPath?: string }): Promise<AgentCatalogue>;
+export function loadAgentCatalogue(roots?: {
+  home?: string;
+  projectPath?: string;
+  skipInvalid?: boolean;
+}): Promise<AgentCatalogue>;
+
+/** `builtin` unless the profile came from a home or project overlay. */
+export function agentSourceOf(agent?: Pick<AgentProfile, 'source'> | null): 'builtin' | 'home' | 'project';
 
 export function studioAgentUrl(port?: number): string;
 export function studioDesignUrl(port?: number): string;

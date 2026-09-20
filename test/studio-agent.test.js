@@ -1,10 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createStudioServer } from '../src/studio/server.js';
 import { SURFACE_AGENT } from '../src/core/agents.js';
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function withServer(fn, extra = {}) {
   const home = await mkdtemp(join(tmpdir(), 'toris-studio-agent-'));
@@ -38,28 +41,54 @@ function mutation(base, body) {
   };
 }
 
+function fixtureProfile(id, extra = {}) {
+  return {
+    id,
+    title: extra.title ?? 'ASO Specialist',
+    category: extra.category ?? 'plan',
+    writes: extra.writes ?? false,
+    summary: extra.summary ?? 'Turns a change into store listing copy.',
+  };
+}
+
+async function writeProfile(dir, id, extra = {}) {
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, `${id}.json`), JSON.stringify(extra.raw ?? fixtureProfile(id, extra)), 'utf8');
+}
+
+async function snapshotAgentDirs(home, cwd) {
+  const files = {};
+  for (const [key, dir] of [
+    ['home', join(home, 'agents')],
+    ['project', join(cwd, '.toris', 'agents')],
+  ]) {
+    try {
+      const names = (await readdir(dir)).sort();
+      files[key] = {};
+      for (const name of names) {
+        files[key][name] = await readFile(join(dir, name), 'utf8');
+      }
+    } catch (error) {
+      if (error.code === 'ENOENT') files[key] = null;
+      else throw error;
+    }
+  }
+  return files;
+}
+
 test('GET /api/agents includes a project-local profile from .toris/agents', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'toris-studio-agents-cwd-'));
-  await mkdir(join(cwd, '.toris', 'agents'), { recursive: true });
-  await writeFile(
-    join(cwd, '.toris', 'agents', 'aso-specialist.json'),
-    JSON.stringify({
-      id: 'aso-specialist',
-      title: 'ASO Specialist',
-      category: 'plan',
-      writes: false,
-      summary: 'Turns a change into store listing copy.',
-    }),
-    'utf8',
-  );
+  await writeProfile(join(cwd, '.toris', 'agents'), 'aso-specialist');
   try {
     await withServer(
       async ({ base }) => {
         const response = await fetch(`${base}/api/agents`);
         const body = await response.json();
         assert.equal(response.status, 200);
-        assert.ok(body.agents.some((agent) => agent.id === 'aso-specialist'));
-        assert.ok(body.agents.some((agent) => agent.id === 'implementer'));
+        const aso = body.agents.find((agent) => agent.id === 'aso-specialist');
+        assert.equal(aso.source, 'project');
+        const builtin = body.agents.find((agent) => agent.id === 'implementer');
+        assert.equal(builtin.source, 'builtin');
         const status = await fetch(`${base}/api/agent/status?agent=aso-specialist`);
         assert.equal((await status.json()).agent.id, 'aso-specialist');
         const turn = await fetch(
@@ -84,6 +113,99 @@ test('GET /api/agents includes a project-local profile from .toris/agents', asyn
   }
 });
 
+test('GET /api/agents includes a user-global profile from ~/.toris/agents', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'toris-studio-agents-home-cwd-'));
+  try {
+    await withServer(
+      async ({ base, home }) => {
+        await writeProfile(join(home, 'agents'), 'growth-marketer', {
+          title: 'Growth Marketer',
+          summary: 'Plans launch loops for a single operator.',
+        });
+        const response = await fetch(`${base}/api/agents`);
+        const body = await response.json();
+        assert.equal(response.status, 200);
+        const custom = body.agents.find((agent) => agent.id === 'growth-marketer');
+        assert.equal(custom.title, 'Growth Marketer');
+        assert.equal(custom.source, 'home');
+      },
+      { cwd },
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('GET /api/agents does not write overlay files', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'toris-studio-agents-ro-'));
+  await writeProfile(join(cwd, '.toris', 'agents'), 'aso-specialist');
+  try {
+    await withServer(
+      async ({ base, home }) => {
+        const before = await snapshotAgentDirs(home, cwd);
+        assert.equal(before.home, null);
+        assert.ok(before.project['aso-specialist.json']);
+        assert.equal((await fetch(`${base}/api/agents`)).status, 200);
+        assert.equal((await fetch(`${base}/api/agent/status`)).status, 200);
+        assert.deepEqual(await snapshotAgentDirs(home, cwd), before);
+      },
+      { cwd },
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('GET /api/agents skips broken JSON without 500', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'toris-studio-agents-broken-'));
+  const dir = join(cwd, '.toris', 'agents');
+  await writeProfile(dir, 'aso-specialist');
+  await writeFile(join(dir, 'broken-specialist.json'), '{ not json', 'utf8');
+  await writeFile(join(dir, 'also-broken.json'), JSON.stringify({ id: 'also-broken' }), 'utf8');
+  try {
+    await withServer(
+      async ({ base }) => {
+        const response = await fetch(`${base}/api/agents`);
+        assert.equal(response.status, 200);
+        const body = await response.json();
+        assert.ok(body.agents.some((agent) => agent.id === 'aso-specialist'));
+        assert.ok(body.agents.some((agent) => agent.id === 'implementer'));
+        assert.equal(body.agents.some((agent) => agent.id === 'broken-specialist'), false);
+        assert.equal(body.agents.some((agent) => agent.id === 'also-broken'), false);
+        const turn = await fetch(
+          `${base}/api/agent/turn`,
+          mutation(base, { agent: 'aso-specialist', message: 'draft listing' }),
+        );
+        assert.equal(turn.status, 200);
+        assert.equal((await turn.json()).agent.id, 'aso-specialist');
+      },
+      {
+        cwd,
+        runAgentTurn: async ({ agent }) => ({
+          ok: true,
+          agent: { id: agent, title: 'ASO Specialist' },
+          text: 'ok',
+          events: [],
+        }),
+      },
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('Studio agent picker labels custom profiles from source', async () => {
+  const html = await readFile(join(repoRoot, 'src/studio/ui/index.html'), 'utf8');
+  const js = await readFile(join(repoRoot, 'src/studio/ui/app.js'), 'utf8');
+  assert.match(html, /id="agent-list"/);
+  assert.match(html, /\.toris\/agents/);
+  assert.match(js, /function agentPickerBadge/);
+  assert.match(js, /source === 'home' \|\| agent\?\.source === 'project'/);
+  assert.match(js, /\$\{source\} · \$\{writes\}/);
+  assert.match(js, /agent:\s*state\.agentId/);
+  assert.doesNotMatch(js, /\/api\/agents\/(?:create|update|delete)/);
+});
+
 test('GET /api/agents lists the same catalogue the TUI picker uses', async () => {
   await withServer(async ({ base }) => {
     const response = await fetch(`${base}/api/agents`);
@@ -92,6 +214,7 @@ test('GET /api/agents lists the same catalogue the TUI picker uses', async () =>
     assert.equal(body.ready, false);
     assert.equal(body.agent.id, SURFACE_AGENT.id);
     assert.equal(body.agents[0].id, 'toris');
+    assert.equal(body.agents[0].source, 'builtin');
     assert.ok(body.agents.some((agent) => agent.id === 'implementer'));
     assert.match(body.tui, /toris/);
     assert.match(body.gui, /\/agent$/);

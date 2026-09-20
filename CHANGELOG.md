@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Studio custom agent profiles** — `/agent` lists the same catalogue as `toris agents`, including `.toris/agents/*.json` (project) and `~/.toris/agents/*.json` (home). Custom rows are labeled `project` / `home`. Selecting one sends that id on the existing `POST /api/agent/turn`. `GET /api/agents` is read-only and skips a broken JSON file instead of 500. No profile editor. See `docs/STUDIO.md` and `docs/AGENTS.md`.
 - **Studio android chip** — shared chrome shows a quiet read-only chip from `GET /api/android` (`androidStatus`) when at least one device is listed. Click opens `/android`. Hidden when adb is missing, failed, or reports zero devices. GET only; no screenshot/logcat/install. See `docs/STUDIO.md`.
 - **Studio daemon chip** — shared chrome shows a quiet read-only chip from `GET /api/daemon` (`presentDaemonSnapshot` / `readDaemonStatus`) when the worker is running. Click opens `/daemon`. Hidden when the worker is down. GET only; no start/stop/enqueue. See `docs/STUDIO.md`.
 - **Studio pending patches chip** — shared chrome shows a quiet read-only chip for pending records from `GET /api/patches?status=pending` (same `listPatches` / `presentPatch` path as `/patches`). Click opens `/patches`. Hidden when the count is 0. GET only; no write. See `docs/STUDIO.md`.

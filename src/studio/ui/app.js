@@ -297,6 +297,16 @@ function currentAgent() {
   return state.agents.find((item) => item.id === state.agentId) || state.agents[0] || { id: 'toris', title: 'Toris', summary: '', category: 'core', writes: true };
 }
 
+function agentSourceOf(agent) {
+  return agent?.source === 'home' || agent?.source === 'project' ? agent.source : 'builtin';
+}
+
+function agentPickerBadge(agent) {
+  const writes = agent.writes ? 'writes' : 'read';
+  const source = agentSourceOf(agent);
+  return source === 'builtin' ? writes : `${source} · ${writes}`;
+}
+
 function renderAgents() {
   const items = state.agents;
   elements['agent-count'].textContent = String(items.length);
@@ -322,7 +332,7 @@ function renderAgents() {
     kind.textContent = agent.category.toUpperCase();
     const status = document.createElement('span');
     status.className = 'badge';
-    status.textContent = agent.writes ? 'writes' : 'read';
+    status.textContent = agentPickerBadge(agent);
     const title = document.createElement('strong');
     title.textContent = agent.title;
     const meta = document.createElement('small');
@@ -352,7 +362,10 @@ function renderAgentWorkspace() {
     ? `터미널에서는 toris --agent ${agent.id} 또는 /agent ${agent.id}로 엽니다.`
     : (state.agentReason || '모델이 연결되면 대화를 시작할 수 있습니다.');
   elements['agent-tui-hint'].textContent = state.agentTui || `toris --agent ${agent.id}\n/agent ${agent.id}`;
-  elements['agent-role-copy'].textContent = `${agent.title} · ${agent.summary}`;
+  const origin = agentSourceOf(agent);
+  elements['agent-role-copy'].textContent = origin === 'builtin'
+    ? `${agent.title} · ${agent.summary}`
+    : `${agent.title} · ${origin} · ${agent.summary}`;
   elements['agent-status-copy'].textContent = state.agentReady
     ? '로컬 채팅 준비됨. 보내기는 이 브라우저에서만 동작합니다.'
     : (state.agentReason || '연결 대기');

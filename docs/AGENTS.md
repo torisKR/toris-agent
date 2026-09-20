@@ -19,9 +19,12 @@ One JSON object per file. Directories are not recursive (`examples/` is ignored)
 
 Precedence matches skills: **builtin < home < project**. A project file with id `implementer`
 replaces the built-in Implementer. A new id appears everywhere the catalogue is shown and is
-assignable in plans (unless `category` is `core`).
+assignable in plans (unless `category` is `core`). Studio `/agent` is the same list: custom
+rows are labeled `project` or `home`. Pick one to send that id on `POST /api/agent/turn`.
+There is no profile editor in Studio.
 
-There is no network fetch. Absent directories are empty, not errors.
+There is no network fetch. Absent directories are empty, not errors. Studio skips a broken
+file so the picker stays up. `toris agents` still fails with a field error.
 
 ## Schema
 
