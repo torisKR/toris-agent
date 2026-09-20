@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Studio daemon chip** — shared chrome shows a quiet read-only chip from `GET /api/daemon` (`presentDaemonSnapshot` / `readDaemonStatus`) when the worker is running. Click opens `/daemon`. Hidden when the worker is down. GET only; no start/stop/enqueue. See `docs/STUDIO.md`.
 - **Studio pending patches chip** — shared chrome shows a quiet read-only chip for pending records from `GET /api/patches?status=pending` (same `listPatches` / `presentPatch` path as `/patches`). Click opens `/patches`. Hidden when the count is 0. GET only; no write. See `docs/STUDIO.md`.
 - **Studio spend chip** — shared chrome shows a quiet read-only chip for today's spend from `buildBrief` / `GET /api/brief` (remaining when a daily budget is set). Click opens `/brief`. GET only; no write. See `docs/STUDIO.md`.
 - **Opt-in knowledge starter packs** — `toris knowledge pack list` and Studio `/knowledge` can install one shipped pack (`product-growth`, `flutter-expo-android`, `solo-revenue`, `toris-ops`) from `packs/knowledge/<slug>/` through `addDomain` + nodes + `link`. Never auto-installs on first run or `knowledge init`. Duplicate slug is a CLI error / HTTP 409 unless CLI `--force`. Studio has no force. GET never writes. Does not write USER.md / MEMORY.md. See `docs/KNOWLEDGE.md` and `docs/STUDIO.md`.
