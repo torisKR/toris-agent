@@ -70,7 +70,7 @@ CLI `toris patches`, `toris apply`, and `toris discard` are unchanged.
 
 Enable, disable, remove, and the optional add-schedule form call the existing schedule helpers (`addSchedule`, `setScheduleEnabled`, `removeSchedule`). **Queue run** posts a one-shot inbox job (`POST /api/daemon/run`) with the same shape as `toris daemon run`: a goal plus optional `dryRun`, `autonomy`, and `budgetUsd`. Autonomy must be L1–L5. If Studio was started from a registered project path, that project's checks are attached the same way as the CLI (the browser does not send them). If the worker is down the route returns HTTP 503 (CLI exit 5). Goals that are only `brief` / `toris brief` are refused with HTTP 400, same as the CLI. These mutations need the current local `Origin` plus the in-memory session token. Reads are same-origin GET. Studio still binds only to `127.0.0.1`.
 
-The page does **not** start or stop the worker — that stays on `toris daemon start` / `stop` so a browser tab cannot take the lock. See [DAEMON.md](./DAEMON.md).
+The page does **not** start or stop the worker — that stays on `toris daemon start` / `stop` so a browser tab cannot take the lock. A quiet read-only chip on the shared Studio chrome shows `daemon` from that same `GET /api/daemon` status when the worker is running and links to `/daemon`; it is hidden when the worker is down and never starts, stops, or enqueues. See [DAEMON.md](./DAEMON.md).
 
 ## Brief
 
