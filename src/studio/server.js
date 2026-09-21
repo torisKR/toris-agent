@@ -19,7 +19,7 @@ import { isRepo } from '../core/git.js';
 import { TorisError } from '../core/errors.js';
 import { summarizeCost } from '../core/cost.js';
 import { loadConfig } from '../core/config.js';
-import { DesignStore } from './design-store.js';
+import { DesignStore, consumeDesignTrayAfterAccept } from './design-store.js';
 import { buildBookmarklet } from './design.js';
 import {
   PATCH_REVIEW_DIFF_CHAR_LIMIT,
@@ -295,9 +295,14 @@ export async function createStudioServer(options) {
       loadAndroidEvidence: (rels) => loadAndroidEvidence(options.home, rels),
       signal: abort.signal,
     };
+    const attachedTrayIds = body.tray
+      ? (await designs.getTray()).items.map((item) => item.id)
+      : [];
     if (!wantsEventStream(request)) {
       try {
-        sendJson(response, 200, await turn(payload));
+        const result = await turn(payload);
+        await consumeDesignTrayAfterAccept(designs, body.tray, attachedTrayIds);
+        sendJson(response, 200, result);
       } catch (error) {
         turnHttpError(error);
       }
@@ -309,6 +314,7 @@ export async function createStudioServer(options) {
         ...payload,
         onEvent: (evt) => writeSse(response, evt.type || 'message', evt),
       });
+      await consumeDesignTrayAfterAccept(designs, body.tray, attachedTrayIds);
       writeSse(response, 'done', result);
     } catch (error) {
       if (abort.signal.aborted) writeSse(response, 'abort', { ok: false });

@@ -181,3 +181,22 @@ export class DesignStore {
     return this.saveTray({ items: [] });
   }
 }
+
+/**
+ * Remove only the tray items a turn attached, after that request is accepted.
+ * Items added or changed while the turn ran stay. Turns that omit tray,
+ * empty snapshots, and callers that never get here (auth / validation /
+ * model failures) leave tray.json alone. Reuses clearTray when nothing remains.
+ */
+export async function consumeDesignTrayAfterAccept(store, trayRequested, attachedIds = []) {
+  if (!trayRequested) return null;
+  const ids = (Array.isArray(attachedIds) ? attachedIds : [])
+    .filter((id) => typeof id === 'string' && id);
+  if (!ids.length) return null;
+  const attached = new Set(ids);
+  const tray = await store.getTray();
+  const remaining = tray.items.filter((item) => !attached.has(item.id));
+  if (remaining.length === tray.items.length) return tray;
+  if (remaining.length === 0) return store.clearTray();
+  return store.saveTray({ items: remaining });
+}
