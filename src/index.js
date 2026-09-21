@@ -14,6 +14,7 @@ export {
   serializeAgentProfile,
   writeAgentProfile,
   updateAgentProfile,
+  deleteAgentProfile,
   composeAgentCatalogue,
   loadAgentCatalogue,
   agentSourceOf,

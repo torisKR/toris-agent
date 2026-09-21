@@ -1,4 +1,4 @@
-import { updateAgentProfile, writeAgentProfile } from '../core/agents.js';
+import { deleteAgentProfile, updateAgentProfile, writeAgentProfile } from '../core/agents.js';
 import { HttpError } from './http.js';
 
 function presentWritten(written) {
@@ -39,6 +39,23 @@ export async function updateStudioAgentProfile(id, input, { projectPath } = {}) 
   }
   try {
     return presentWritten(await updateAgentProfile({ ...body, id }, { projectPath }));
+  } catch (error) {
+    studioAgentWriteError(error);
+  }
+}
+
+function presentDeleted(removed) {
+  return { ok: true, deleted: true, id: removed.id, path: `.toris/agents/${removed.id}.json` };
+}
+
+/**
+ * Opt-in Studio delete of one existing project-local `.toris/agents/<id>.json`.
+ * Home/builtin (no project file) is 404. Invalid id is 400.
+ * Does not touch `~/.toris/agents/`.
+ */
+export async function deleteStudioAgentProfile(id, { projectPath } = {}) {
+  try {
+    return presentDeleted(await deleteAgentProfile(id, { projectPath }));
   } catch (error) {
     studioAgentWriteError(error);
   }
