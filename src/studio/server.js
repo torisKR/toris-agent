@@ -295,10 +295,13 @@ export async function createStudioServer(options) {
       loadAndroidEvidence: (rels) => loadAndroidEvidence(options.home, rels),
       signal: abort.signal,
     };
+    const attachedTrayIds = body.tray
+      ? (await designs.getTray()).items.map((item) => item.id)
+      : [];
     if (!wantsEventStream(request)) {
       try {
         const result = await turn(payload);
-        await consumeDesignTrayAfterAccept(designs, body.tray);
+        await consumeDesignTrayAfterAccept(designs, body.tray, attachedTrayIds);
         sendJson(response, 200, result);
       } catch (error) {
         turnHttpError(error);
@@ -311,7 +314,7 @@ export async function createStudioServer(options) {
         ...payload,
         onEvent: (evt) => writeSse(response, evt.type || 'message', evt),
       });
-      await consumeDesignTrayAfterAccept(designs, body.tray);
+      await consumeDesignTrayAfterAccept(designs, body.tray, attachedTrayIds);
       writeSse(response, 'done', result);
     } catch (error) {
       if (abort.signal.aborted) writeSse(response, 'abort', { ok: false });

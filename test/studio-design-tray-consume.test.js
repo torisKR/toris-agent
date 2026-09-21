@@ -98,20 +98,37 @@ test('consumeDesignTrayAfterAccept clears only when a tray was attached', async 
     });
     await store.addToTray(capture.id);
 
-    const skipped = await consumeDesignTrayAfterAccept(store, false);
+    const later = await store.save({
+      url: 'http://127.0.0.1:3000/',
+      selector: '.price',
+      outerHTML: '<span class="price">$12</span>',
+    });
+    await store.addToTray(later.id);
+
+    const skipped = await consumeDesignTrayAfterAccept(store, false, [capture.id]);
     assert.equal(skipped, null);
+    assert.equal((await store.getTray()).items.length, 2);
+
+    const noIds = await consumeDesignTrayAfterAccept(store, true, []);
+    assert.equal(noIds, null);
+    assert.equal((await store.getTray()).items.length, 2);
+
+    const partial = await consumeDesignTrayAfterAccept(store, true, [capture.id]);
+    assert.equal(partial.items.length, 1);
+    assert.equal(partial.items[0].id, later.id);
     assert.equal((await store.getTray()).items.length, 1);
 
-    const emptied = await consumeDesignTrayAfterAccept(store, true);
+    const emptied = await consumeDesignTrayAfterAccept(store, true, [later.id]);
     assert.deepEqual(emptied.items, []);
     assert.equal((await store.getTray()).items.length, 0);
     assert.ok(JSON.parse(await readFile(join(home, 'studio', 'design', `${capture.id}.json`), 'utf8')).id);
+    assert.ok(JSON.parse(await readFile(join(home, 'studio', 'design', `${later.id}.json`), 'utf8')).id);
 
-    const emptyAgain = await consumeDesignTrayAfterAccept(store, true);
-    assert.deepEqual(emptyAgain.items, []);
+    const emptyAgain = await consumeDesignTrayAfterAccept(store, true, [later.id]);
+    assert.equal(emptyAgain.items.length, 0);
     const trayPath = join(home, 'studio', 'design', 'tray.json');
     const before = await readFile(trayPath, 'utf8');
-    const stillEmpty = await consumeDesignTrayAfterAccept(store, false);
+    const stillEmpty = await consumeDesignTrayAfterAccept(store, false, [later.id]);
     assert.equal(stillEmpty, null);
     assert.equal(await readFile(trayPath, 'utf8'), before);
   } finally {
@@ -224,6 +241,41 @@ test('successful SSE turn-with-tray clears after accept', async () => {
         text: 'will edit',
         agent: { id: 'implementer', title: 'Implementer' },
       }),
+    },
+  );
+});
+
+test('successful turn consumes only the attached tray items', async () => {
+  let studioRef;
+  let queuedDuringTurn;
+  await withServer(
+    async ({ base, home, studio }) => {
+      studioRef = studio;
+      const first = await seed(studio);
+      const sent = await fetch(
+        `${base}/api/agent/turn`,
+        mutation(base, { agent: 'implementer', message: 'Align these two.', tray: true }),
+      );
+      assert.equal(sent.status, 200);
+      assert.ok(queuedDuringTurn?.id);
+      const tray = await studio.designs.getTray();
+      assert.equal(tray.items.length, 1);
+      assert.equal(tray.items[0].id, queuedDuringTurn.id);
+      assert.ok(JSON.parse(await readFile(join(home, 'studio', 'design', `${first.id}.json`), 'utf8')).id);
+      assert.ok(JSON.parse(await readFile(join(home, 'studio', 'design', `${queuedDuringTurn.id}.json`), 'utf8')).id);
+      const onDisk = JSON.parse(await readFile(join(home, 'studio', 'design', 'tray.json'), 'utf8'));
+      assert.deepEqual(onDisk.items.map((item) => item.id), [queuedDuringTurn.id]);
+    },
+    {
+      runAgentTurn: async () => {
+        queuedDuringTurn = await studioRef.designs.save({
+          url: 'http://127.0.0.1:3000/',
+          selector: '.price',
+          outerHTML: '<span class="price">$12</span>',
+        });
+        await studioRef.designs.addToTray(queuedDuringTurn.id);
+        return { ok: true, text: 'will edit', agent: { id: 'implementer', title: 'Implementer' } };
+      },
     },
   );
 });
