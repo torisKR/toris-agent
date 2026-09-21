@@ -28,7 +28,7 @@ const state = {
   selectedHunk: '',
 };
 const elementIds = [
-  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','create-agent-form','new-agent-id','new-agent-title','new-agent-category','new-agent-summary','new-agent-writes','new-agent-system','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
+  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','create-agent-form','new-agent-id','new-agent-title','new-agent-category','new-agent-summary','new-agent-writes','new-agent-system','edit-agent-panel','edit-agent-form','edit-agent-id','edit-agent-title','edit-agent-category','edit-agent-summary','edit-agent-writes','edit-agent-system','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
 ];
 const elements = Object.fromEntries(elementIds.map((id) => [id, document.getElementById(id)]));
 
@@ -353,6 +353,30 @@ function setAgentBusy(busy) {
   elements['agent-input'].disabled = busy || !state.agentReady;
 }
 
+let editFormAgentId = null;
+
+function fillEditAgentForm(agent) {
+  elements['edit-agent-id'].textContent = agent.id;
+  elements['edit-agent-title'].value = agent.title || '';
+  elements['edit-agent-category'].value = agent.category || 'plan';
+  elements['edit-agent-summary'].value = agent.summary || '';
+  elements['edit-agent-writes'].checked = Boolean(agent.writes);
+  elements['edit-agent-system'].value = agent.system || '';
+}
+
+function syncEditAgentForm({ force = false } = {}) {
+  const agent = currentAgent();
+  const project = agentSourceOf(agent) === 'project';
+  elements['edit-agent-panel'].hidden = !project;
+  if (!project) {
+    editFormAgentId = null;
+    return;
+  }
+  if (!force && editFormAgentId === agent.id) return;
+  editFormAgentId = agent.id;
+  fillEditAgentForm(agent);
+}
+
 function renderAgentWorkspace() {
   const agent = currentAgent();
   const hasTurns = threadOf().length > 0;
@@ -370,6 +394,7 @@ function renderAgentWorkspace() {
     ? '로컬 채팅 준비됨. 보내기는 이 브라우저에서만 동작합니다.'
     : (state.agentReason || '연결 대기');
   setAgentBusy(state.busy);
+  syncEditAgentForm();
   syncDesignSend();
   elements['design-agent-status'].textContent = state.agentReady
     ? (state.tray.length ? `트레이 ${state.tray.length}개를 같은 로컬 에이전트에게 보냅니다.` : '요소를 고르면 트레이에 쌓입니다.')
@@ -445,6 +470,39 @@ elements['create-agent-form'].addEventListener('submit', async (event) => {
     announce(`Created ${state.agentId}.`);
     await loadAgents();
     showSurface('agent', { agentId: state.agentId });
+  } catch (error) {
+    announce(error.message);
+  }
+});
+
+elements['edit-agent-form'].addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const agent = currentAgent();
+  if (agentSourceOf(agent) !== 'project') {
+    announce('Only a project-local profile can be edited.');
+    return;
+  }
+  const id = agent.id;
+  const title = elements['edit-agent-title'].value.trim();
+  const category = elements['edit-agent-category'].value;
+  const summary = elements['edit-agent-summary'].value.trim();
+  const system = elements['edit-agent-system'].value.trim();
+  try {
+    await api(`/api/agents/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        title,
+        category,
+        writes: elements['edit-agent-writes'].checked,
+        summary,
+        ...(system ? { system } : {}),
+      }),
+    });
+    announce(`Saved ${id}.`);
+    editFormAgentId = null;
+    await loadAgents();
   } catch (error) {
     announce(error.message);
   }

@@ -476,8 +476,17 @@ Additive Studio create (project-local only): `POST /api/agents` writes one
 (same on-disk shape as a hand-written overlay). Invalid id/schema is HTTP 400
 (`E_INVALID_AGENT`). Duplicate project file is HTTP 409 (`E_AGENT_EXISTS`).
 Missing Origin/session token is HTTP 403. None of those write. GET never writes.
-Does not write `torisHome()/agents/`. No edit/delete. See `docs/STUDIO.md` and
+Does not write `torisHome()/agents/`. No delete. See `docs/STUDIO.md` and
 `docs/AGENTS.md`.
+
+Additive Studio edit (project-local only): `PUT /api/agents/:id` replaces one
+existing `<cwd>/.toris/agents/<id>.json` through `updateAgentProfile` /
+`parseAgentProfile` (same on-disk shape as create). Path id is immutable.
+Unknown or not-project-local ids (home or builtin, no project file) are HTTP 404
+(`E_AGENT_NOT_FOUND`) and write nothing. Invalid body is HTTP 400
+(`E_INVALID_AGENT`) and writes nothing. Missing Origin/session token is HTTP 403
+and writes nothing. GET never writes. Does not write `torisHome()/agents/`.
+See `docs/STUDIO.md` and `docs/AGENTS.md`.
 
 ## Additive: cross-run cost ledger (post-0.1)
 

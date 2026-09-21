@@ -10,7 +10,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('product shell contains queue, editor, media review, quality, guarded publish, and agent regions', async () => {
   const html = await readFile(join(root, 'src/studio/ui/index.html'), 'utf8');
-  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'spend-chip', 'patches-chip', 'daemon-chip', 'android-chip', 'design-chip', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'nav-brief', 'nav-android', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'create-agent-form', 'new-agent-id', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
+  for (const id of ['review-queue', 'content-workspace', 'post-form', 'video-import', 'media-preview', 'quality-panel', 'render-form', 'render-button', 'evidence-receipt', 'publish-dialog', 'live-status', 'spend-chip', 'patches-chip', 'daemon-chip', 'android-chip', 'design-chip', 'nav-agent', 'nav-design', 'nav-patches', 'nav-knowledge', 'nav-daemon', 'nav-brief', 'nav-android', 'agent-shell', 'agent-list', 'agent-form', 'agent-tui-hint', 'agent-stop', 'create-agent-form', 'new-agent-id', 'edit-agent-form', 'edit-agent-title', 'design-shell', 'design-frame', 'design-agent-form', 'design-item-form', 'patches-shell', 'patch-queue', 'patch-review-form']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /id="agent-send"[^>]*disabled/);

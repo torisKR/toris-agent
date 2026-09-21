@@ -13,6 +13,7 @@ export {
   parseAgentProfile,
   serializeAgentProfile,
   writeAgentProfile,
+  updateAgentProfile,
   composeAgentCatalogue,
   loadAgentCatalogue,
   agentSourceOf,

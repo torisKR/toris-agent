@@ -115,6 +115,15 @@ export function writeAgentProfile(
   roots: { projectPath: string },
 ): Promise<AgentProfile & { file: string }>;
 
+/**
+ * Replace one existing project-local overlay. Same schema as `writeAgentProfile`.
+ * Missing project file is `E_AGENT_NOT_FOUND`. Does not write `~/.toris/agents/`.
+ */
+export function updateAgentProfile(
+  raw: unknown,
+  roots: { projectPath: string },
+): Promise<AgentProfile & { file: string }>;
+
 /** Merge overlays onto the built-in catalogue. Same id replaces the built-in. */
 export function composeAgentCatalogue(overlays?: readonly AgentProfile[]): AgentCatalogue;
 

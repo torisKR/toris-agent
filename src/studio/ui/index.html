@@ -112,6 +112,26 @@
             <button class="button" type="submit">Create</button>
           </form>
         </section>
+        <section class="agent-create" id="edit-agent-panel" aria-label="Edit profile" hidden>
+          <form id="edit-agent-form" class="stack">
+            <p class="field">Edit profile <code id="edit-agent-id"></code></p>
+            <label class="field" for="edit-agent-title">Title<input id="edit-agent-title" name="title" maxlength="80" required placeholder="ASO Specialist"></label>
+            <label class="field" for="edit-agent-category">Category
+              <select id="edit-agent-category" name="category" required>
+                <option value="plan">plan</option>
+                <option value="build">build</option>
+                <option value="review">review</option>
+                <option value="verify">verify</option>
+                <option value="ship">ship</option>
+                <option value="core">core</option>
+              </select>
+            </label>
+            <label class="field" for="edit-agent-summary">Summary<input id="edit-agent-summary" name="summary" minlength="11" maxlength="500" required placeholder="Turns a change into store listing copy."></label>
+            <label class="confirm-check agent-writes"><input id="edit-agent-writes" type="checkbox"> May edit files</label>
+            <label class="field" for="edit-agent-system">Instructions (optional)<textarea id="edit-agent-system" name="system" maxlength="8000" placeholder="Specialist system prompt."></textarea></label>
+            <button class="button" type="submit">Save</button>
+          </form>
+        </section>
         <div id="agent-list" class="review-queue" role="listbox" aria-label="에이전트 프로필"></div>
       </aside>
       <main id="agent-workspace" class="content-workspace" tabindex="-1">
