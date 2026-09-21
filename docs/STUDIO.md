@@ -40,6 +40,7 @@ Open `http://127.0.0.1:5824/design` (or the 디자인 tab).
 2. Click an element. Studio records the CSS selector path, bounded `outerHTML`, key computed styles (color, font, spacing), page URL, and a cropped screenshot when the browser can rasterize it. Each pick lands in the annotation tray.
 3. Optionally write a short per-element note, pick more elements, then send **one** instruction with the whole tray. That payload is persisted under `~/.toris/studio/design/` (`des_*.json`, optional `des_*.png`, and `tray.json`) and attached to a single `POST /api/agent/turn`.
 4. After a successful send, the tray clears. Capture files stay on disk so you can re-queue them.
+5. When the tray has items, **Clear tray** asks for confirm, then empties `tray.json` (`POST /api/design/tray/clear` → `DesignStore.clearTray` / `saveTray({ items: [] })` / `presentTray`). Capture files stay on disk so you can re-queue them. Missing Origin/session token is HTTP 403 and writes nothing. GET never clears. After success the tray UI refreshes and the chrome chip goes quiet at 0.
 
 For pages that cannot be proxied usefully (strict CSP, authenticated SPAs), drag the **Toris pick** bookmarklet onto the bookmark bar. In the app tab, click it, pick an element, and Studio opens `/design#ingest=...` on loopback. The ingest page is same-origin, so the capture is stored with the usual Origin + session token.
 
