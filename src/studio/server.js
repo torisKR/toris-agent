@@ -68,6 +68,7 @@ const STATIC_ASSETS = new Map([
   ['/assets/patches-chip.js', ['patches-chip.js', 'text/javascript; charset=utf-8']],
   ['/assets/daemon-chip.js', ['daemon-chip.js', 'text/javascript; charset=utf-8']],
   ['/assets/android-chip.js', ['android-chip.js', 'text/javascript; charset=utf-8']],
+  ['/assets/design-chip.js', ['design-chip.js', 'text/javascript; charset=utf-8']],
   ['/assets/android.css', ['android.css', 'text/css; charset=utf-8']],
   ['/assets/design-picker.js', ['design-picker.js', 'text/javascript; charset=utf-8']],
   ['/assets/favicon.svg', ['favicon.svg', 'image/svg+xml']],

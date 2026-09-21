@@ -47,6 +47,8 @@ A built-in sample page at `/design/sample` is always available so the picker can
 
 The proxy only fetches `http`/`https` URLs, strips a target document CSP, and frames the result with `frame-ancestors 'self'`. Untrusted target scripts run in a sandboxed iframe without `allow-same-origin`, so they cannot read the Studio session token.
 
+A quiet read-only chip on the shared Studio chrome shows the annotation tray count from that same `GET /api/design/tray` (`DesignStore.getTray` / `presentTray`) and links to `/design`. Hidden when the count is 0. GET only; it never writes `tray.json` or design captures, never clears the tray, and never sends a turn.
+
 ## Patch Review
 
 After Design Mode or an agent run leaves an isolated diff, open `http://127.0.0.1:5824/patches` (or the 패치 tab).
