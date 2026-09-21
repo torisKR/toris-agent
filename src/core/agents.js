@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
 import { TorisError, UsageError } from './errors.js';
@@ -297,6 +297,32 @@ export async function writeAgentProfile(raw, { projectPath, overwrite = false } 
  */
 export async function updateAgentProfile(raw, { projectPath } = {}) {
   return writeAgentProfile(raw, { projectPath, overwrite: true });
+}
+
+/**
+ * Delete one existing project-local overlay at `<projectPath>/.toris/agents/<id>.json`.
+ * Missing project file is `E_AGENT_NOT_FOUND`. Does not touch `~/.toris/agents/`.
+ * @param {unknown} id
+ * @param {{projectPath?:string}} [roots]
+ */
+export async function deleteAgentProfile(id, { projectPath } = {}) {
+  if (typeof projectPath !== 'string' || projectPath.trim() === '') {
+    throw invalidAgent('profile', 'project path is required to delete a project-local agent profile.');
+  }
+  if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+    throw invalidAgent('profile', 'needs an "id" slug like "aso-specialist" (lowercase letters and hyphens).');
+  }
+  const file = join(projectPath, '.toris', 'agents', `${id}.json`);
+  try {
+    await access(file);
+  } catch (err) {
+    if (err && err.code === 'ENOENT') {
+      throw new TorisError(`${file}: project-local agent "${id}" not found.`, 'E_AGENT_NOT_FOUND');
+    }
+    throw err;
+  }
+  await unlink(file);
+  return Object.freeze({ id, source: 'project', file, deleted: true });
 }
 
 /** Load and validate one `<id>.json` profile file. */

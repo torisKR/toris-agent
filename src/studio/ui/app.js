@@ -28,7 +28,7 @@ const state = {
   selectedHunk: '',
 };
 const elementIds = [
-  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','create-agent-form','new-agent-id','new-agent-title','new-agent-category','new-agent-summary','new-agent-writes','new-agent-system','edit-agent-panel','edit-agent-form','edit-agent-id','edit-agent-title','edit-agent-category','edit-agent-summary','edit-agent-writes','edit-agent-system','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
+  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','create-agent-form','new-agent-id','new-agent-title','new-agent-category','new-agent-summary','new-agent-writes','new-agent-system','edit-agent-panel','edit-agent-form','edit-agent-id','edit-agent-title','edit-agent-category','edit-agent-summary','edit-agent-writes','edit-agent-system','delete-agent','design-shell','design-count','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
 ];
 const elements = Object.fromEntries(elementIds.map((id) => [id, document.getElementById(id)]));
 
@@ -503,6 +503,30 @@ elements['edit-agent-form'].addEventListener('submit', async (event) => {
     announce(`Saved ${id}.`);
     editFormAgentId = null;
     await loadAgents();
+  } catch (error) {
+    announce(error.message);
+  }
+});
+
+elements['delete-agent'].addEventListener('click', async (event) => {
+  event.preventDefault();
+  const agent = currentAgent();
+  if (agentSourceOf(agent) !== 'project') {
+    announce('Only a project-local profile can be deleted.');
+    return;
+  }
+  if (!window.confirm(`Delete ${agent.title || agent.id}?`)) return;
+  const id = agent.id;
+  try {
+    await api(`/api/agents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    announce(`Deleted ${id}.`);
+    if (state.agentId === id) {
+      state.agentId = 'toris';
+      rememberAgent('toris');
+    }
+    editFormAgentId = null;
+    await loadAgents();
+    showSurface('agent', { agentId: state.agentId });
   } catch (error) {
     announce(error.message);
   }

@@ -53,7 +53,11 @@ Copy [docs/examples/agents/aso-specialist.json](examples/agents/aso-specialist.j
 When a project-local row is selected, **Edit** / **Save** replaces that file
 (`PUT /api/agents/:id` → `updateAgentProfile` / `parseAgentProfile`). `id` is
 immutable. Home or builtin ids (no project file) are HTTP 404 and write nothing.
-It does not write `~/.toris/agents/`. There is no delete UI.
+**Delete** asks for confirm, then removes that one project file
+(`DELETE /api/agents/:id` → `deleteAgentProfile`). Unknown / home / builtin ids
+are HTTP 404 and delete nothing. After success the catalogue refreshes and the
+selection clears if that id was selected. It does not write or delete
+`~/.toris/agents/`.
 
 ```bash
 toris agents

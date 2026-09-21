@@ -11,7 +11,7 @@ import { mediaResponse, saveMp4Upload } from './media-store.js';
 import { RenderService } from './render-service.js';
 import { checkRelease, contentHash } from './release-guard.js';
 import { inspectAgentRuntime, publicAgentStatus, runAgentTurn } from './agent-runtime.js';
-import { createStudioAgentProfile, updateStudioAgentProfile } from './agent-write.js';
+import { createStudioAgentProfile, deleteStudioAgentProfile, updateStudioAgentProfile } from './agent-write.js';
 import { loadAgentCatalogue, resolveSurfaceAgent } from '../core/agents.js';
 import { Store } from '../core/store.js';
 import { applySavedPatch, discardSavedPatch, getPatch, listPatches, readPatchDiff, refreshSavedPatchDiff } from '../core/patches.js';
@@ -224,6 +224,14 @@ export async function createStudioServer(options) {
     const body = await readJson(request);
     try {
       sendJson(response, 200, await updateStudioAgentProfile(params.id, body, { projectPath: options.cwd }));
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(error.code === 'E_AGENT_NOT_FOUND' ? 404 : 400, error.message);
+    }
+  });
+  router.add('DELETE', '/api/agents/:id', async (_request, response, params) => {
+    try {
+      sendJson(response, 200, await deleteStudioAgentProfile(params.id, { projectPath: options.cwd }));
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(error.code === 'E_AGENT_NOT_FOUND' ? 404 : 400, error.message);

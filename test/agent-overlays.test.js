@@ -15,6 +15,7 @@ import {
   serializeAgentProfile,
   writeAgentProfile,
   updateAgentProfile,
+  deleteAgentProfile,
 } from '../src/core/agents.js';
 import { normalizeTasks, buildPlanPrompt, validAgents } from '../src/core/planner.js';
 import { cmdAgents } from '../src/cli/commands/catalog.js';
@@ -253,6 +254,58 @@ test('updateAgentProfile replaces one existing project overlay and refuses missi
     await assert.rejects(() => readdir(join(home, 'agents')), { code: 'ENOENT' });
     const names = await readdir(join(projectPath, '.toris', 'agents'));
     assert.deepEqual(names, ['aso-specialist.json']);
+  });
+});
+
+test('deleteAgentProfile removes one project overlay and refuses home or builtin ids', async () => {
+  await withRoot(async (root) => {
+    const projectPath = join(root, 'repo');
+    const home = join(root, 'home');
+    const raw = {
+      id: 'aso-specialist',
+      title: 'ASO Specialist',
+      category: 'plan',
+      writes: false,
+      summary: 'Turns a change into store listing copy.',
+    };
+    await writeAgentProfile(raw, { projectPath });
+    await mkdir(join(home, 'agents'), { recursive: true });
+    await writeFile(
+      join(home, 'agents', 'home-only.json'),
+      `${JSON.stringify({ ...raw, id: 'home-only', title: 'Home Only' }, null, 2)}\n`,
+      'utf8',
+    );
+    const removed = await deleteAgentProfile('aso-specialist', { projectPath });
+    assert.equal(removed.id, 'aso-specialist');
+    assert.equal(removed.deleted, true);
+    await assert.rejects(() => readFile(join(projectPath, '.toris', 'agents', 'aso-specialist.json'), 'utf8'), {
+      code: 'ENOENT',
+    });
+    await assert.rejects(() => deleteAgentProfile('aso-specialist', { projectPath }), {
+      name: 'TorisError',
+      code: 'E_AGENT_NOT_FOUND',
+    });
+    await assert.rejects(() => deleteAgentProfile('home-only', { projectPath }), {
+      name: 'TorisError',
+      code: 'E_AGENT_NOT_FOUND',
+    });
+    await assert.rejects(() => deleteAgentProfile('implementer', { projectPath }), {
+      name: 'TorisError',
+      code: 'E_AGENT_NOT_FOUND',
+    });
+    await assert.rejects(() => deleteAgentProfile('ASO', { projectPath }), {
+      name: 'TorisError',
+      code: 'E_INVALID_AGENT',
+    });
+    await assert.rejects(() => deleteAgentProfile('aso-specialist', {}), /project path/);
+    const homeText = await readFile(join(home, 'agents', 'home-only.json'), 'utf8');
+    assert.match(homeText, /Home Only/);
+    const catalogue = await loadAgentCatalogue({ home, projectPath });
+    assert.equal(
+      listSurfaceAgents(undefined, catalogue).some((agent) => agent.id === 'aso-specialist'),
+      false,
+    );
+    assert.equal(resolveSurfaceAgent('home-only', catalogue).source, 'home');
   });
 });
 

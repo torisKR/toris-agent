@@ -124,6 +124,15 @@ export function updateAgentProfile(
   roots: { projectPath: string },
 ): Promise<AgentProfile & { file: string }>;
 
+/**
+ * Delete one existing project-local overlay. Missing project file is `E_AGENT_NOT_FOUND`.
+ * Does not touch `~/.toris/agents/`.
+ */
+export function deleteAgentProfile(
+  id: string,
+  roots: { projectPath: string },
+): Promise<{ id: string; source: 'project'; file: string; deleted: true }>;
+
 /** Merge overlays onto the built-in catalogue. Same id replaces the built-in. */
 export function composeAgentCatalogue(overlays?: readonly AgentProfile[]): AgentCatalogue;
 
