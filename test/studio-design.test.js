@@ -192,12 +192,12 @@ test('annotation tray queues multiple captures and sends them in one turn', asyn
       );
       assert.equal(sent.status, 200);
       assert.equal(received.tray, true);
-      const removed = await fetch(`${base}/api/design/tray/items/${second.id}`, {
-        method: 'DELETE',
-        headers: { origin: base, 'x-toris-studio-token': 'test-token' },
-      });
-      assert.equal(removed.status, 200);
-      assert.equal((await removed.json()).items.length, 1);
+      const consumed = await (await fetch(`${base}/api/design/tray`)).json();
+      assert.equal(consumed.items.length, 0);
+      const onDiskAfter = JSON.parse(await readFile(join(home, 'studio', 'design', 'tray.json'), 'utf8'));
+      assert.deepEqual(onDiskAfter.items, []);
+      assert.ok(JSON.parse(await readFile(join(home, 'studio', 'design', `${first.id}.json`), 'utf8')).id);
+      assert.ok(JSON.parse(await readFile(join(home, 'studio', 'design', `${second.id}.json`), 'utf8')).id);
     },
     {
       runAgentTurn: async (input) => {

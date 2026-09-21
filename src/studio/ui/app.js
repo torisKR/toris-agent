@@ -769,17 +769,16 @@ elements['design-agent-form'].addEventListener('submit', async (event) => {
   const text = elements['design-note'].value.trim() || 'Inspect and fix the selected UI elements.';
   elements['design-send'].disabled = true;
   try {
+    const trayCount = state.tray.length;
     const result = await streamAgentTurn({
       agent: state.agentId,
       message: text,
       history: [],
       tray: true,
     });
-    announce(`${result.agent?.title || '에이전트'}가 트레이 ${state.tray.length}개를 받았습니다.`);
+    announce(`${result.agent?.title || '에이전트'}가 트레이 ${trayCount}개를 받았습니다.`);
     elements['design-note'].value = '';
-    await api('/api/design/tray/clear', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
-    state.tray = [];
-    state.design = null;
+    await loadTray();
   } catch (error) {
     announce(error.message);
   }

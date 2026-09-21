@@ -181,3 +181,15 @@ export class DesignStore {
     return this.saveTray({ items: [] });
   }
 }
+
+/**
+ * Empty the annotation tray only after a turn that attached it is accepted.
+ * Turns that omit tray, empty trays, and callers that never get here
+ * (auth / validation / model failures) leave tray.json alone.
+ */
+export async function consumeDesignTrayAfterAccept(store, trayRequested) {
+  if (!trayRequested) return null;
+  const tray = await store.getTray();
+  if (!tray.items.length) return tray;
+  return store.clearTray();
+}

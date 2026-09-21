@@ -451,6 +451,8 @@ Additive Studio knowledge edit (same store): `POST /api/knowledge/domains/:slug/
 
 Additive Studio knowledge pin (same store, same turn): optional `knowledge: { domain, nodeId }` on the existing `POST /api/agent/turn`. The server loads that node from `KnowledgeStore` and prepends a capped title/kind/excerpt `[pinned knowledge]` block. Unknown id is HTTP 400 (no model call, no write, no fabricated text). Omitted pin is unchanged. Auto-retrieve ranking is unchanged. No second turn endpoint. See `docs/KNOWLEDGE.md`.
 
+Additive Studio Design Mode tray consume (same store, same turn): when `POST /api/agent/turn` includes `tray: true` and the request is accepted, the server empties `tray.json` via `DesignStore.clearTray`. Capture files stay on disk. A turn that omits tray is unchanged. Rejected or failed turns (including missing Origin/session token) do not clear. GET never clears. No second turn endpoint. See `docs/STUDIO.md`.
+
 Additive opt-in knowledge packs (same store): `toris knowledge pack list` and `GET /api/knowledge/packs` read shipped trees under `packs/knowledge/<slug>/` and never write. `toris knowledge pack install <slug>` / `POST /api/knowledge/packs/:slug/install` copy one pack through `KnowledgeStore.addDomain` + `addNode` + `link`. Duplicate slug is `E_DOMAIN_EXISTS` / HTTP 409 unless CLI `--force` replaces it. Studio has no force. Missing Origin/session token is HTTP 403 and writes nothing. Install does not write USER.md / MEMORY.md and does not fetch the network. See `docs/KNOWLEDGE.md`.
 
 ## Additive: project-local agent profiles (post-0.1)
