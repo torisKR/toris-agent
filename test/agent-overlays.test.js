@@ -14,6 +14,7 @@ import {
   parseAgentProfile,
   serializeAgentProfile,
   writeAgentProfile,
+  updateAgentProfile,
 } from '../src/core/agents.js';
 import { normalizeTasks, buildPlanPrompt, validAgents } from '../src/core/planner.js';
 import { cmdAgents } from '../src/cli/commands/catalog.js';
@@ -214,6 +215,44 @@ test('writeAgentProfile writes one valid project overlay and refuses duplicates'
     });
     assert.equal(JSON.parse(await readFile(file, 'utf8')).title, 'ASO Specialist');
     await assert.rejects(() => readdir(join(home, 'agents')), { code: 'ENOENT' });
+  });
+});
+
+test('updateAgentProfile replaces one existing project overlay and refuses missing ids', async () => {
+  await withRoot(async (root) => {
+    const projectPath = join(root, 'repo');
+    const home = join(root, 'home');
+    const raw = {
+      id: 'aso-specialist',
+      title: 'ASO Specialist',
+      category: 'plan',
+      writes: false,
+      summary: 'Turns a change into store listing copy.',
+    };
+    await writeAgentProfile(raw, { projectPath });
+    const updated = await updateAgentProfile(
+      { ...raw, title: 'Listing Editor', writes: true, summary: 'Rewrites one store listing from the repo.' },
+      { projectPath },
+    );
+    assert.equal(updated.title, 'Listing Editor');
+    assert.equal(updated.writes, true);
+    assert.equal(updated.source, 'project');
+    const file = join(projectPath, '.toris', 'agents', 'aso-specialist.json');
+    const onDisk = JSON.parse(await readFile(file, 'utf8'));
+    assert.equal(onDisk.title, 'Listing Editor');
+    assert.equal(onDisk.writes, true);
+    assert.equal(Object.hasOwn(onDisk, 'source'), false);
+    await assert.rejects(() => updateAgentProfile({ ...raw, id: 'missing-agent' }, { projectPath }), {
+      name: 'TorisError',
+      code: 'E_AGENT_NOT_FOUND',
+    });
+    await assert.rejects(() => updateAgentProfile({ ...raw, id: 'implementer' }, { projectPath }), {
+      name: 'TorisError',
+      code: 'E_AGENT_NOT_FOUND',
+    });
+    await assert.rejects(() => readdir(join(home, 'agents')), { code: 'ENOENT' });
+    const names = await readdir(join(projectPath, '.toris', 'agents'));
+    assert.deepEqual(names, ['aso-specialist.json']);
   });
 });
 

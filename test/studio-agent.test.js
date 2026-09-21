@@ -203,6 +203,9 @@ test('Studio agent picker labels custom profiles from source', async () => {
   assert.match(html, /id="new-agent-id"/);
   assert.match(html, /id="new-agent-title"/);
   assert.match(html, /id="new-agent-system"/);
+  assert.match(html, /id="edit-agent-form"/);
+  assert.match(html, /id="edit-agent-title"/);
+  assert.match(html, /id="edit-agent-system"/);
   assert.match(js, /function agentPickerBadge/);
   assert.match(js, /source === 'home' \|\| agent\?\.source === 'project'/);
   assert.match(js, /\$\{source\} · \$\{writes\}/);

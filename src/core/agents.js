@@ -260,26 +260,43 @@ async function atomicWrite(path, contents) {
 /**
  * Write one project-local overlay to `<projectPath>/.toris/agents/<id>.json`.
  * Validates with `parseAgentProfile` first. Duplicate file is `E_AGENT_EXISTS`.
+ * `overwrite: true` replaces an existing project file (`E_AGENT_NOT_FOUND` if missing).
  * Does not write `~/.toris/agents/`.
  * @param {unknown} raw
- * @param {{projectPath?:string}} [roots]
+ * @param {{projectPath?:string, overwrite?:boolean}} [roots]
  */
-export async function writeAgentProfile(raw, { projectPath } = {}) {
+export async function writeAgentProfile(raw, { projectPath, overwrite = false } = {}) {
   if (typeof projectPath !== 'string' || projectPath.trim() === '') {
     throw invalidAgent('profile', 'project path is required to write a project-local agent profile.');
   }
   const parsed = parseAgentProfile(raw, { file: 'profile', source: 'project' });
   const file = join(projectPath, '.toris', 'agents', `${parsed.id}.json`);
+  let exists = false;
   try {
     await access(file);
-    throw new TorisError(`${file}: agent "${parsed.id}" already exists.`, 'E_AGENT_EXISTS');
+    exists = true;
   } catch (err) {
-    if (err && err.code === 'E_AGENT_EXISTS') throw err;
     if (!err || err.code !== 'ENOENT') throw err;
+  }
+  if (exists && !overwrite) {
+    throw new TorisError(`${file}: agent "${parsed.id}" already exists.`, 'E_AGENT_EXISTS');
+  }
+  if (!exists && overwrite) {
+    throw new TorisError(`${file}: project-local agent "${parsed.id}" not found.`, 'E_AGENT_NOT_FOUND');
   }
   const disk = serializeAgentProfile(parsed);
   await atomicWrite(file, `${JSON.stringify(disk, null, 2)}\n`);
   return Object.freeze({ ...parsed, source: 'project', file });
+}
+
+/**
+ * Replace one existing project-local overlay. Same schema as `writeAgentProfile`.
+ * Missing project file is `E_AGENT_NOT_FOUND`. Does not write `~/.toris/agents/`.
+ * @param {unknown} raw
+ * @param {{projectPath?:string}} [roots]
+ */
+export async function updateAgentProfile(raw, { projectPath } = {}) {
+  return writeAgentProfile(raw, { projectPath, overwrite: true });
 }
 
 /** Load and validate one `<id>.json` profile file. */

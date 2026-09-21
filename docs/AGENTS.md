@@ -21,7 +21,7 @@ Precedence matches skills: **builtin < home < project**. A project file with id 
 replaces the built-in Implementer. A new id appears everywhere the catalogue is shown and is
 assignable in plans (unless `category` is `core`). Studio `/agent` is the same list: custom
 rows are labeled `project` or `home`. Pick one to send that id on `POST /api/agent/turn`.
-There is no profile editor in Studio.
+Studio can create or edit a **project-local** overlay only. It never writes `~/.toris/agents/`.
 
 There is no network fetch. Absent directories are empty, not errors. Studio skips a broken
 file so the picker stays up. `toris agents` still fails with a field error.
@@ -50,7 +50,10 @@ crash with a stack trace. `id` `toris` may only use `category: "core"`.
 Copy [docs/examples/agents/aso-specialist.json](examples/agents/aso-specialist.json) to
 `.toris/agents/aso-specialist.json` to try a specialist locally. Studio `/agent` can
 **Create** that same project-local file (`POST /api/agents` → `writeAgentProfile`).
-It does not write `~/.toris/agents/`. There is no edit/delete UI yet.
+When a project-local row is selected, **Edit** / **Save** replaces that file
+(`PUT /api/agents/:id` → `updateAgentProfile` / `parseAgentProfile`). `id` is
+immutable. Home or builtin ids (no project file) are HTTP 404 and write nothing.
+It does not write `~/.toris/agents/`. There is no delete UI.
 
 ```bash
 toris agents
