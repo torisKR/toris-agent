@@ -178,6 +178,11 @@
         <p class="agent-lead">요소를 고르면 트레이에 쌓입니다. 메모를 붙인 뒤 한 번의 지시로 보냅니다.</p>
         <button class="button quiet" id="design-clear-tray" type="button" hidden>Clear tray</button>
         <div id="design-captures" class="review-queue"><div class="queue-empty">아직 주석이 없습니다. 가운데에서 페이지를 열고 요소를 클릭하세요.</div></div>
+        <section class="design-past" id="design-past-section" aria-labelledby="design-past-title" hidden>
+          <div class="section-title"><span>Past</span><h2 id="design-past-title">Past captures</h2></div>
+          <p class="agent-lead design-past-lead">디스크에 남은 캡처입니다. 트레이에 다시 넣을 수 있습니다.</p>
+          <div id="design-past-captures" class="review-queue"></div>
+        </section>
       </aside>
       <main id="design-workspace" class="content-workspace" tabindex="-1">
         <form id="design-url-form" class="design-url-bar">

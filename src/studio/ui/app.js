@@ -28,7 +28,7 @@ const state = {
   selectedHunk: '',
 };
 const elementIds = [
-  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','create-agent-form','new-agent-id','new-agent-title','new-agent-category','new-agent-summary','new-agent-writes','new-agent-system','edit-agent-panel','edit-agent-form','edit-agent-id','edit-agent-title','edit-agent-category','edit-agent-summary','edit-agent-writes','edit-agent-system','delete-agent','design-shell','design-count','design-clear-tray','design-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
+  'review-queue','queue-count','workspace-empty','workspace-detail','detail-kind','detail-title','detail-status','media-preview','timeline-meta','evidence-list','post-form','video-import','video-file','render-form','render-text','render-duration','render-button','quality-list','toast','open-publish','publish-dialog','publish-check','publish-confirmation','publish-submit','review-shell','agent-shell','nav-review','nav-agent','nav-design','nav-patches','agent-list','agent-count','agent-empty','agent-empty-copy','agent-chat','agent-log','agent-form','agent-input','agent-send','agent-stop','agent-tui-hint','agent-role-copy','agent-status-copy','agent-workspace','create-agent-form','new-agent-id','new-agent-title','new-agent-category','new-agent-summary','new-agent-writes','new-agent-system','edit-agent-panel','edit-agent-form','edit-agent-id','edit-agent-title','edit-agent-category','edit-agent-summary','edit-agent-writes','edit-agent-system','delete-agent','design-shell','design-count','design-clear-tray','design-captures','design-past-section','design-past-captures','design-url-form','design-url','design-sample','design-frame','design-empty-copy','design-meta','design-meta-url','design-meta-selector','design-meta-tag','design-styles','design-html','design-shot','design-item-form','design-item-note','design-item-save','design-item-remove','design-agent-form','design-note','design-send','design-agent-status','design-bookmarklet','design-workspace','patches-shell','patch-count','patch-queue','patch-workspace','patch-empty','patch-detail','patch-kind','patch-heading','patch-status','patch-truncated','patch-diff','patch-empty-copy','patch-meta','patch-meta-origin','patch-meta-files','patch-meta-stats','patch-meta-autonomy','patch-apply','patch-discard','patch-review-form','patch-note','patch-review-send','patch-review-status',
 ];
 const elements = Object.fromEntries(elementIds.map((id) => [id, document.getElementById(id)]));
 
@@ -637,6 +637,69 @@ function renderDesignCaptures() {
   }
 }
 
+function pastCaptures() {
+  const onTray = new Set(state.tray.map((item) => item.id).filter(Boolean));
+  return state.captures.filter((item) => item?.id && !onTray.has(item.id));
+}
+
+function renderPastCaptures() {
+  const section = elements['design-past-section'];
+  const list = elements['design-past-captures'];
+  const items = pastCaptures();
+  list.replaceChildren();
+  section.hidden = items.length === 0;
+  if (items.length === 0) return;
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = `tray-item${item.id && item.id === state.design?.id ? ' is-selected' : ''}`;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'queue-item';
+    const top = document.createElement('span');
+    top.className = 'queue-item-top';
+    const kind = document.createElement('span');
+    kind.className = 'queue-kind';
+    kind.textContent = (item.tagName || 'EL').toUpperCase();
+    const title = document.createElement('strong');
+    title.textContent = item.selector || item.url;
+    const meta = document.createElement('small');
+    meta.textContent = item.note || item.url;
+    top.append(kind);
+    button.append(top, title, meta);
+    button.addEventListener('click', () => {
+      state.design = item;
+      renderDesign();
+    });
+    const requeue = document.createElement('button');
+    requeue.type = 'button';
+    requeue.className = 'button quiet tray-requeue';
+    requeue.textContent = '트레이에 넣기';
+    requeue.addEventListener('click', (event) => {
+      event.stopPropagation();
+      requeuePastCapture(item.id).catch((error) => announce(error.message));
+    });
+    row.append(button, requeue);
+    list.append(row);
+  }
+}
+
+async function loadCaptures() {
+  const listed = await api('/api/design/captures');
+  state.captures = listed.items || [];
+}
+
+async function requeuePastCapture(id) {
+  const tray = await api('/api/design/tray/items', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  state.tray = tray.items || [];
+  state.design = state.tray.find((item) => item.id === id) || state.tray[0] || state.design;
+  renderDesign();
+  announce('Past capture를 트레이에 넣었습니다.');
+}
+
 function safeScreenshot(value) {
   return typeof value === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=\s]+$/.test(value)
     ? value
@@ -668,13 +731,17 @@ function renderDesign() {
   }
   syncDesignSend();
   renderDesignCaptures();
+  renderPastCaptures();
 }
 
 async function loadTray() {
   const tray = await api('/api/design/tray');
   state.tray = tray.items || [];
   if (state.design?.id) {
-    state.design = state.tray.find((item) => item.id === state.design.id) || state.tray[0] || null;
+    state.design = state.tray.find((item) => item.id === state.design.id)
+      || state.captures.find((item) => item.id === state.design.id)
+      || state.tray[0]
+      || null;
   } else if (!state.design) {
     state.design = state.tray[0] || null;
   }
@@ -698,7 +765,9 @@ async function applyCapture(raw) {
 async function removeTrayItem(id) {
   const tray = await api(`/api/design/tray/items/${encodeURIComponent(id)}`, { method: 'DELETE' });
   state.tray = tray.items || [];
-  if (state.design?.id === id) state.design = state.tray[0] || null;
+  if (state.design?.id === id) {
+    state.design = state.captures.find((item) => item.id === id) || state.tray[0] || null;
+  }
   renderDesign();
   announce('트레이에서 뺐습니다.');
 }
@@ -1055,8 +1124,7 @@ try {
   await loadAgents();
   const bookmarklet = await api('/api/design/bookmarklet');
   elements['design-bookmarklet'].href = bookmarklet.href;
-  const listed = await api('/api/design/captures');
-  state.captures = listed.items || [];
+  await loadCaptures();
   await loadTray();
   const ingested = ingestFromHash();
   showSurface(readSurface(), { replace: true, agentId: state.agentId });
