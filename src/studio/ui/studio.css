@@ -125,3 +125,8 @@ dialog::backdrop { background: rgb(0 0 0 / .76); backdrop-filter: blur(4px); }
   .design-url-bar { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .sr-toast { transition: none; } .empty-orbit { transform: none; } }
+
+.design-past { margin-top: 18px; padding: 0 0 18px; border-top: 1px solid var(--border); }
+.design-past .section-title { margin: 16px 18px 8px; }
+.design-past-lead { margin-bottom: 8px; }
+.tray-requeue { min-height: 32px; padding: 0 8px; font-size: 11px; }
