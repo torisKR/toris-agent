@@ -1,0 +1,102 @@
+name: desktop-release
+
+# Build the toris desktop app (Tauri) on every platform and attach the
+# installers to the GitHub release for a `v*` tag.
+#
+# This is configuration only: nothing here runs until a maintainer pushes a
+# `v*` tag (or dispatches it manually). It complements `release.yml` (which
+# publishes the npm packages) — that job is untouched.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build the bundles but do not attach them to a release
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: bundle ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macos-arm64
+            runner: macos-14
+            args: '--target aarch64-apple-darwin'
+            rust_target: aarch64-apple-darwin
+          - label: macos-x64
+            runner: macos-15-intel
+            args: '--target x86_64-apple-darwin'
+            rust_target: x86_64-apple-darwin
+          - label: linux-x64
+            runner: ubuntu-22.04
+            args: ''
+            rust_target: x86_64-unknown-linux-gnu
+          - label: windows-x64
+            runner: windows-2022
+            args: ''
+            rust_target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
+            libayatana-appindicator3-dev libsoup-3.0-dev \
+            build-essential curl wget file libssl-dev pkg-config
+
+      - name: Install frontend dependencies
+        run: npm --prefix desktop ci || npm --prefix desktop install
+
+      # tauri-action runs the frontend build (beforeBuildCommand), compiles the
+      # Rust backend, produces the platform installers, and — on a tag build
+      # that is not a dry run — uploads them to the matching GitHub release.
+      - name: Build the desktop app and attach installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: .
+          tauriScript: npx --yes @tauri-apps/cli@^2
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: 'toris desktop ${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
+          # On workflow_dispatch dry runs there is no tag, so nothing is
+          # uploaded; the bundles remain as build artifacts for inspection.
+          includeUpdaterJson: false
+
+      - name: Upload bundles as workflow artifacts
+        if: ${{ github.ref_type != 'tag' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: toris-desktop-${{ matrix.label }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+            src-tauri/target/*/release/bundle/**/*
+          if-no-files-found: ignore
+          retention-days: 7
