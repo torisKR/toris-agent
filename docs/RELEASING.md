@@ -48,6 +48,26 @@ contract is revised.
 
 ## Publish the archive and tap
 
+The current public release also has a matching `Formula/toris-agent.rb` in the
+source repository. This provides an immediately usable custom tap:
+
+```bash
+brew tap torisKR/tools https://github.com/torisKR/toris-agent.git
+brew install torisKR/tools/toris-agent
+brew test torisKR/tools/toris-agent
+```
+
+`.github/workflows/homebrew.yml` verifies this route on macOS using the public
+HTTPS release asset. The source formula must use the actual published archive's
+checksum. If you retain this route for later releases, update the source formula
+along with the separate tap. Local file modes can change archive bytes even
+when source contents match; preserve the published artifact and its checksum.
+
+The conventional tap repository below remains a separate publication step.
+To switch an existing custom tap after that repository is published, uninstall
+`toris-agent`, run `brew untap torisKR/tools`, then tap and install from the
+conventional repository.
+
 Commit the source changes and create the matching version tag. The release
 workflow publishes the archive and `SHA256SUMS` to a public release of
 `torisKR/toris-agent`. For `0.5.1`, the formula points to:

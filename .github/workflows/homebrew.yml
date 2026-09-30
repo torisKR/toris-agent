@@ -1,0 +1,54 @@
+name: Homebrew installation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Formula/**'
+      - '.github/workflows/homebrew.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: verify public source-repository tap
+    runs-on: macos-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install from the public tap URL
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN HOMEBREW_GITHUB_API_TOKEN
+          brew tap torisKR/tools https://github.com/torisKR/toris-agent.git
+          brew install torisKR/tools/toris-agent
+
+      - name: Test the installed formula and release version
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN HOMEBREW_GITHUB_API_TOKEN
+          brew test torisKR/tools/toris-agent
+          toris --version
+          "$(brew --prefix node)/bin/node" --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const formula = readFileSync('Formula/toris-agent.rb', 'utf8');
+          const version = formula.match(/^\s*version "([^"]+)"$/m)?.[1];
+          assert.ok(version, 'committed formula must declare its release version');
+          const tap = execFileSync('brew', ['--repo', 'torisKR/tools'], { encoding: 'utf8' }).trim();
+          assert.equal(readFileSync(`${tap}/Formula/toris-agent.rb`, 'utf8'), formula,
+            'public tap must contain the committed formula');
+          const info = JSON.parse(execFileSync('toris', ['--version', '--json'], { encoding: 'utf8' }));
+          assert.equal(info.name, 'toris-agent');
+          assert.equal(info.version, version);
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            `Verified public Homebrew installation and formula test: toris-agent ${version}\n\nTap URL: https://github.com/torisKR/toris-agent.git\n`);
+          NODE

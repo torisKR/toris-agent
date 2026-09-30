@@ -37,17 +37,17 @@ The demo is a real offline terminal session: setup → status → deterministic 
 
 ## Install with Homebrew
 
-After the public release and tap are available:
-
 ```bash
-brew tap torisKR/tools
+brew tap torisKR/tools https://github.com/torisKR/toris-agent.git
 brew install torisKR/tools/toris-agent
 cd /path/to/your-project
 toris init --solo
 toris --offline
 ```
 
-The tap is [`torisKR/homebrew-tools`](https://github.com/torisKR/homebrew-tools). Its formula downloads the versioned archive from [GitHub Releases](https://github.com/torisKR/toris-agent/releases), checks its SHA256, and uses Homebrew's Node.js. It requires no npm install, native build, or model account for the offline workflow. Run `brew test torisKR/tools/toris-agent` to verify installation and `brew upgrade toris-agent` to update. See [release and tap maintenance](docs/RELEASING.md).
+The explicit repository URL uses this public source repository as a custom tap. Its [Formula](Formula/toris-agent.rb) downloads the versioned archive from [GitHub Releases](https://github.com/torisKR/toris-agent/releases), checks its SHA256, and uses Homebrew's Node.js. It requires no npm install, native build, or model account for the offline workflow. Run `brew test torisKR/tools/toris-agent` to verify installation and `brew upgrade toris-agent` to update.
+
+The release workflow can also create the separate public `torisKR/homebrew-tools` tap when its `HOMEBREW_TAP_TOKEN` repository secret is configured. Fresh installs can then use `brew tap torisKR/tools` without a repository URL. The custom tap above provides installation while that separate publication is pending. See [release and tap maintenance](docs/RELEASING.md).
 
 ## Quickstart from source
 
