@@ -1,6 +1,6 @@
 # Agent profiles — builtins and project-local roles
 
-Toris has one agent catalogue. `toris agents`, TUI `/agent`, `--agent`, Studio `/agent`, and the
+Toris has one agent catalogue. `toris agents`, TUI `/agent`, `--agent`, and the
 planner all read the same list. You do not fork the repo to add a domain specialist.
 
 ## Builtins
@@ -19,12 +19,11 @@ One JSON object per file. Directories are not recursive (`examples/` is ignored)
 
 Precedence matches skills: **builtin < home < project**. A project file with id `implementer`
 replaces the built-in Implementer. A new id appears everywhere the catalogue is shown and is
-assignable in plans (unless `category` is `core`). Studio `/agent` is the same list: custom
-rows are labeled `project` or `home`. Pick one to send that id on `POST /api/agent/turn`.
-Studio can create or edit a **project-local** overlay only. It never writes `~/.toris/agents/`.
+assignable in plans (unless `category` is `core`). `toris agents` labels custom rows
+`project` or `home`, so you can see which file supplies the role.
 
-There is no network fetch. Absent directories are empty, not errors. Studio skips a broken
-file so the picker stays up. `toris agents` still fails with a field error.
+There is no network fetch. Absent directories are empty, not errors. `toris agents`
+reports an invalid overlay with the file and field that need correction.
 
 ## Schema
 
@@ -47,19 +46,23 @@ Optional:
 Unknown fields fail. Invalid JSON fails. The error names the file and the field — it does not
 crash with a stack trace. `id` `toris` may only use `category: "core"`.
 
-Copy [docs/examples/agents/aso-specialist.json](examples/agents/aso-specialist.json) to
-`.toris/agents/aso-specialist.json` to try a specialist locally. Studio `/agent` can
-**Create** that same project-local file (`POST /api/agents` → `writeAgentProfile`).
-When a project-local row is selected, **Edit** / **Save** replaces that file
-(`PUT /api/agents/:id` → `updateAgentProfile` / `parseAgentProfile`). `id` is
-immutable. Home or builtin ids (no project file) are HTTP 404 and write nothing.
-**Delete** asks for confirm, then removes that one project file
-(`DELETE /api/agents/:id` → `deleteAgentProfile`). Unknown / home / builtin ids
-are HTTP 404 and delete nothing. After success the catalogue refreshes and the
-selection clears if that id was selected. It does not write or delete
-`~/.toris/agents/`.
+## Manage and select a role
+
+Copy [aso-specialist.json](examples/agents/aso-specialist.json) to
+`.toris/agents/aso-specialist.json` to try a specialist locally. Create or edit
+overlays in your editor, then run `toris agents` to check the schema and inspect
+the effective catalogue. Keep the filename and `id` in agreement.
+
+Remove an overlay by deleting that JSON file. If it replaced a home or builtin
+role, the lower-precedence role becomes available again on the next catalogue
+load. Use the `SOURCE` column to choose the file you intend to change.
 
 ```bash
 toris agents
+toris agents --json
 toris --agent aso-specialist
 ```
+
+In an interactive session, `/agent` lists the available roles and
+`/agent aso-specialist` selects one for subsequent turns. Start a new session
+after changing overlay files so it loads the updated catalogue.

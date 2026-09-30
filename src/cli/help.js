@@ -1,14 +1,16 @@
 import { line, c } from './output.js';
 
-export const USAGE = `${'toris'} - local-first multi-agent development harness
+export const USAGE = `${'toris'} - a terminal harness for solo developers
 
 USAGE
   toris                     Open the interactive chat TUI (at a terminal)
   toris --agent <id>        Open that agent in the TUI
+  toris --offline           Open local workflow tools without a model
   toris <command> [options]
 
 COMMANDS
   init                      Create ~/.toris and a default config
+  init --solo               Prepare one-agent settings and register this project
   doctor                    Check runtime, providers, git and store
   connect                   Connect a model backend (CLI login or API key)
   chat ["<message>"]        Talk to a model with tools (REPL if no message)
@@ -34,9 +36,6 @@ COMMANDS
   daemon start|stop|status  Local background worker (pid/lock under ~/.toris)
   daemon run "<goal>"       Queue a run for the local daemon (exit 5 if down)
   daemon schedule           Local cron: list | add | remove | enable | disable
-  studio                    Local GUI on 127.0.0.1:5824 (review + /agent + /design + /patches + /knowledge + /daemon + /brief + /android)
-  studio --open             Start or attach Studio and open the loopback URL
-  studio service <action>   Install, status, restart or uninstall autostart
   android status|devices|screenshot|logcat|install
                             Optional adb helpers for Android verify evidence
   knowledge                 Local secretary knowledge (domains, DAG, tacit)
@@ -55,9 +54,10 @@ COMMANDS
 
 RUN OPTIONS
   -p, --project <ref>       Project id, name or unique prefix
-      --autonomy <L1..L5>   How much may happen unattended (default L3)
+      --autonomy <L1..L5>   Configured autonomy (fresh --solo uses L2)
       --budget <usd>        Cost ceiling for this run
       --dry-run             Plan only; never edits files
+      --offline             With --dry-run: deterministic plan, no model calls
       --apply               Apply an isolated L2 diff without asking
       --no-review           Skip the opposite-provider second pass
       --provider <name>     claude | codex
@@ -73,17 +73,17 @@ EXIT CODES
   0 ok   1 failure   2 usage   3 verification failed   4 approval denied   5 daemon unavailable
 
 EXAMPLES
+  toris init --solo          # project, checks, CLI profile and solo defaults
+  toris --offline            # /status, /plan <goal>, /check, /receipt
   toris                     # TUI chat
   toris --agent implementer
-  toris studio              # GUI; agent room at /agent, Design Mode at /design, patches at /patches, knowledge at /knowledge, daemon at /daemon, brief at /brief, android at /android
-  toris studio --open       # same, then open the loopback URL in the browser
   toris android status      # adb/emulator presence (optional)
   toris knowledge init      # USER.md, MEMORY.md, starter domain packs
   toris knowledge pack list
   toris knowledge pack install flutter-expo-android
   toris knowledge search flutter
   toris knowledge reflect run_abc123 --json
-  toris init && toris doctor
+  toris init --solo && toris doctor
   toris project add .
   toris run "add a health endpoint" --dry-run
   toris run "fix the failing parser test" --autonomy L3

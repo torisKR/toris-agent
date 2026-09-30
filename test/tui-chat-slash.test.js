@@ -42,9 +42,20 @@ test('aliases and casing map onto the canonical command', () => {
   assert.equal(parseSlashCommand('/profile main').name, 'model');
   assert.equal(parseSlashCommand('/agents').name, 'agent');
   assert.equal(parseSlashCommand('/role planner').name, 'agent');
-  assert.equal(parseSlashCommand('/gui').name, 'studio');
+  assert.equal(parseSlashCommand('/gui').known, false);
   assert.equal(parseSlashCommand('/reset').name, 'clear');
   assert.equal(parseSlashCommand('/tokens').name, 'usage');
+});
+
+test('solo workflow commands stay in the terminal and Studio is unavailable', () => {
+  for (const name of ['status', 'plan', 'run', 'check', 'diff', 'receipt']) {
+    assert.equal(parseSlashCommand(`/${name}`).known, true, name);
+  }
+  for (const name of ['studio', 'gui', 'ui']) {
+    assert.equal(parseSlashCommand(`/${name}`).known, false, name);
+  }
+  assert.equal(parseSlashCommand('/verify').name, 'check');
+  assert.doesNotMatch(stripAnsi(renderSlashHelp()), /Studio|GUI|\/studio/i);
 });
 
 test('an unrecognised command is reported, not guessed at', () => {

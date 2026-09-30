@@ -1,149 +1,191 @@
 name: release
 
-# Publishing is a two-stage handshake. The platform packages must exist on the
-# registry *before* the root package that lists them as optionalDependencies,
-# otherwise a fresh `npm install toris-agent` resolves the optional deps to
-# nothing and every user silently drops to the JS fallback.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: Build and pack, but do not publish
-        type: boolean
-        default: true
+      tag:
+        description: Existing version tag to release (for example v0.5.0)
+        type: string
+        required: true
 
 permissions:
-  contents: read
-  id-token: write
+  contents: write
+
+concurrency:
+  group: toris-agent-release
+  cancel-in-progress: false
 
 jobs:
-  # Stage 1: one native build per platform, on a real runner of that platform.
-  # No cross-compilation — every triple in scripts/targets.js maps to a runner
-  # that is natively that triple, so the toolchain stays boring.
-  native:
-    name: build ${{ matrix.triple }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - triple: darwin-arm64
-            runner: macos-14
-            rust_target: aarch64-apple-darwin
-          - triple: darwin-x64
-            runner: macos-15-intel
-            rust_target: x86_64-apple-darwin
-          - triple: linux-x64-gnu
-            runner: ubuntu-22.04
-            rust_target: x86_64-unknown-linux-gnu
-          - triple: linux-arm64-gnu
-            runner: ubuntu-22.04-arm
-            rust_target: aarch64-unknown-linux-gnu
-          - triple: win32-x64-msvc
-            runner: windows-2022
-            rust_target: x86_64-pc-windows-msvc
+  release:
+    name: verify and publish portable release
+    runs-on: macos-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
         with:
-          node-version: '22'
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Install Rust target
-        run: rustup target add ${{ matrix.rust_target }}
-
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v7
         with:
-          workspaces: crates/toris-native
+          node-version: '24'
 
-      - name: Build cdylib
-        run: >
-          cargo build --release
-          --manifest-path crates/toris-native/Cargo.toml
-          --target ${{ matrix.rust_target }}
-
-      - name: Pack platform package
-        run: node scripts/pack-native.js --triple ${{ matrix.triple }}
-
-      # Proving the freshly built binary actually dlopens here is the whole
-      # point of the matrix. A .node that packs but fails to load would
-      # otherwise only surface on a user's machine as a silent fallback.
-      - name: Verify the binary loads
-        run: node scripts/verify-native.js --triple ${{ matrix.triple }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: native-${{ matrix.triple }}
-          path: npm/native-${{ matrix.triple }}
-          if-no-files-found: error
-          retention-days: 7
-
-  # Stage 2: publish platform packages first, then the root that depends on them.
-  publish:
-    name: publish to npm
-    needs: native
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          registry-url: https://registry.npmjs.org
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: native-*
-          path: npm
-
-      - name: Show what will be published
+      - name: Verify the version and source tag
         run: |
-          find npm -name package.json -exec node -e '
-            const p = require(process.argv[1]);
-            console.log(p.name + "@" + p.version + "  os=" + p.os + "  cpu=" + p.cpu);
-          ' {} \;
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          const tag = process.env.RELEASE_TAG;
+          assert.equal(process.env.GITHUB_REPOSITORY, 'torisKR/toris-agent');
+          assert.match(pkg.version, /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/);
+          assert.equal(tag, `v${pkg.version}`, 'release tag must match package.json');
+          const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const refs = execFileSync('git', ['ls-remote', '--tags', 'origin',
+            `refs/tags/${tag}`, `refs/tags/${tag}^{}`], { encoding: 'utf8' }).trim().split('\n');
+          const remote = refs.find(line => line.endsWith('^{}')) ?? refs.find(line => line.endsWith(`/${tag}`));
+          assert.equal(remote?.split(/\s+/)[0], source, 'checkout must match the remote source tag');
+          appendFileSync(process.env.GITHUB_ENV, `SOURCE_SHA=${source}\nRELEASE_VERSION=${pkg.version}\n`);
+          NODE
 
-      # A partial matrix is worse than no release: users on the missing
-      # platform get a root package whose optional dep never resolves.
-      - name: Refuse to publish an incomplete matrix
+      - name: Check syntax and run tests
         run: |
-          # The comparison happens in Node, not in the shell. Passing the count
-          # through a shell variable means passing it through Node's stdout
-          # formatting, which colourises bare numbers when FORCE_COLOR is set.
-          # `[ "$count" -ne "$expected" ]` then dies with "integer expression
-          # expected" and the `if` falls through to the *success* path — the
-          # gate would wave an incomplete matrix straight past. Fail-open, in
-          # the one check whose whole job is to fail closed.
-          node -e "
-            import('./scripts/targets.js').then(async (m) => {
-              const { readdir } = await import('node:fs/promises');
-              const dirs = (await readdir('npm', { withFileTypes: true }))
-                .filter((e) => e.isDirectory());
-              if (dirs.length !== m.TARGETS.length) {
-                console.error(
-                  'expected ' + m.TARGETS.length + ' platform packages, found ' + dirs.length
-                );
-                process.exit(1);
+          npm run lint
+          node --check scripts/build-release.js
+          npm test
+
+      - name: Build the archive and formula
+        run: |
+          node scripts/build-release.js --out "$RUNNER_TEMP/toris-release" > "$RUNNER_TEMP/release.json"
+          cat "$RUNNER_TEMP/release.json"
+
+      - name: Install and test the generated formula with Homebrew
+        run: |
+          brew tap-new toris-release/local
+          export TEST_FORMULA="$(brew --repo toris-release/local)/Formula/toris-agent.rb"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { pathToFileURL } from 'node:url';
+          const release = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/release.json`, 'utf8'));
+          const formula = readFileSync(release.formula, 'utf8');
+          // Only the disposable test formula uses a local URL; its SHA256 and
+          // install/test code are unchanged. The published formula stays intact.
+          writeFileSync(process.env.TEST_FORMULA,
+            formula.replace(/^  url .+$/m, `  url "${pathToFileURL(release.archive).href}"`));
+          NODE
+          brew install --build-from-source toris-release/local/toris-agent
+          brew test toris-release/local/toris-agent
+
+      - name: Publish GitHub Release without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Recheck the remote tag after testing, before any publication.
+          git fetch --no-tags origin "refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse 'FETCH_HEAD^{commit}')" = "$SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY" > "$RUNNER_TEMP/source-repo.json"
+          node -e 'if (JSON.parse(require("fs").readFileSync(process.argv[1])).private) throw Error("Release repository must be public")' "$RUNNER_TEMP/source-repo.json"
+          RELEASE_DIR="$RUNNER_TEMP/toris-release"
+          ARCHIVE="toris-agent-$RELEASE_VERSION.tgz"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/existing-release.json" 2> "$RUNNER_TEMP/release-error.txt"; then
+            node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1])); if(r.draft !== false || r.tag_name !== process.env.RELEASE_TAG) throw Error("Existing release must be published and match the source tag")' "$RUNNER_TEMP/existing-release.json"
+            mkdir -p "$RUNNER_TEMP/existing-assets"
+            for ASSET in "$ARCHIVE" SHA256SUMS; do
+              if node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1])); process.exit(r.assets.some(a=>a.name===process.argv[2]) ? 0 : 1)' "$RUNNER_TEMP/existing-release.json" "$ASSET"; then
+                gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir "$RUNNER_TEMP/existing-assets"
+                cmp "$RELEASE_DIR/$ASSET" "$RUNNER_TEMP/existing-assets/$ASSET"
+              else
+                gh release upload "$RELEASE_TAG" "$RELEASE_DIR/$ASSET" --repo "$GITHUB_REPOSITORY"
+              fi
+            done
+          elif grep -q '(HTTP 404)' "$RUNNER_TEMP/release-error.txt"; then
+            printf 'Portable terminal harness %s. Install with `brew install torisKR/tools/toris-agent` after the Homebrew tap is published.\n' "$RELEASE_VERSION" > "$RUNNER_TEMP/release-notes.md"
+            gh release create "$RELEASE_TAG" "$RELEASE_DIR/$ARCHIVE" "$RELEASE_DIR/SHA256SUMS" \
+              --repo "$GITHUB_REPOSITORY" --verify-tag --target "$SOURCE_SHA" \
+              --title "toris-agent $RELEASE_VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            cat "$RUNNER_TEMP/release-error.txt" >&2
+            exit 1
+          fi
+          # Download the published bytes and compare them to the tested archive.
+          mkdir -p "$RUNNER_TEMP/published-assets"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$ARCHIVE" --pattern SHA256SUMS --dir "$RUNNER_TEMP/published-assets"
+          cmp "$RELEASE_DIR/$ARCHIVE" "$RUNNER_TEMP/published-assets/$ARCHIVE"
+          cmp "$RELEASE_DIR/SHA256SUMS" "$RUNNER_TEMP/published-assets/SHA256SUMS"
+          echo "Published and verified GitHub Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the public Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo 'GitHub Release published. Homebrew tap was not created or updated: configure HOMEBREW_TAP_TOKEN and rerun this release workflow.' >> "$GITHUB_STEP_SUMMARY"
+            echo '::error::GitHub Release succeeded, but Homebrew publication requires the HOMEBREW_TAP_TOKEN repository secret.'
+            exit 1
+          fi
+          if gh api repos/torisKR/homebrew-tools > "$RUNNER_TEMP/tap-repo.json" 2> "$RUNNER_TEMP/tap-error.txt"; then
+            node -e 'if (JSON.parse(require("fs").readFileSync(process.argv[1])).private) throw Error("Homebrew tap must be public")' "$RUNNER_TEMP/tap-repo.json"
+          elif grep -q '(HTTP 404)' "$RUNNER_TEMP/tap-error.txt"; then
+            gh repo create torisKR/homebrew-tools --public --description 'Homebrew formulae for Toris tools'
+          else
+            cat "$RUNNER_TEMP/tap-error.txt" >&2
+            exit 1
+          fi
+          gh auth setup-git
+          gh repo clone https://github.com/torisKR/homebrew-tools.git "$RUNNER_TEMP/homebrew-tools"
+          TAP_DIR="$RUNNER_TEMP/homebrew-tools"
+          if ! git -C "$TAP_DIR" rev-parse --verify HEAD >/dev/null 2>&1; then
+            git -C "$TAP_DIR" checkout -b main
+          fi
+          mkdir -p "$TAP_DIR/Formula"
+          export TAP_DIR
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { existsSync, readFileSync } from 'node:fs';
+          const path = `${process.env.TAP_DIR}/Formula/toris-agent.rb`;
+          if (existsSync(path)) {
+            const current = readFileSync(path, 'utf8').match(/^\s*version "([^"]+)"$/m)?.[1];
+            const parse = version => {
+              const match = version?.match(/^(\d+)\.(\d+)\.(\d+)(?:-([\w.-]+))?(?:\+[\w.-]+)?$/);
+              assert.ok(match, 'tap formula must declare a semantic version');
+              return { main: match.slice(1, 4).map(BigInt), pre: match[4]?.split('.') };
+            };
+            const left = parse(process.env.RELEASE_VERSION), right = parse(current);
+            let order = 0;
+            for (let i = 0; i < 3 && order === 0; i++) {
+              order = left.main[i] < right.main[i] ? -1 : left.main[i] > right.main[i] ? 1 : 0;
+            }
+            if (order === 0 && (!left.pre || !right.pre)) {
+              order = left.pre ? -1 : right.pre ? 1 : 0;
+            } else if (order === 0) {
+              for (let i = 0; i < Math.max(left.pre.length, right.pre.length) && order === 0; i++) {
+                const a = left.pre[i], b = right.pre[i];
+                if (a === b) continue;
+                if (a === undefined || b === undefined) order = a === undefined ? -1 : 1;
+                else if (/^\d+$/.test(a) && /^\d+$/.test(b)) order = BigInt(a) < BigInt(b) ? -1 : 1;
+                else if (/^\d+$/.test(a) !== /^\d+$/.test(b)) order = /^\d+$/.test(a) ? -1 : 1;
+                else order = a < b ? -1 : 1;
               }
-              console.error('matrix complete: ' + dirs.length + ' platform packages');
-            });
-          "
-
-      - name: Publish platform packages
-        if: inputs.dry_run != true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -e
-          for dir in npm/*/; do
-            npm publish "$dir" --access public --provenance
-          done
-
-      # Only now is it safe: every optionalDependency the root declares is live.
-      - name: Publish root package
-        if: inputs.dry_run != true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+            }
+            assert.ok(order >= 0, `Refusing to downgrade Homebrew from ${current} to ${process.env.RELEASE_VERSION}`);
+          }
+          NODE
+          cp "$RUNNER_TEMP/toris-release/Formula/toris-agent.rb" "$TAP_DIR/Formula/toris-agent.rb"
+          git -C "$TAP_DIR" add Formula/toris-agent.rb
+          if ! git -C "$TAP_DIR" diff --cached --quiet; then
+            git -C "$TAP_DIR" config user.name 'github-actions[bot]'
+            git -C "$TAP_DIR" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git -C "$TAP_DIR" commit -m "toris-agent $RELEASE_VERSION"
+            git -C "$TAP_DIR" push origin HEAD
+          fi
+          echo 'Public Homebrew tap published: https://github.com/torisKR/homebrew-tools' >> "$GITHUB_STEP_SUMMARY"

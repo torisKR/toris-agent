@@ -212,7 +212,7 @@ export function publicDaemonJob(job) {
 
 /**
  * Read-only worker history. Does not drain the inbox or rewrite running jobs,
- * so Studio can list history while the daemon owns `daemon-jobs.json`.
+ * so the CLI can list history while the daemon owns `daemon-jobs.json`.
  */
 export async function listRecentDaemonJobs(home, options = {}) {
   const store = options.store || new Store(home);

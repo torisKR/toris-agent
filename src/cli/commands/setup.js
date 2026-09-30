@@ -19,6 +19,7 @@ import { androidDoctorChecks } from '../../core/android.js';
 import { knowledgeDoctorCheck } from '../../core/knowledge/index.js';
 import { daemonDoctorCheck } from './daemon.js';
 import { KnowledgeStore } from '../../core/knowledge/store.js';
+import { soloConfig, soloProject, soloSummary } from '../../core/solo.js';
 import { printJson, line, keyValues, c, statusColor } from '../output.js';
 
 const require = createRequire(import.meta.url);
@@ -33,19 +34,24 @@ export async function cmdVersion(ctx) {
   return EXIT.OK;
 }
 
-export async function cmdInit(ctx) {
+export async function cmdInit(ctx, _positionals = [], flags = {}) {
   const existed = ctx.configExists;
-  const config = existed ? ctx.config : { ...DEFAULT_CONFIG };
+  const preset = flags.solo === true ? await soloConfig(ctx.home) : null;
+  const config = preset?.config ?? (existed ? ctx.config : { ...DEFAULT_CONFIG });
   await saveConfig(ctx.home, config);
   await ctx.store.init();
   await new KnowledgeStore({ home: ctx.home, projectPath: ctx.cwd }).init({ seed: true });
+  const solo = preset
+    ? soloSummary(config, preset.availableProviders, await soloProject(ctx.store, ctx.cwd))
+    : null;
   if (ctx.json) {
-    printJson({ ok: true, home: ctx.home, config: configPath(ctx.home), created: !existed });
+    printJson({ ok: true, home: ctx.home, config: configPath(ctx.home), created: !existed,
+      ...(solo ? { solo } : {}) });
     return EXIT.OK;
   }
   line(
     existed
-      ? `${c.yellow('~')} Config already present, left untouched.`
+      ? `${c.yellow('~')} ${solo ? 'Solo defaults filled; stored preferences preserved.' : 'Config already present, left untouched.'}`
       : `${c.green('+')} Created config.`,
   );
   keyValues([
@@ -53,6 +59,29 @@ export async function cmdInit(ctx) {
     ['config', configPath(ctx.home)],
   ]);
   line();
+  if (solo) {
+    line(c.bold('Solo developer harness'));
+    keyValues([
+      ['project', `${solo.project.name} (${solo.project.id})`],
+      ['path', solo.project.path],
+      ['autonomy', `${solo.autonomy} (${solo.apply} apply)`],
+      ['agents', String(solo.maxParallelAgents)],
+      ['daily budget', `$${solo.maxDailyCostUsd}`],
+      ['provider', config.defaultProvider],
+      ['knowledge', solo.knowledgeAutoRetrieve ? 'auto-retrieve' : 'disabled'],
+      ['checks', solo.project.checks?.length ? solo.project.checks.join(', ') : 'none detected; configure project checks'],
+    ]);
+    line();
+    line(`Next: ${c.cyan('toris doctor')} then ${c.cyan('toris')} for the TUI.`);
+    line(`Plan: ${c.cyan(`toris run "<goal>" -p ${solo.project.id} --dry-run`)}`);
+    if (solo.apply === 'manual') {
+      line(`Review: ${c.cyan('toris patches')}, ${c.cyan('toris diff <patchId>')}, then ${c.cyan('toris apply <patchId>')}.`);
+    }
+    if (solo.availableProviders.length === 0) {
+      line(c.dim('No enabled CLI found on PATH. Install and log in to claude or codex, then run toris connect.'));
+    }
+    return EXIT.OK;
+  }
   line(`Next: ${c.cyan('toris doctor')} then ${c.cyan('toris project add .')}`);
   if (Object.keys(config.models?.profiles ?? {}).length === 0) {
     line(

@@ -55,7 +55,7 @@ export async function settleIsolation({
     originTouched: leaked,
   });
 
-  const decision = forceApply ? 'auto' : holdApply ? 'ask' : applyDecision(autonomy);
+  const decision = holdApply ? 'ask' : forceApply ? 'auto' : applyDecision(autonomy);
   if (decision === 'auto' && !leaked) {
     const applied = await applySavedPatch(store, record.id);
     return {

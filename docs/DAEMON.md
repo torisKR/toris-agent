@@ -22,7 +22,11 @@ State lives under `$TORIS_HOME` (default `~/.toris`):
 
 `toris run` itself still executes in the foreground. Only `toris daemon run` and due schedules enqueue work.
 
-Studio `/daemon` at `http://127.0.0.1:5824/daemon` reads the same status, schedules, and job history. Schedule enable/disable/remove/add use the same store mutations (Origin + session token). **Queue run** is `POST /api/daemon/run`: the same inbox drop as `toris daemon run` (goal plus optional dry-run / autonomy / budget). HTTP 503 maps CLI exit 5 when the worker is down; `brief` / `toris brief` goals are refused. The page does not start or stop the worker. Shared Studio chrome shows a quiet read-only `daemon` chip from `GET /api/daemon` when the worker is running (hidden when it is not); the chip only links to `/daemon`.
+Use `toris daemon status --json` to inspect the worker and recent job history, and
+`toris daemon schedule list` to inspect saved schedules. Both support `--json`.
+`toris daemon run` accepts a goal with optional dry-run, autonomy, and budget
+flags. It exits with code 5 when the worker is down. `brief` and `toris brief`
+goals are refused; use the foreground digest described in [BRIEF.md](./BRIEF.md).
 
 ## Schedules
 

@@ -1,4 +1,11 @@
-## Runtime baseline
+## Historical package runtime baseline
+
+This file preserves the v0.1 `@toris/*` monorepo coordination contract. The
+published runtime is JavaScript under `src/`, launched by `bin/toris.js`; its
+current terminal interface is documented in `cli.md` and `../CONTRACT.md`.
+Current configuration uses `torisHome()/config.json`. The package layout,
+TypeScript signatures, SQLite paths, and planned socket below belong to the
+historical contract.
 
 - Node `>=22`, ESM only (`"type": "module"`), TypeScript 5.7, `moduleResolution: NodeNext`.
 - **All relative imports MUST use explicit `.js` extensions** (NodeNext ESM), e.g. `import { x } from './x.js'`.

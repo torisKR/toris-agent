@@ -9,7 +9,7 @@ Solo builders need the agent to remember *how this person ships*, not only what 
 | Need | How others talk about it | How Toris does it |
 | --- | --- | --- |
 | Human-editable memory | Markdown memory files | `USER.md`, `MEMORY.md`, `domains/<slug>/*.md` |
-| Bounded profile | A short USER + MEMORY pair | Character bounds; overflow compresses head+tail |
+| Bounded profile | A short USER + MEMORY pair | Byte bounds; overflow compresses head+tail |
 | Session continuity | Summaries / recall | Keyword + tag search, optional `index.json` |
 | Skills after success | Write a procedure when work worked | `toris knowledge reflect` / chat `/reflect` — **opt-in write** |
 | Domain packs | Bundled expertise | Starter domains you extend, pointing at builtin `skills/` |
@@ -42,14 +42,14 @@ These ship in the package and copy into `~/.toris/knowledge/domains/` on first i
 1. **product-growth** — SEO/GEO, store listing, shipping loops (`seo-geo-optimizer`, `app-store-listing-creator`, `ship-small`)
 2. **flutter-android** — Flutter performance, Play release, device evidence
 3. **expo-android** — Expo Android performance and motion, then Android verify
-4. **toris-ops** — autonomy, receipts, Design Mode, android verify
+4. **toris-ops** — autonomy, receipts, isolated patches, Android verification
 5. **solo-revenue** — 1인 개발 수익화 루프: build → evidence → ship → list
 
 Each pack has a real `DOMAIN.md`, at least three nodes, a small `dag.json`, and one tacit note. Extend them; do not treat them as frozen product copy.
 
 ## Opt-in starter packs
 
-A smaller catalog lives under `packs/knowledge/<slug>/` in the repo: `DOMAIN.md`, a few nodes, and `dag.json`. Install **one** pack with an explicit action — never on first run, never from a GET.
+A smaller catalog lives under `packs/knowledge/<slug>/` in the repo: `DOMAIN.md`, a few nodes, and `dag.json`. Install **one** pack with an explicit command.
 
 ```bash
 toris knowledge pack list
@@ -57,9 +57,7 @@ toris knowledge pack install flutter-expo-android
 toris knowledge pack install product-growth --force
 ```
 
-Shipped slugs: `product-growth`, `flutter-expo-android`, `solo-revenue`, `toris-ops`. The installer reuses `KnowledgeStore.addDomain` + `addNode` + `link` into `~/.toris/knowledge/domains/<slug>/`. It refuses if that domain already exists (`E_DOMAIN_EXISTS` / CLI error / HTTP 409) unless CLI `--force` replaces it. Studio has no force. After `toris knowledge init`, the overlapping seed slugs (`product-growth`, `solo-revenue`, `toris-ops`) already exist, so only a missing slug such as `flutter-expo-android` is installable without `--force`. List is read-only. Install does not write `USER.md` or `MEMORY.md`, and does not fetch the network.
-
-Studio `/knowledge` shows a quiet **Install starter pack** list with one **Install** button per pack that is not already installed (`GET /api/knowledge/packs`, `POST /api/knowledge/packs/:slug/install`). Origin + session token on the write. GET never writes.
+Shipped slugs: `product-growth`, `flutter-expo-android`, `solo-revenue`, `toris-ops`. The installer reuses `KnowledgeStore.addDomain` + `addNode` + `link` into `~/.toris/knowledge/domains/<slug>/`. It refuses if that domain already exists (`E_DOMAIN_EXISTS`) unless `--force` replaces it. After `toris knowledge init`, the overlapping seed slugs (`product-growth`, `solo-revenue`, `toris-ops`) already exist, so only a missing slug such as `flutter-expo-android` is installable without `--force`. List is read-only. Install does not write `USER.md` or `MEMORY.md`, and does not fetch the network.
 
 ## DAG
 
@@ -116,7 +114,7 @@ API-backed chat (`anthropic`, `openai`, `grok`) gets:
 | `knowledge_reflect` | propose only |
 | `knowledge_write` | `needsApproval` — asks below L3, auto at L3+ |
 
-On each `toris chat` turn (and Studio agent turns on the same session path), Toris **auto-retrieves** matching domain nodes and tacit notes from `~/.toris/knowledge/` and injects a bounded `[knowledge context]` block. The operator does not need to call `knowledge_search` first.
+On each terminal chat turn (`toris` or `toris chat`), Toris **auto-retrieves** matching domain nodes and tacit notes from `~/.toris/knowledge/` and injects a bounded `[knowledge context]` block. The operator does not need to call `knowledge_search` first.
 
 Retrieval is keyword + tag over the existing `index.json` (no remote embeddings). It prefers domain nodes + tacit, clips each body, and drops the lowest-score items once the char budget is hit. USER.md / MEMORY.md stay in the system prompt when already loaded; they are not dumped again on every turn. Below L3 this path is **read-only** — it never writes tacit, USER.md, or MEMORY.md.
 
@@ -141,7 +139,8 @@ Slash commands:
 - `/knowledge [query]` — status or search
 - `/reflect` — propose tacit notes from this session, or the latest verified run
 - `/reflect <runId>` — propose from that run's receipt (verification must have passed)
-- `/reflect accept` — write the proposals (inbox if no domain)
+- `/reflect <runId> accept` — write a proposal from that run (inbox if no domain)
+- `/reflect accept` — derive and write a proposal from the current session, falling back to the latest verified run
 
 Do not expect silent MEMORY.md updates. That is the point.
 
@@ -149,32 +148,43 @@ Do not expect silent MEMORY.md updates. That is the point.
 
 1. Do the work. Verify it. The receipt of a passing run carries a quiet `toris knowledge reflect <runId>` line — it does not write anything.
 2. `/reflect`, `toris knowledge reflect <runId>`, or `toris knowledge reflect --text "..."`.
-3. Edit the proposal if the wording is too specific. `--json` returns the draft without writing.
-4. `--write` / `accept` to inbox, then `tacit promote` into a domain. Below L3, chat `knowledge_write` still asks first.
+3. Review the proposal. `--json` returns the draft without writing. Supply curated wording with `--text` if needed.
+4. Accept the same source explicitly: `toris knowledge reflect <runId> --write` or `/reflect <runId> accept`. Without a domain, the note goes to the inbox; use `tacit promote` to move it into a domain. Below L3, chat `knowledge_write` still asks first.
+
+Acceptance derives the proposal again from the supplied source. Include the run
+id and domain again when accepting a receipt-backed draft; `/reflect accept`
+uses the session or latest verified run instead of remembering the last preview.
 
 A receipt-backed draft includes the goal, plan titles, check exit codes, and a short outcome note. Failed or unverified runs do not propose a success tacit. Domain is guessed from keywords/tags on an existing pack when you omit `--domain`.
 
 A tacit note is “how we actually do X **here**”. A skill under `skills/` is a reusable procedure. A domain may list related builtin skills in `DOMAIN.md` frontmatter (`skills: seo-geo-optimizer, ship-small`).
 
-## Studio
+## Maintain knowledge from the terminal
 
-Optional GUI: `http://127.0.0.1:5824/knowledge`. Browse domains, nodes, and DAG edges; add a node or edge; pin one DAG node onto the next Studio agent turn. It is a **separate page** (`knowledge.html` + `knowledge.js`) so it does not share the review-room client with Design Mode or the agent room.
+Inspect a domain's nodes and edges, read a node, and add links with the existing
+commands:
 
-The selected domain also has a **DAG panel** (plain nested list — no graph library). Nodes show title and kind; edges nest under the source node. Click a node for its short body. When a node is selected, the detail panel shows editable title and body; kind stays read-only. **Save** writes that one node through `KnowledgeStore.updateNode` (same markdown file and id — no second node). Empty title is HTTP 400 and writes nothing. Unknown domain or unknown node is HTTP 404, same as inspect, and writes nothing. Same Origin + session token gate as Accept. The panel then reloads the existing DAG GET. Nothing is written on GET or until you Save. Each node has one **use on next turn** control. Checking it pins that node's domain + id onto the next Studio `POST /api/agent/turn` (same attachment path Design Mode and Android already use). The server loads the node from `KnowledgeStore` and prepends a short `[pinned knowledge]` block — title, kind, and a capped excerpt only. An unknown id is HTTP 400: no model call, no write, no fabricated text. Unchecked turns do not include the node. Auto-retrieve ranking is unchanged. A domain with no nodes stays quiet. `GET /api/knowledge/domains/:slug/dag` is the same-origin JSON read (`inspectDomain` slimmed to nodes + edges). It never calls `knowledge init` and does not write.
+```bash
+toris knowledge domains inspect toris-ops --json
+toris knowledge node list toris-ops
+toris knowledge node get toris-ops receipts-not-vibes
+toris knowledge node add toris-ops --id session-continuity --title "Session continuity" --body "Summaries in MEMORY.md."
+toris knowledge node link toris-ops receipts-not-vibes session-continuity --kind supports
+```
 
-Each DAG node also has a quiet **Remove** control. Confirm before delete (browser confirm). **Remove** writes through `KnowledgeStore.removeNode`: the node markdown file is deleted and `dag.json` edges that touch it are dropped. Unknown domain or unknown node is HTTP 404, same as inspect, and writes nothing. Same Origin + session token gate as Accept. The panel then reloads the existing DAG GET. Nothing is written on GET or until you confirm.
+Edit node titles and bodies in `domains/<slug>/nodes/<id>.md`. For an edge
+removal, edit that domain's `dag.json`. When removing a node file, also remove
+edges that mention its id. The current CLI provides add, list, get, and link
+commands; use your editor for updates, deletion, and unlinking.
 
-The same page has a quiet **Install starter pack** list: one **Install** per shipped pack that is not already a domain. **Install** writes that pack through `installKnowledgePack` (`addDomain` + nodes + `link`). Duplicate slug is HTTP 409 and writes nothing. Studio has no force. Unknown slug is HTTP 404. Same Origin + session token gate as Accept. After success the domain list refreshes and the new domain can be selected. `GET /api/knowledge/packs` is read-only and never writes. Does not write USER.md / MEMORY.md.
+After manual edits, run `toris knowledge init` to rebuild the recall index. It
+preserves existing files and restores any missing seed domains. Inspect the
+domain again to check the remaining nodes and edges.
 
-The same page has a small **Create domain** form: required slug, optional short title and description. **Create** writes one domain through `KnowledgeStore.addDomain` — the same path as `toris knowledge domains add` (`DOMAIN.md`, empty `dag.json`, `nodes/` and `tacit/` folders) under the existing knowledge root. Invalid slug is HTTP 400 and writes nothing. Duplicate slug is HTTP 409 and writes nothing. Same Origin + session token gate as Accept. After success the domain list refreshes and the new (empty) domain can be selected so the existing DAG panel and add-node form work. Nothing is written on GET or until you Create. Does not seed starter packs or write USER.md / MEMORY.md.
-
-The same page has a small **add node** form for the selected domain: title, kind (only kinds `KnowledgeStore` already accepts: `node` plus DAG edge kinds), short body, and an optional link to an existing node id in that domain. **Save node** writes exactly one node through `KnowledgeStore.addNode`. If a valid link target is chosen, it also writes one edge through `KnowledgeStore.link` using an existing DAG kind (`supports` when the kind is `node`). Invalid kind or unknown target is HTTP 400 and writes nothing. Unknown domain is HTTP 404, same as the inspect route. Duplicate ids are HTTP 409 — the store does not overwrite. Same Origin + session token gate as Accept. Nothing is written until you submit.
-
-The same page has a small **link** form for the selected domain: from node id, to node id, and an existing DAG edge kind (`prerequisite`, `supports`, `conflicts`, `derived-from`). **Link** writes one edge through `KnowledgeStore.link`. It does not create a node. Unknown from/to is HTTP 404 — the store's `E_UNKNOWN_NODE` — and writes nothing. Duplicate edge is HTTP 409 (`E_DAG_DUPLICATE`) and writes nothing. Unknown domain is HTTP 404, same as inspect. Same Origin + session token gate as Accept. After success the panel reloads the existing DAG GET. Nothing is written on GET or until you Link.
-
-Each listed DAG edge also has a quiet **Unlink** control. Confirm before write (browser confirm). **Unlink** writes through `KnowledgeStore.unlink`: it drops exactly one matching `{ from, to, kind }` from `dag.json` and leaves both nodes on disk. Unknown edge is HTTP 404 and writes nothing. Same Origin + session token gate as Link. The panel then reloads the existing DAG GET. Nothing is written on GET or until you confirm.
-
-The same page can show the latest **verified-run** proposal (goal, short outcome, domain guess) — the Studio equivalent of `toris knowledge reflect` / `/reflect`. **Accept** writes that one tacit note through `KnowledgeStore.addTacit` (same path as `--write` / `/reflect accept`). **Dismiss** does not write. Failed or unverified receipts stay hidden. Nothing is written until you click Accept.
+Use `/knowledge <query>` to recall relevant entries during a TUI session, or
+ask for a particular domain with the `knowledge_search` and `domain_activate`
+chat tools. You can also include a node's text in your prompt. Automatic recall
+remains bounded and reads the local keyword index.
 
 ## Grow a domain
 

@@ -28,7 +28,7 @@ test('a prefix narrows suggestions by command name', () => {
   );
   assert.deepEqual(
     suggestSlashCommands('/c').map((s) => s.name),
-    ['clear'],
+    ['check', 'clear'],
   );
 });
 

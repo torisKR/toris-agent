@@ -19,20 +19,6 @@ export {
   loadAgentCatalogue,
   agentSourceOf,
 } from './core/agents.js';
-export {
-  studioAgentUrl,
-  studioDesignUrl,
-  studioPatchesUrl,
-  studioKnowledgeUrl,
-  studioDaemonUrl,
-  studioBriefUrl,
-  studioAndroidUrl,
-  renderStudioAccess,
-  tuiAgentHint,
-  isLoopbackHttpUrl,
-  openLocalCommand,
-  openLocalUrl,
-} from './core/access.js';
 export { AUTONOMY_LEVELS, resolveAutonomy, gate, withinBudget } from './core/autonomy.js';
 export { ADAPTERS, detectBinary, invokeProvider, oppositeProvider } from './core/providers.js';
 export {
@@ -94,14 +80,3 @@ export {
   parseScheduleExpr,
   tickSchedules,
 } from './daemon/index.js';
-export {
-  normalizeDesignCapture,
-  formatDesignContext,
-  composeDesignTurnMessage,
-  listDesignCaptures,
-  buildCssPath,
-  buildBookmarklet,
-  injectPickerMarkup,
-  assertSafeHttpUrl,
-  DESIGN_STYLE_KEYS,
-} from './studio/design.js';

@@ -27,18 +27,18 @@ export function onboardingSteps({ configExists, profileCount, home }) {
   return [
     {
       done: Boolean(configExists),
-      title: 'toris init',
+      title: 'toris init --solo',
       detail: `writes ${shortenPath(configPath(home))}`,
     },
     {
       done: (profileCount ?? 0) > 0,
       title: 'toris connect',
-      detail: 'or set models.profiles.<name> and models.routing.chat by hand',
+      detail: 'use the installed CLI login, or configure an API model profile',
     },
     {
       done: false,
-      title: 'export ANTHROPIC_API_KEY=... (or OPENAI_API_KEY / XAI_API_KEY)',
-      detail: 'keys live in the environment, never in the config file',
+      title: 'API credentials are optional with a CLI backend',
+      detail: 'for API models, set ANTHROPIC_API_KEY / OPENAI_API_KEY / XAI_API_KEY in the environment',
     },
   ];
 }

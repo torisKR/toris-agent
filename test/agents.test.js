@@ -66,7 +66,7 @@ test('at least one agent in every writing category is allowed to write', () => {
   assert.ok(writers.some((a) => a.category === 'build'));
 });
 
-test('the TUI/GUI catalogue puts the chat persona first, then every task role', () => {
+test('the TUI catalogue puts the chat persona first, then every task role', () => {
   const surface = listSurfaceAgents();
   assert.equal(surface[0].id, SURFACE_AGENT.id);
   assert.equal(surface.length, AGENT_PROFILES.length + 1);
@@ -200,4 +200,3 @@ test('a custom system prompt replaces the derived role text', () => {
   });
   assert.equal(agentRolePrompt(agent), 'Flag unsubstantiated claims. Do not draft replacements.');
 });
-

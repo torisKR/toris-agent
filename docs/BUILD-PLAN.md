@@ -1,6 +1,11 @@
-# toris-agent — parallel build plan (resume here)
+# toris-agent — original monorepo build plan
 
-Status: scaffolding + frozen contract committed. Package implementation not started.
+Historical reference: this plan describes the original TypeScript monorepo
+design. The current product is a solo-developer TUI/CLI implemented under
+`bin/` and `src/`, with local state under `~/.toris/`. Use the root README for
+the current workflow and `npm run lint` / `npm test` for validation. The
+package assignments and `pnpm` integration steps below are retained as the
+original design record, not instructions for the current runtime.
 
 ## Why this file exists
 `docs/CONTRACT.md` freezes every cross-package signature, and `docs/specs/*.md` splits it

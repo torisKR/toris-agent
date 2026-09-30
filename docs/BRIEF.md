@@ -35,7 +35,7 @@ toris daemon schedule add "09:00" "toris brief"
 toris daemon run "toris brief"
 ```
 
-Those commands are refused (Studio **Queue run** uses the same check). A schedule named `toris brief` would otherwise burn a planner/provider turn on the words "toris brief".
+Those commands are refused. A schedule named `toris brief` would otherwise burn a planner/provider turn on the words "toris brief".
 
 Schedule the CLI itself with host cron, systemd, or launchd:
 
@@ -58,6 +58,13 @@ brief
 
 `@daily` on `toris daemon schedule` is for recurring **goals** (`lint the repo`, `draft the standup`), not for this digest. See [DAEMON.md](./DAEMON.md).
 
-## Studio
+## Daily budget
 
-The same digest is on the loopback GUI at `http://127.0.0.1:5824/brief` (`GET /api/brief`). Today's spend, the configured daily budget (`config.maxDailyCostUsd`, quiet when unset), and remaining come from `summarizeCost` / `buildBrief`. A small form **Save**s or **Clear**s that ceiling through the same `maxDailyCostUsd` field CLI `checkBudget` already enforces. Writes happen only on Save/Clear. GET never writes. Same Origin + session token as other Studio mutations. No Slack/Telegram send, no daemon start/stop, no enqueue. See [STUDIO.md](./STUDIO.md).
+Set `maxDailyCostUsd` in `$TORIS_HOME/config.json` (default
+`~/.toris/config.json`) to a non-negative dollar amount. For example, add or
+update `"maxDailyCostUsd": 10` in your existing configuration to set a $10 daily
+ceiling. Set it to `0` to clear the ceiling.
+
+`toris brief` and `toris cost today` report today's spend and remaining budget.
+`toris run` checks the same field before starting work. The digest itself does
+not change your budget or enqueue a run.

@@ -62,29 +62,6 @@ test('optionalDependenciesFor reproduces the declared block', async () => {
   assert.deepEqual(optionalDependenciesFor(pkg.version), pkg.optionalDependencies ?? {});
 });
 
-test('the release matrix covers every target', async () => {
-  const yaml = await readFile(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
-
-  // Deliberately textual: pulling in a YAML parser to check five strings would
-  // add a dependency to a project that currently has zero.
-  const inMatrix = [...yaml.matchAll(/^\s*-\s*triple:\s*(\S+)\s*$/gm)].map((m) => m[1]);
-
-  assert.deepEqual(
-    inMatrix.sort(),
-    TARGETS.map((t) => t.triple).sort(),
-    'release.yml build matrix drifted from scripts/targets.js',
-  );
-
-  // Building a triple on the wrong runner produces a binary that packs fine
-  // and then refuses to load on the user's machine.
-  for (const t of TARGETS) {
-    const leg = new RegExp(
-      `-\\s*triple:\\s*${t.triple}\\s*\\n\\s*runner:\\s*${t.runner}\\s*\\n\\s*rust_target:\\s*${t.rustTarget}\\b`,
-    );
-    assert.match(yaml, leg, `${t.triple} leg must use ${t.runner} / ${t.rustTarget}`);
-  }
-});
-
 test('package names are scoped and derived from the triple', () => {
   for (const t of TARGETS) {
     assert.equal(packageNameFor(t.triple), `${NATIVE_SCOPE}/native-${t.triple}`);

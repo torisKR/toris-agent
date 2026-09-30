@@ -50,7 +50,8 @@ test('the banner names the keys that get an operator unstuck', () => {
   const text = stripAnsi(renderBanner(info).join('\n'));
   assert.match(text, /\/help/);
   assert.match(text, /\/agent/);
-  assert.match(text, /\/studio/);
+  assert.match(text, /\/status/);
+  assert.doesNotMatch(text, /\/studio/);
   assert.match(text, /ctrl-c/);
   assert.match(text, /ctrl-d/);
 });
@@ -199,9 +200,16 @@ test('the first-run message names the command that fixes it', () => {
   );
 
   assert.match(text, /toris init/);
+  assert.match(text, /init --solo/);
   assert.match(text, /config\.json/, 'says where state will land');
   assert.match(text, /API_KEY/, 'says credentials live in the environment');
   assert.doesNotMatch(text, /Error|E_CONFIG|stack/i, 'a first run is not a failure');
+});
+
+test('first-run guidance distinguishes CLI login from optional API credentials', () => {
+  const text = stripAnsi(renderOnboarding({ version: '0.4.0', configExists: false, profileCount: 0, home: '/tmp/solo' }).join('\n'));
+  assert.match(text, /CLI.*login|login.*CLI/i);
+  assert.match(text, /API.*optional|optional.*API/i);
 });
 
 test('a configured-but-profileless install gets the narrower explanation', () => {
@@ -304,11 +312,12 @@ test('a long cwd is clipped inside the box, never past its edge', () => {
   assert.ok(lines.some((l) => l.includes('…')), 'the overflow is marked, not silently cut');
 });
 
-test('the hint line names the keys a newcomer needs on both surfaces', () => {
+test('the hint line names the terminal workflow and interrupt keys', () => {
   const text = stripAnsi(renderBanner({ ...info, width: 80 }).join('\n'));
   assert.match(text, /\/help/);
   assert.match(text, /\/agent/);
-  assert.match(text, /\/studio/);
+  assert.match(text, /\/status/);
+  assert.doesNotMatch(text, /\/studio/);
   assert.match(text, /ctrl-c/);
   assert.match(text, /ctrl-d/);
 });

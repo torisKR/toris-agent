@@ -61,7 +61,7 @@ test('updateNode rewrites title and body without changing the node id', async ()
   await withStore(async (store, home) => {
     const node = await store.addNode('toris-ops', {
       title: 'Temporary edit target',
-      tags: 'studio, edit',
+      tags: 'terminal, edit',
       body: 'Original body.',
     });
     await store.link('toris-ops', {
@@ -71,19 +71,19 @@ test('updateNode rewrites title and body without changing the node id', async ()
     });
     const beforeDag = await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8');
     const updated = await store.updateNode('toris-ops', node.id, {
-      title: 'Edited studio title',
+      title: 'Edited terminal title',
       body: 'Edited body.',
     });
     assert.equal(updated.id, node.id);
-    assert.equal(updated.title, 'Edited studio title');
+    assert.equal(updated.title, 'Edited terminal title');
     assert.equal(updated.body, 'Edited body.');
-    assert.deepEqual(updated.tags, ['studio', 'edit']);
+    assert.deepEqual(updated.tags, ['terminal', 'edit']);
     const ids = (await store.listNodes('toris-ops')).map((item) => item.id);
     assert.equal(ids.filter((id) => id === node.id).length, 1);
     assert.equal(await readFile(join(home, 'knowledge/domains/toris-ops/dag.json'), 'utf8'), beforeDag);
     const markdown = await readFile(join(home, 'knowledge/domains/toris-ops/nodes', `${node.id}.md`), 'utf8');
     assert.match(markdown, /id: temporary-edit-target/);
-    assert.match(markdown, /title: Edited studio title/);
+    assert.match(markdown, /title: Edited terminal title/);
     assert.match(markdown, /Edited body\./);
   });
 });

@@ -10,7 +10,8 @@ import {
   renderAgentCatalog,
   resolveSurfaceAgent,
 } from '../../core/agents.js';
-import { openLocalUrl, renderStudioAccess, studioAgentUrl, studioOrigin } from '../../core/access.js';
+import { createHarnessHandlers } from '../tui/harness.js';
+import { worktreeDiff } from '../../core/worktree.js';
 import {
   pickChatModel,
   assertChatUsable,
@@ -95,10 +96,14 @@ function buildApprover({ rl, isAutoApproved, log }) {
 export async function cmdChat(ctx, args, flags) {
   const { json } = ctx;
   let { config } = ctx;
+  const offline = Boolean(flags.offline);
+  if (offline && (json || args.length > 0)) {
+    throw new UsageError('Offline mode is a terminal workspace: run `toris --offline` and use /help.');
+  }
 
   // Zero profiles + a real terminal = onboard instead of erroring, the way
   // opencode/gemini-cli do. Non-TTY and --json keep the explicit error.
-  if (listProfiles(config).length === 0 && stdin.isTTY && !json) {
+  if (!offline && listProfiles(config).length === 0 && stdin.isTTY && !json) {
     const { runConnectWizard } = await import('./connect.js');
     const connected = await runConnectWizard({ config, home: ctx.home });
     if (!connected?.ok || connected.cancelled) {
@@ -117,8 +122,10 @@ export async function cmdChat(ctx, args, flags) {
     catalogue,
   );
 
-  const resolved = pickChatModel(config, typeof flags.profile === 'string' ? flags.profile : undefined);
-  assertChatUsable(resolved, config);
+  const resolved = offline
+    ? { profile: 'offline', provider: 'offline', model: 'local commands' }
+    : pickChatModel(config, typeof flags.profile === 'string' ? flags.profile : undefined);
+  if (!offline) assertChatUsable(resolved, config);
 
   // CLI-backed providers run their own agent loop (tools, skills, approvals)
   // inside the spawned CLI; driving a second tool loop from toris would run
@@ -143,17 +150,19 @@ export async function cmdChat(ctx, args, flags) {
     // process warm; a one-shot answer has nothing to amortise the boot over.
     warm: !json && args.length === 0,
   };
-  const provider = createProvider(resolved, providerOptions);
+  const provider = offline
+    ? { name: 'offline', async *stream() { throw new Error('Offline session: connect a provider with `toris connect`, then restart toris to chat.'); } }
+    : createProvider(resolved, providerOptions);
   let autonomyLevel = String(flags.autonomy ?? config.defaultAutonomy ?? 'L2').toUpperCase();
   const foldIsolation = async ({ forceApply = false, abandon = false } = {}) => {
     if (!isolation) return null;
     const current = isolation;
-    isolation = null;
     if (abandon) {
       await abandonIsolation(current.session);
+      isolation = null;
       return { abandoned: true };
     }
-    return settleIsolation({
+    const settled = await settleIsolation({
       store: ctx.store,
       session: current.session,
       before: current.before,
@@ -161,17 +170,19 @@ export async function cmdChat(ctx, args, flags) {
       autonomy: autonomyLevel,
       forceApply: forceApply || Boolean(flags.apply) || Boolean(flags.yes),
     });
+    isolation = null;
+    return settled;
   };
   const knowledgeSession = { activeDomains: [] };
   const knowledgeStore = new KnowledgeStore({ home: ctx.home, projectPath: ctx.cwd });
   const autoRetrieve = knowledgeAutoRetrieveEnabled(config, flags);
   const tools =
-    flags['no-tools'] || isCliBacked
+    offline || flags['no-tools'] || isCliBacked
       ? []
       : createDefaultTools({ cwd: process.cwd(), home: ctx.home, knowledge: knowledgeSession });
 
   const { skills, problems } =
-    flags['no-skills'] || isCliBacked
+    offline || flags['no-skills'] || isCliBacked
       ? { skills: [], problems: [] }
       : await discoverSkills(
           skillSearchPaths({
@@ -244,6 +255,13 @@ export async function cmdChat(ctx, args, flags) {
   const completer = (line) => completeSlash(line, catalogue);
   const rl = createInterface({ input: stdin, output: stdout, completer });
   const log = (line) => stdout.write(`${line}\n`);
+  const { onChatTurn, ...harnessHandlers } = createHarnessHandlers(ctx, {
+    log,
+    offline,
+    autonomy: () => autonomyLevel,
+    workingDirectory: () => isolation?.session.path ?? ctx.cwd,
+    liveDiff: async () => isolation ? (await worktreeDiff(isolation.session)).patch : null,
+  });
 
   const UNWRAPPED_WIDTH = 1_000_000;
   const isTty = Boolean(stdout.isTTY);
@@ -338,6 +356,7 @@ export async function cmdChat(ctx, args, flags) {
   let generation = null;
 
   const askModel = async (text) => {
+    onChatTurn();
     generation = new AbortController();
     const composed = await composeTurn(text, session.history);
     noteKnowledge(log);
@@ -385,14 +404,8 @@ export async function cmdChat(ctx, args, flags) {
 
   const showModel = () => log(c.dim(`${active.profile} → ${active.provider}/${active.model}`));
 
-  const guiFor = (agentId) => {
-    const base = studioAgentUrl();
-    const id = String(agentId || 'toris');
-    return id === 'toris' ? base : `${base}?id=${encodeURIComponent(id)}`;
-  };
-
   const showAgent = () =>
-    log(c.dim(`${activeAgent.id} · ${activeAgent.title} · GUI ${guiFor(activeAgent.id)}`));
+    log(c.dim(`${activeAgent.id} · ${activeAgent.title}`));
 
   const showAutonomy = () => {
     const level = AUTONOMY_LEVELS[autonomyLevel] ?? AUTONOMY_LEVELS.L2;
@@ -419,6 +432,10 @@ export async function cmdChat(ctx, args, flags) {
    * provider-neutral, so it replays into a fresh session untouched.
    */
   const switchModel = (name) => {
+    if (offline) {
+      log(c.dim('Offline session: run `toris connect`, then restart toris to select a model.'));
+      return;
+    }
     let next;
     try {
       next = resolveProfile(name, config);
@@ -463,21 +480,11 @@ export async function cmdChat(ctx, args, flags) {
     showAgent();
   };
 
-  const probeStudio = async () => {
-    try {
-      const response = await fetch(`${studioOrigin()}/api/health`, {
-        signal: AbortSignal.timeout(400),
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
-  };
-
   const listLines = (items) => (items.length > 0 ? items.join('\n') : '  (none)');
 
   /** @type {Record<string, (args: string[]) => void>} */
   const slashHandlers = {
+    ...harnessHandlers,
     help: () => log(renderSlashHelp()),
     agent: (rest) => {
       if (rest.length > 0) {
@@ -485,18 +492,6 @@ export async function cmdChat(ctx, args, flags) {
         return;
       }
       log(renderAgentCatalog(listSurfaceAgents(undefined, catalogue), activeAgent.id));
-      log(c.dim(`  GUI  ${guiFor(activeAgent.id)}`));
-    },
-    studio: async () => {
-      const running = await probeStudio();
-      log(renderStudioAccess({ running }));
-      if (!running) {
-        log(c.dim('  start with toris studio --open'));
-        return;
-      }
-      const url = guiFor(activeAgent.id);
-      const opened = await openLocalUrl(url);
-      log(c.dim(opened.ok ? `  opened ${url}` : `  ${opened.error || 'could not open browser'} — try toris studio --open`));
     },
     model: (rest) => (rest.length > 0 ? switchModel(rest[0]) : showModel()),
     autonomy: (rest) => (rest.length > 0 ? setAutonomy(rest[0]) : showAutonomy()),
@@ -521,7 +516,13 @@ export async function cmdChat(ctx, args, flags) {
         log(`${c.green('APPLIED')} ${patch.id}`);
         return;
       }
+      if (!isolation) {
+        log(c.dim('No live isolation. /patches lists saved patches to apply by id.'));
+        return;
+      }
       await closeIsolation({ forceApply: true });
+      leaving = true;
+      log(c.dim('Restart toris to begin a new chat session after applying the live isolation.'));
     },
     discard: async (rest) => {
       if (rest[0]) {
@@ -529,8 +530,14 @@ export async function cmdChat(ctx, args, flags) {
         log(`${c.yellow('DISCARDED')} ${patch.id}`);
         return;
       }
+      if (!isolation) {
+        log(c.dim('No live isolation. /patches lists saved patches to discard by id.'));
+        return;
+      }
       await foldIsolation({ abandon: true });
       log(c.dim('dropped the live isolated worktree without applying'));
+      leaving = true;
+      log(c.dim('Restart toris to begin a new chat session after discarding the live isolation.'));
     },
     knowledge: async (rest) => {
       const query = rest.join(' ').trim();
@@ -688,6 +695,7 @@ export async function cmdChat(ctx, args, flags) {
     log(text);
   }
   for (const problem of problems) log(c.yellow(`  skill  ${problem.message}`));
+  if (offline) log(c.dim('Offline workspace · /status · /plan <goal> · /check · no model calls'));
 
   for (;;) {
     let line;
@@ -704,8 +712,11 @@ export async function cmdChat(ctx, args, flags) {
     if (slash) {
       if (slash.name === 'exit') break;
       const handler = slashHandlers[slash.name];
-      if (handler) await handler(slash.args);
-      else log(c.dim(`unknown command "${slash.raw}". /help for the list.`));
+      if (handler) {
+        try { await handler(slash.args); }
+        catch (error) { log(c.red(`error  ${error.message}`)); }
+      } else log(c.dim(`unknown command "${slash.raw}". /help for the list.`));
+      if (leaving) break;
       continue;
     }
 

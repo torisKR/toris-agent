@@ -77,7 +77,7 @@ export function listAgents(
   catalogue?: AgentCatalogue,
 ): readonly AgentProfile[];
 
-/** TUI/GUI picker: the chat persona first, then every task role. */
+/** TUI picker: the chat persona first, then every task role. */
 export function listSurfaceAgents(category?: AgentCategory, catalogue?: AgentCatalogue): readonly AgentProfile[];
 
 /** The profile with this id, or `null` when unknown. */
@@ -145,26 +145,6 @@ export function loadAgentCatalogue(roots?: {
 
 /** `builtin` unless the profile came from a home or project overlay. */
 export function agentSourceOf(agent?: Pick<AgentProfile, 'source'> | null): 'builtin' | 'home' | 'project';
-
-export function studioAgentUrl(port?: number): string;
-export function studioDesignUrl(port?: number): string;
-export function studioPatchesUrl(port?: number): string;
-export function studioKnowledgeUrl(port?: number): string;
-export function studioDaemonUrl(port?: number): string;
-export function studioBriefUrl(port?: number): string;
-export function studioAndroidUrl(port?: number): string;
-export function renderStudioAccess(info?: { running?: boolean; port?: number }): string;
-export function tuiAgentHint(agentId?: string): string;
-export function isLoopbackHttpUrl(value: unknown): boolean;
-export function openLocalCommand(platform?: string): { command: string; args: string[] };
-export function openLocalUrl(
-  url: string,
-  deps?: {
-    opener?: (url: string) => unknown;
-    spawn?: (...args: unknown[]) => unknown;
-    platform?: string;
-  },
-): Promise<{ ok: boolean; error?: string }>;
 
 // ---------------------------------------------------------------------------
 // Autonomy
@@ -928,45 +908,3 @@ export function submitDaemonJob(home: string, input: Record<string, unknown>, op
 
 /** CLI entry point. Resolves to the process exit code rather than exiting. */
 export function main(argv?: readonly string[], deps?: Record<string, unknown>): Promise<number>;
-
-export const DESIGN_STYLE_KEYS: readonly string[];
-
-export interface DesignCapture {
-  url: string;
-  selector: string;
-  outerHTML: string;
-  computedStyle: Record<string, string>;
-  text: string;
-  tagName: string;
-  rect: { x: number; y: number; width: number; height: number } | null;
-  screenshotDataUrl: string | null;
-  screenshotPath?: string | null;
-  note?: string;
-  id?: string;
-}
-
-export function assertSafeHttpUrl(value: string, label?: string): URL;
-export function buildCssPath(node: {
-  nodeType: number;
-  tagName?: string;
-  id?: string;
-  parentElement?: unknown;
-  children?: unknown[];
-}): string;
-export function normalizeDesignCapture(input?: Record<string, unknown>): DesignCapture;
-export function formatDesignContext(
-  capture: DesignCapture | Record<string, unknown>,
-  options?: { index?: number; total?: number },
-): string;
-export function listDesignCaptures(
-  capture?: DesignCapture | DesignCapture[] | null,
-): DesignCapture[];
-export function composeDesignTurnMessage(
-  message: string,
-  capture?: DesignCapture | DesignCapture[] | null,
-): string;
-export function buildBookmarklet(origin: string): string;
-export function injectPickerMarkup(
-  html: string,
-  options?: { pickerSrc?: string; baseHref?: string },
-): string;

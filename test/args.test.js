@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { parseArgs, asNumber, requirePositional } from '../src/cli/args.js';
 import { UsageError } from '../src/core/errors.js';
 
+test('the solo preset flag never consumes the init command', () => {
+  const { positionals, flags } = parseArgs(['--solo', 'init']);
+  assert.deepEqual(positionals, ['init']);
+  assert.equal(flags.solo, true);
+});
+
 test('parses positionals, long flags and aliases together', () => {
   const { positionals, flags } = parseArgs(['run', 'ship it', '-p', 'api', '--autonomy', 'L3']);
   assert.deepEqual(positionals, ['run', 'ship it']);
@@ -14,12 +20,6 @@ test('treats known booleans as flags, not value consumers', () => {
   const { positionals, flags } = parseArgs(['run', '--dry-run', 'goal']);
   assert.equal(flags['dry-run'], true);
   assert.deepEqual(positionals, ['run', 'goal'], 'boolean must not swallow the next token');
-});
-
-test('studio --open is a boolean and does not consume the next token', () => {
-  const { positionals, flags } = parseArgs(['studio', '--open', 'service']);
-  assert.equal(flags.open, true);
-  assert.deepEqual(positionals, ['studio', 'service']);
 });
 
 test('daemon --foreground is a boolean and does not consume the next token', () => {

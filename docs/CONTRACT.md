@@ -1,10 +1,16 @@
 # Toris Agent — Frozen Interface Contract (v0.1.0)
 
-> This file is the coordination artifact for parallel implementation.
-> Every package codes **against** these signatures. Do not change them unilaterally.
-> Package owners have exclusive write access to their own directory (path ownership).
+> The `@toris/*` signatures below preserve the original v0.1 monorepo coordination
+> contract. They are historical package specifications, not the layout of the
+> current published JavaScript runtime. Keep those signatures stable when working
+> on the original packages.
+>
+> The current solo-developer interface is the terminal TUI and CLI, launched by
+> `bin/toris.js` through `src/cli/index.js`. Its command surface and local feature
+> contracts are documented below. Current configuration is
+> `torisHome()/config.json`; local runtime state uses `src/core/store.js`.
 
-## Runtime baseline
+## Historical package runtime baseline
 
 - Node `>=22`, ESM only (`"type": "module"`), TypeScript 5.7, `moduleResolution: NodeNext`.
 - **All relative imports MUST use explicit `.js` extensions** (NodeNext ESM), e.g. `import { x } from './x.js'`.
@@ -379,38 +385,116 @@ export function isDaemonRunning(home?: string): Promise<boolean>;
 export function socketPath(home?: string): string;
 ```
 
-First usable slice (this tree): `toris daemon start|status|stop|run|schedule` is a **local** pid/lock worker under `$TORIS_HOME`. State file is `daemon.json` `{ pid, version, startedAt, heartbeatAt, home, socket, jobs, schedules }`. `socket` is `null` in this slice — there is no `daemon.sock` RPC, no remote multi-machine, and no cloud. Jobs are submitted by dropping JSON into `daemon/inbox/` (`toris daemon run`, Studio `POST /api/daemon/run`, or a due local schedule). Schedules live in `daemon/schedules/*.json` and tick on the worker heartbeat in the host timezone (5-field cron, `@every`, `HH:MM` weekdays). Full `Supervisor` / `connect()` remains the later hook.
+Current local daemon: `toris daemon start|status|stop|run|schedule` is a pid/lock worker under `$TORIS_HOME`. State file is `daemon.json` `{ pid, version, startedAt, heartbeatAt, home, socket, jobs, schedules }`. `socket` is `null` in this runtime. Jobs are submitted as JSON in `daemon/inbox/` by `toris daemon run` or a due local schedule. Schedules live in `daemon/schedules/*.json` and tick on the worker heartbeat in the host timezone (5-field cron, `@every`, `HH:MM` weekdays). The frozen `Supervisor` / `connect()` signatures above describe the planned socket interface; the current worker uses the local file inbox. See `docs/DAEMON.md`.
 
-## `toris-agent` (apps/cli) — command surface
+## `toris-agent` — terminal command surface
 
-Binary: `toris`. Global flags: `--json`, `--home <dir>`, `--no-color`, `--verbose`.
-Every command MUST support `--json` emitting a single JSON object to stdout.
+Binary: `toris`, dispatched by `src/cli/index.js`; built-in help lives in
+`src/cli/help.js`. Configuration is `<home>/config.json`, with `~/.toris` as the
+default home. `--home <dir>` overrides `TORIS_HOME` and the default.
 
-```
-toris init                       # scaffold ~/.toris/config.yaml
-toris doctor                     # runtime, adapters, git, db, daemon checks (exit 1 if any FAIL)
-toris project add [path] | list | inspect <id> | remove <id>
-toris run "<goal>" [-p <project>] [--autonomy L1..L5] [--budget <usd>] [--dry-run] [--yes]
+Global flags: `--json`, `--home <dir>`, `--no-color`, `--verbose`, `-h`/`--help`,
+and `-v`/`--version`. JSON output disables ANSI colour. Finite commands emit their
+result as a JSON object; for a chat result use `toris chat "<message>" --json`.
+`bot` and `daemon start --foreground` remain running after their JSON readiness
+output.
+
+Bare `toris` opens the chat TUI when both stdin and stdout are terminals and
+`--json` is absent. `toris --agent <id>` selects its initial role. The first
+interactive chat can guide model connection when no profiles exist. With no
+command in a pipe or CI, Toris prints help and exits `2`; with `--json`, it
+prints the usage and command list and exits `0`. Help is global: `toris --help`
+prints it and exits `2`, while `toris run --help` prints the same help and exits
+`0`. `toris --version` and `toris version` print the version.
+
+```text
+toris                                      # interactive chat TUI
+toris --agent <id>                         # start the TUI as a catalogue role
+toris init [--solo]                        # config.json, store and starter knowledge
+toris doctor                              # runtime/provider/git/store checks; exit 1 on FAIL
+toris connect [--provider <id>] [--model <id>] [--name <profile>]
+toris chat ["<message>"] [--agent <id>] [--profile <name>] [--no-knowledge]
+toris project add [path]                   # defaults to cwd
+toris project list
+toris project inspect <id>
+toris project remove <id>
+toris run "<goal>" [run-options]
 toris runs [--status <s>] [--project <id>] [--limit <n>]
-toris inspect <runId>            # run detail
-toris receipt <runId> [--md]     # evidence receipt
-toris cost [today] [--json]      # cross-run spend vs maxDailyCostUsd
-toris brief [today] [--json]     # local secretary digest (read-only; not a daemon job)
-toris approvals [--run <id>] | toris approve <id> [--reason] | toris reject <id> [--reason]
-toris logs <runId> [-f]          # event tail
-toris cancel <runId>
-toris daemon start|stop|status   # local pid/lock worker
-toris daemon run "<goal>"        # queue a run (exit 5 if down)
-toris daemon schedule list|add|remove|enable|disable
-toris agents [--category <c>]    # agent profile catalog
+toris inspect <runId>
+toris receipt <runId> [--md]
+toris cost [today]                         # cross-run spend vs maxDailyCostUsd
+toris brief [today]                        # spend, runs, daemon and knowledge digest
+toris logs <runId>                         # saved event log
+toris cancel <runId>                       # mark the stored run cancelled
+toris approvals [--run <id>]
+toris approve <id> [--reason <text>]
+toris reject <id> [--reason <text>]
+toris agents [--category <c>]
 toris skills
+toris autonomy
+toris patches [--status <s>]
+toris diff <patchId>
+toris apply <patchId>
+toris discard <patchId>
+toris daemon [status]
+toris daemon start [--foreground]
+toris daemon stop
+toris daemon run "<goal>" [run-options]
+toris daemon schedule [list]
+toris daemon schedule add <expr> "<goal>" [run-options] [--disabled]
+toris daemon schedule remove|enable|disable <id>
+toris android [status]
+toris android devices
+toris android screenshot [--serial <serial>]
+toris android logcat [--serial <serial>] [--lines <n>]
+toris android install <apk> [--serial <serial>]
+toris knowledge [status]                   # local store; see additive contract below
+toris memory [status]                      # alias for toris knowledge
+toris bot                                 # Slack Socket Mode / Telegram listener
+toris update [--check]
 toris version
-toris studio                     # localhost GUI: review, /agent, /design, /patches
-toris studio --open              # start or attach, then open the loopback URL
-toris android status|devices|screenshot|logcat|install   # optional adb evidence
 ```
 
-Exit codes: `0` success, `1` generic failure, `2` usage error, `3` verification failed, `4` approval denied/timeout, `5` daemon unavailable.
+Run options shared by `run`, `daemon run` and `daemon schedule add`:
+
+```text
+-p, --project <ref>       Registered project id, name or unique prefix
+    --autonomy <L1..L5>   Override the configured autonomy level
+    --budget <usd>        Run cost ceiling
+    --dry-run             Plan without executing tasks
+    --apply               Apply an isolated L2 diff without asking
+    --no-review           Skip the opposite-provider second pass
+    --provider <name>     claude | codex
+```
+
+`connect` reuses a provider CLI's login or an API key from the environment, saves
+a model profile, and routes chat to it. Provider ids are `claude-cli`,
+`codex-cli`, `anthropic`, `openai` and `grok`. API providers need a concrete
+`--model <id>`; CLI providers can use `auto`. `connect --json` is noninteractive
+and requires `--provider`.
+
+`agents` lists the effective builtin, home and project catalogue. Create, edit
+or remove overlay JSON files in `~/.toris/agents/` or `<repo>/.toris/agents/`,
+then inspect them with `toris agents`. In the TUI, `/agent` lists roles and
+`/agent <id>` switches roles. Other session commands include `/status`,
+`/plan <goal>`, `/run <goal>`, `/check`, `/diff [id]`, `/receipt [runId]`,
+`/model [profile]`, `/autonomy [L1-L5]`, `/knowledge [query]`,
+`/reflect [runId|accept]`, `/patches`, `/apply [id]` and `/discard [id]`.
+`/help` shows the full session command list.
+
+`patches` lists stored isolated diffs. Inspect one with `diff`, apply it to its
+original repository with `apply`, or discard it and its worktree with `discard`.
+The daemon is a local pid/lock worker with a file inbox; `daemon run` exits `5`
+if it is unavailable. Schedules are local cron expressions or supported cron
+aliases such as `@daily`, evaluated in the host timezone while the daemon runs.
+
+Android helpers are optional and use `adb`. Screenshot and logcat evidence is
+saved under `<home>/android/screenshots/` and `<home>/android/logs/`. Use
+`--serial` when choosing a device; `android status` reports tool and device
+availability without requiring a model connection.
+
+Exit codes: `0` success, `1` generic failure, `2` usage error,
+`3` verification failed, `4` approval denied/timeout, `5` daemon unavailable.
 
 ## Rules every implementer must follow
 
@@ -431,29 +515,19 @@ Not a breaking change to the frozen signatures above. On-disk layout for the sec
 - `torisHome()/knowledge/domains/<slug>/{DOMAIN.md,dag.json,nodes/*.md,tacit/*.md}`
 - optional project overlay: `<repo>/.toris/knowledge/`
 
-CLI: `toris knowledge` (alias `toris memory`). Chat tools: `knowledge_search`, `memory_get`, `knowledge_write`, `domain_activate`, `knowledge_reflect`. Studio: `GET /knowledge`. See `docs/KNOWLEDGE.md`.
+CLI: `toris knowledge` (alias `toris memory`). Chat tools: `knowledge_search`, `memory_get`, `knowledge_write`, `domain_activate`, `knowledge_reflect`. See `docs/KNOWLEDGE.md`.
 
-Additive chat behaviour (does not change frozen signatures): `toris chat` and Studio agent turns auto-retrieve matching domain nodes and tacit notes into a bounded `[knowledge context]` block. Disable with `knowledge.autoRetrieve: false` in `config.json` or `toris chat --no-knowledge`. Retrieval is read-only; tacit writes stay opt-in (`/reflect`, `knowledge_write`).
+Additive chat behaviour (does not change frozen signatures): `toris chat` auto-retrieves matching domain nodes and tacit notes into a bounded `[knowledge context]` block. Disable with `knowledge.autoRetrieve: false` in `config.json` or `toris chat --no-knowledge`. Retrieval is read-only; tacit writes stay opt-in (`/reflect accept`, `knowledge_write`). The TUI `/knowledge <query>` command searches the same local store.
 
-Additive reflect: `toris knowledge reflect [runId|--from-run <id>]` proposes a tacit draft from a verified run receipt (or the latest verified run). Receipt JSON may include `reflectHint`. Schema version stays `1`. No silent USER.md / MEMORY.md / tacit writes.
+Additive reflect: `toris knowledge reflect [runId|--from-run <id>]` proposes a tacit draft from a verified run receipt (or the latest verified run). Receipt JSON may include `reflectHint`. Schema version stays `1`. Accept explicitly with `toris knowledge reflect <runId> --write` (or `--yes`), or preview `/reflect <runId>` then use `/reflect <runId> accept` in the TUI. Bare `/reflect accept` proposes and accepts from current session history or the latest eligible run. Failed or unverified receipts produce no proposal to accept. Reflection does not silently update USER.md or MEMORY.md.
 
-Additive Studio reflect (same helper, same store): `GET /api/knowledge/reflect` is a same-origin read of the latest verified-run proposal. `POST /api/knowledge/reflect/accept` writes that one tacit note (`acceptReflections` → `KnowledgeStore.addTacit`) and requires Origin + session token. `POST /api/knowledge/reflect/dismiss` does not write. Failed or unverified receipts return `notable: false` with `proposal: null`.
+Domain and DAG inspection: `toris knowledge domains list` lists home and project domains. `toris knowledge domains inspect <slug> [--json]` exposes the domain's nodes, edges, counts, source, and cycles. `toris knowledge node list <domain>` and `toris knowledge node get <domain> <id>` inspect individual nodes. Commands that need a store initialize it if absent.
 
-Additive Studio DAG read (same store): `GET /api/knowledge/domains/:slug/dag` returns `{ ok, slug, title, source, nodes: [{ id, title, kind, excerpt }], edges: [{ from, to, kind }], nodeCount, edgeCount }` from `inspectDomain`. Unknown domain is HTTP 404 (same as `GET /api/knowledge/domains/:slug`). Empty domains return empty arrays. The GET never calls `init` and does not write.
+Explicit local writes: `toris knowledge domains add <slug>`, `toris knowledge node add <domain> --title <title>`, and `toris knowledge tacit add [domain] --title <title>` create knowledge through `KnowledgeStore`. `toris knowledge tacit promote <id> --domain <slug>` moves an inbox note into a domain. `toris knowledge user get|append|set` and `toris knowledge memory get|append|set` manage the profile and working memory explicitly.
 
-Additive Studio knowledge link (same store): `POST /api/knowledge/domains/:slug/edges` writes one edge via `KnowledgeStore.link` between two existing nodes. It does not create a node. Unknown domain or unknown from/to is HTTP 404 (same as inspect / `E_UNKNOWN_NODE`) and writes nothing. Duplicate edge is HTTP 409 (`E_DAG_DUPLICATE`) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
+Knowledge links: `toris knowledge node link <domain> <from> <to> [--kind <kind>]` adds one edge via `KnowledgeStore.link` between existing nodes. It does not create a node. Unknown nodes and duplicate edges fail with local typed errors (`E_UNKNOWN_NODE`, `E_DAG_DUPLICATE`). Nodes remain Markdown files and links remain in `dag.json`; use an editor to update nodes or remove edges. When deleting a node, also remove edges that reference it. Run `toris knowledge init` afterward to refresh the index; it preserves existing files and restores missing starter material.
 
-Additive Studio knowledge unlink (same store): `POST /api/knowledge/domains/:slug/edges/unlink` drops exactly one matching `{ from, to, kind }` via `KnowledgeStore.unlink`. It does not delete nodes. Unknown domain or unknown edge is HTTP 404 and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
-
-Additive Studio knowledge remove (same store): `POST /api/knowledge/domains/:slug/nodes/:id/remove` deletes that node via `KnowledgeStore.removeNode` and drops `dag.json` edges that touch it. Unknown domain or unknown node is HTTP 404 (same as inspect) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
-
-Additive Studio knowledge edit (same store): `POST /api/knowledge/domains/:slug/nodes/:id/update` updates that node's title and/or body via `KnowledgeStore.updateNode`. Kind and node id are unchanged. Empty title is HTTP 400 and writes nothing. Unknown domain or unknown node is HTTP 404 (same as inspect) and writes nothing. Missing Origin/session token is HTTP 403 and writes nothing. GET does not write. See `docs/KNOWLEDGE.md`.
-
-Additive Studio knowledge pin (same store, same turn): optional `knowledge: { domain, nodeId }` on the existing `POST /api/agent/turn`. The server loads that node from `KnowledgeStore` and prepends a capped title/kind/excerpt `[pinned knowledge]` block. Unknown id is HTTP 400 (no model call, no write, no fabricated text). Omitted pin is unchanged. Auto-retrieve ranking is unchanged. No second turn endpoint. See `docs/KNOWLEDGE.md`.
-
-Additive Studio Design Mode tray consume (same store, same turn): when `POST /api/agent/turn` includes `tray: true` and the request is accepted, the server removes the tray items that turn attached (`DesignStore.clearTray` when none remain). Capture files stay on disk. Items added after the turn started stay in the tray. A turn that omits tray is unchanged. Rejected or failed turns (including missing Origin/session token) do not clear. GET never clears. No second turn endpoint. See `docs/STUDIO.md`.
-
-Additive opt-in knowledge packs (same store): `toris knowledge pack list` and `GET /api/knowledge/packs` read shipped trees under `packs/knowledge/<slug>/` and never write. `toris knowledge pack install <slug>` / `POST /api/knowledge/packs/:slug/install` copy one pack through `KnowledgeStore.addDomain` + `addNode` + `link`. Duplicate slug is `E_DOMAIN_EXISTS` / HTTP 409 unless CLI `--force` replaces it. Studio has no force. Missing Origin/session token is HTTP 403 and writes nothing. Install does not write USER.md / MEMORY.md and does not fetch the network. See `docs/KNOWLEDGE.md`.
+Additive opt-in knowledge packs (same store): `toris knowledge pack list` reads shipped trees under `packs/knowledge/<slug>/` without writing. `toris knowledge pack install <slug>` copies one pack through `KnowledgeStore.addDomain` + `addNode` + `link`. Duplicate slug is `E_DOMAIN_EXISTS` unless `--force` replaces it. Install does not write USER.md / MEMORY.md and does not fetch the network. See `docs/KNOWLEDGE.md`.
 
 ## Additive: project-local agent profiles (post-0.1)
 
@@ -471,32 +545,12 @@ Required fields: `id`, `title`, `category` (`core|plan|build|review|verify|ship`
 `summary`. Optional: `system` (specialist prompt). Unknown keys fail with `E_INVALID_AGENT`.
 `toris` may be overridden only as `category: "core"`. New non-`core` ids are planner-assignable.
 
-CLI: `toris agents` lists `source`. See `docs/AGENTS.md`.
-
-Additive Studio create (project-local only): `POST /api/agents` writes one
-`<cwd>/.toris/agents/<id>.json` through `writeAgentProfile` / `parseAgentProfile`
-(same on-disk shape as a hand-written overlay). Invalid id/schema is HTTP 400
-(`E_INVALID_AGENT`). Duplicate project file is HTTP 409 (`E_AGENT_EXISTS`).
-Missing Origin/session token is HTTP 403. None of those write. GET never writes.
-Does not write `torisHome()/agents/`. See `docs/STUDIO.md` and
-`docs/AGENTS.md`.
-
-Additive Studio edit (project-local only): `PUT /api/agents/:id` replaces one
-existing `<cwd>/.toris/agents/<id>.json` through `updateAgentProfile` /
-`parseAgentProfile` (same on-disk shape as create). Path id is immutable.
-Unknown or not-project-local ids (home or builtin, no project file) are HTTP 404
-(`E_AGENT_NOT_FOUND`) and write nothing. Invalid body is HTTP 400
-(`E_INVALID_AGENT`) and writes nothing. Missing Origin/session token is HTTP 403
-and writes nothing. GET never writes. Does not write `torisHome()/agents/`.
-See `docs/STUDIO.md` and `docs/AGENTS.md`.
-
-Additive Studio delete (project-local only): `DELETE /api/agents/:id` removes one
-existing `<cwd>/.toris/agents/<id>.json` through `deleteAgentProfile`. Unknown or
-not-project-local ids (home or builtin, no project file) are HTTP 404
-(`E_AGENT_NOT_FOUND`) and delete nothing. Invalid id is HTTP 400
-(`E_INVALID_AGENT`) and deletes nothing. Missing Origin/session token is HTTP 403
-and deletes nothing. GET never deletes. Does not touch `torisHome()/agents/`.
-See `docs/STUDIO.md` and `docs/AGENTS.md`.
+CLI: `toris agents [--category <c>] [--json]` lists each profile's `source`.
+Choose a profile with `toris --agent <id>`, `toris chat --agent <id>`, or the TUI
+`/agent <id>` command. Create or edit an overlay by writing its JSON file in the
+home or project path above. Remove that file to reveal a same-id profile from
+the next lower-precedence source. Profile validation uses `parseAgentProfile`
+and reports `E_INVALID_AGENT` for invalid shapes. See `docs/AGENTS.md`.
 
 ## Additive: cross-run cost ledger (post-0.1)
 
@@ -507,27 +561,37 @@ Not a breaking change to the frozen signatures above. Daily spend is local-only:
 - `checkBudget(spent, budget, config)` refuses when `spent` reaches the tighter of `--budget` / `config.maxDailyCostUsd` (non-positive = unlimited)
 - CLI: `toris cost` | `toris cost today` | `toris cost --json`
 - Receipt (additive): `budgetUsd`, `budgetNote`, `dailyCostUsd`
-- Studio health (additive): `GET /api/health` includes `{ cost: { day, spentUsd, capUsd, remainingUsd } }`
 
 ## Additive: local secretary brief (post-0.1)
 
 Read-only digest. No new on-disk format.
 
 - CLI: `toris brief` | `toris brief today` | `toris brief --json`
-- Studio: `GET /brief` page + `GET /api/brief` (same-origin read; `{ ok: true, ...buildBrief() }`). GET never writes.
-- Additive Studio budget write: `POST /api/brief/budget` sets or clears `config.maxDailyCostUsd` via `setDailyBudget` (same field `checkBudget` / a later `toris run` already enforce). Body `{ maxDailyCostUsd }` (`null` / `''` / `0` clears). Invalid numbers are HTTP 400 and write nothing. Missing Origin/session token is HTTP 403 and writes nothing. Response is `{ ok: true, ...buildBrief() }`.
+- Set the daily cap in `config.json` using `maxDailyCostUsd`; `toris cost` and `toris brief` show it, and later runs enforce it. Set `0` to clear the daily cap.
 - Reuses `summarizeCost`, `Store.listRuns`, `readDaemonStatus`, and the knowledge `index.json`
 - Knowledge headlines skip quietly when `~/.toris/knowledge/` is not initialized
 - Not a daemon job type. `daemon schedule add` / `daemon run` refuse a goal that is only `brief` / `toris brief`. Host cron runs the CLI. See `docs/BRIEF.md`.
 
-## Additive: Studio Android evidence (post-0.1)
+## Additive: local Android evidence (post-0.1)
 
-Same optional adb helpers as `toris android`. No new on-disk format beyond `~/.toris/android/`.
+Optional adb helpers are available through `toris android`. Artifacts live under
+`torisHome()/android/` and commands print their paths, with structured results
+available through `--json`.
 
-- Studio: `GET /android` page + `GET /api/android` (same shape as `androidStatus`)
-- `GET /api/android/artifacts` — newest ~20 files under `~/.toris/android/` (`name`, `bytes`, `mtime`)
-- `POST /api/android/screenshot` and `POST /api/android/logcat` — Origin + session token
-- Image media (`GET /api/android/media?path=`) stays inside `~/.toris/android/`; traversal is rejected
-- Selected artifacts attach to the existing `POST /api/agent/turn` (`android.artifacts` relative paths). Screenshot path + bounded logcat excerpt. Traversal is rejected. No second turn endpoint
-- `install` stays CLI-only. Missing `adb` is HTTP 200 on status, never 500. See `docs/STUDIO.md`.
+- `toris android status` reports adb/emulator presence and devices. Missing adb returns `{ ok: false, ready: false, devices: [] }` in JSON with exit 0; `doctor` treats missing Android tools as optional warnings.
+- `toris android devices` lists connected devices and emulators.
+- `toris android screenshot [--serial <id>]` saves a PNG under `android/screenshots/`.
+- `toris android logcat [--serial <id>] [--lines <n>]` saves a log under `android/logs/`; the default is 200 lines, capped at 2,000, with a bounded tail in the result.
+- `toris android install <apk> [--serial <id>]` installs a readable local APK.
+- Capture and install operations require adb; command failures return local errors. Keep artifact paths with the run's verification evidence.
 
+## Additive: isolated patch review (post-0.1)
+
+Local runs and chat can retain isolated edits as saved patches. Patch metadata
+is stored by `Store` and diff files live at `torisHome()/patches/<patchId>.diff`.
+
+- `toris patches [--status <status>] [--json]` lists saved patch records.
+- `toris diff <patchId> [--json]` reads the patch record and stored diff.
+- `toris apply <patchId> [--json]` applies a pending patch to its original repository and records the outcome. Apply failures are reported as `E_PATCH_APPLY`.
+- `toris discard <patchId> [--json]` drops a pending patch's worktree and diff and marks it discarded.
+- Apply and discard require a pending patch; other states fail with `E_PATCH_STATE`. The CLI run flag `--apply` permits immediate application of an isolated L2 diff.

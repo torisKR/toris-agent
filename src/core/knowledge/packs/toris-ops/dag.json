@@ -6,18 +6,8 @@
       "kind": "supports"
     },
     {
-      "from": "design-mode-evidence",
-      "to": "receipts-not-vibes",
-      "kind": "supports"
-    },
-    {
       "from": "android-verify-optional",
       "to": "receipts-not-vibes",
-      "kind": "supports"
-    },
-    {
-      "from": "autonomy-ladder",
-      "to": "design-mode-evidence",
       "kind": "supports"
     }
   ]

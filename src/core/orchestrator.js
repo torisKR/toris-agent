@@ -1,4 +1,7 @@
-import { newRunId, newEventId } from './ids.js';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { newRunId, newEventId, createId } from './ids.js';
 import { ADAPTERS, oppositeProvider, invokeProvider, detectBinary } from './providers.js';
 import { buildPlanPrompt, extractJsonArray, normalizeTasks, fallbackPlan } from './planner.js';
 import { loadAgentCatalogue } from './agents.js';
@@ -14,7 +17,7 @@ import {
   dailySpendFromRuns,
   recordRunCost,
 } from './cost.js';
-import { openIsolation, settleIsolation } from './isolation.js';
+import { openIsolation, settleIsolation, abandonIsolation } from './isolation.js';
 import { formatPatchNotice, notifyChannels } from './channels.js';
 import { worktreeDiff } from './worktree.js';
 import { buildReviewPrompt, parseReview, skippedReview } from './review.js';
@@ -95,7 +98,12 @@ export class Orchestrator {
   async resolveProvider(preferred) {
     const order = [preferred, oppositeProvider(preferred)];
     for (const name of order) {
-      const adapter = ADAPTERS[name];
+      const base = ADAPTERS[name];
+      if (!base || this.config?.providers?.[name]?.enabled === false) continue;
+      const configured = this.config?.providers?.[name]?.bin;
+      const bin = process.env[`TORIS_${name.toUpperCase()}_BIN`] ||
+        (typeof configured === 'string' && configured.trim() ? configured : base.bin);
+      const adapter = bin === base.bin ? base : { ...base, bin };
       if (adapter && (await this.detect(adapter.bin))) return { adapter, available: true };
     }
     return { adapter: ADAPTERS[preferred] ?? ADAPTERS.claude, available: false };
@@ -104,8 +112,12 @@ export class Orchestrator {
   /** The other CLI, so a model never reviews its own diff. */
   async resolveReviewer(implementerName) {
     const name = oppositeProvider(implementerName);
-    const adapter = ADAPTERS[name];
-    if (!adapter) return null;
+    const base = ADAPTERS[name];
+    if (!base || this.config?.providers?.[name]?.enabled === false) return null;
+    const configured = this.config?.providers?.[name]?.bin;
+    const bin = process.env[`TORIS_${name.toUpperCase()}_BIN`] ||
+      (typeof configured === 'string' && configured.trim() ? configured : base.bin);
+    const adapter = bin === base.bin ? base : { ...base, bin };
     if (!(await this.detect(adapter.bin))) return null;
     return adapter;
   }
@@ -174,9 +186,20 @@ export class Orchestrator {
       });
       return next;
     } catch (err) {
-      const review = skippedReview(err.message, { provider: reviewer.name });
-      await this.#emit(run, 'review.failed', { provider: reviewer.name, error: err.message });
-      return { ...run, review };
+      const reason = err?.message ?? String(err);
+      const costUsd = Number.isFinite(err?.costUsd) && err.costUsd >= 0 ? err.costUsd : 0;
+      const review = {
+        provider: reviewer.name,
+        passed: false,
+        skipped: false,
+        verdict: 'fail',
+        error: reason,
+        summary: `Review did not complete: ${reason}`,
+        findings: [{ severity: 'blocker', title: 'Review did not complete', detail: reason }],
+      };
+      const next = { ...run, costUsd: run.costUsd + costUsd, review };
+      await this.#emit(next, 'review.failed', { provider: reviewer.name, error: reason, costUsd });
+      return next;
     }
   }
 
@@ -192,11 +215,35 @@ export class Orchestrator {
       await this.#emit(run, 'plan.fallback', { reason: 'no provider binary on PATH' });
       return { tasks: fallbackPlan(run.goal, { now: this.now, catalogue }), costUsd: 0 };
     }
-    const prompt = buildPlanPrompt(run.goal, project, { catalogue });
+    const origin = project?.path ?? this.cwd;
+    if (origin && (!this.store?.home || !(await isRepo(origin)))) {
+      await this.#emit(run, 'plan.fallback', {
+        reason: 'repository planning requires an isolated Git checkout; used a deterministic plan',
+      });
+      return { tasks: fallbackPlan(run.goal, { now: this.now, catalogue }), costUsd: 0 };
+    }
+    let planning = null;
+    let scratch = null;
     let result;
     try {
+      if (origin) {
+        planning = await openIsolation({ origin, home: this.store.home, id: createId('plan', this.now) });
+        await this.#emit(run, 'plan.isolated', { worktree: planning.session.path });
+      } else {
+        // A goal without repository context still gets a provider plan, but
+        // its process never inherits the caller's working directory.
+        scratch = await mkdtemp(join(tmpdir(), 'toris-plan-'));
+      }
+      const cwd = planning?.session.path ?? scratch;
+      const planningProject = project ? { ...project, path: cwd } : null;
+      const prompt = [
+        buildPlanPrompt(run.goal, planningProject, { catalogue }),
+        '',
+        'Planning only: inspect this disposable workspace without editing, committing or pushing.',
+        'Do not access or change another checkout. Return the plan only; all edits here will be discarded.',
+      ].join('\n');
       result = await this.invoke(adapter, prompt, {
-        cwd: project?.path,
+        cwd,
         timeoutMs: this.config?.providerTimeoutMs,
       });
     } catch (err) {
@@ -206,6 +253,9 @@ export class Orchestrator {
       // gets something actionable instead of a stack trace.
       await this.#emit(run, 'plan.failed', { reason: err?.message ?? String(err) });
       return { tasks: fallbackPlan(run.goal, { now: this.now, catalogue }), costUsd: 0 };
+    } finally {
+      if (planning) await abandonIsolation(planning.session);
+      if (scratch) await rm(scratch, { recursive: true, force: true });
     }
     const tasks = normalizeTasks(extractJsonArray(result.text), { now: this.now, catalogue });
     if (tasks.length === 0) {
@@ -457,6 +507,9 @@ export class Orchestrator {
 
     let pendingApply = false;
     if (isolation) {
+      const holdApply = current.review?.passed === false ||
+        current.verification.passed === false ||
+        current.tasks.some(task => task.status === 'failed');
       const settled = await settleIsolation({
         store: this.store,
         session: isolation.session,
@@ -464,8 +517,8 @@ export class Orchestrator {
         source: 'run',
         autonomy: autonomy.level,
         runId: current.id,
-        forceApply: Boolean(opts.apply),
-        holdApply: current.review?.passed === false,
+        forceApply: Boolean(opts.apply) && !holdApply,
+        holdApply,
       });
       pendingApply = Boolean(settled.patch && !settled.applied);
       current = {

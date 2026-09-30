@@ -20,8 +20,8 @@ export const DEFAULT_TERMINAL_WIDTH = 80;
  */
 export const MIN_TERMINAL_WIDTH = 20;
 
-/** The keys that get someone out of trouble — including the other surface. */
-const HINT = '/help · /agent · /studio · ctrl-c interrupt · ctrl-d exit';
+/** The keys that get someone back to the terminal workflow. */
+const HINT = '/help · /agent · /status · ctrl-c interrupt · ctrl-d exit';
 
 /**
  * Widest the welcome box is allowed to get.

@@ -69,7 +69,7 @@ export function listAgents(category, catalogue) {
   return profiles.filter((a) => a.category === category);
 }
 
-/** The catalogue the TUI picker and Studio agent room share. */
+/** The catalogue shown in the TUI agent picker. */
 export function listSurfaceAgents(category, catalogue) {
   const { surface, profiles } = catalogueOf(catalogue);
   const all = [surface, ...profiles];
@@ -352,7 +352,7 @@ function sourceForDir(dir, { home, projectPath } = {}) {
  * Read every `*.json` file in `dirs` (not recursive). Later directories win
  * on id, matching skills: builtin < home < project.
  * Missing directories are normal. A bad file throws TorisError, not a crash,
- * unless `skipInvalid` is set (Studio catalogue: keep the rest of the list).
+ * unless `skipInvalid` is set to keep the rest of the list.
  * @param {string[]} dirs
  * @param {{home?:string, projectPath?:string, skipInvalid?:boolean}} [roots]
  */
@@ -419,7 +419,7 @@ export function composeAgentCatalogue(overlays = []) {
 
 /**
  * Live catalogue for this home + project. No network. Absent dirs are empty.
- * Studio passes `skipInvalid: true` so one broken file cannot hide the rest.
+ * Optional `skipInvalid` keeps valid profiles when a sibling file is broken.
  * @param {{home?:string, projectPath?:string, skipInvalid?:boolean}} [roots]
  */
 export async function loadAgentCatalogue({ home, projectPath, skipInvalid = false } = {}) {

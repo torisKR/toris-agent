@@ -7,7 +7,7 @@ const STARTER_HINTS = [
   { slug: 'product-growth', pattern: /\b(seo|geo|listing|aso|llms\.txt)\b/i },
   { slug: 'flutter-android', pattern: /\bflutter\b/i },
   { slug: 'expo-android', pattern: /\bexpo\b/i },
-  { slug: 'toris-ops', pattern: /\b(toris|autonomy|receipt|design mode)\b/i },
+  { slug: 'toris-ops', pattern: /\b(toris|autonomy|receipt)\b/i },
   { slug: 'solo-revenue', pattern: /\b(수익|1인|solo|revenue)\b/i },
 ];
 

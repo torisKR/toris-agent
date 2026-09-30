@@ -1,74 +1,42 @@
-# Toris Studio Design System
+# Toris terminal design
 
-## Product promise
+Toris is a local development harness for one person working in a repository. The terminal is the product interface: no browser, web server, port, or desktop autostart is required.
 
-Toris Studio is a local creator operations room at `127.0.0.1:5824`. It keeps post drafts, source media, renders, quality evidence, and review state on the user's Mac. The interface must never imply that `submitted` means `live verified`.
+## The working sequence
 
-## Design read
+1. `toris init --solo` registers the project and detects its checks.
+2. `toris --offline` lets a new user inspect the workspace before connecting a model.
+3. `/status` shows the project, editing directory, autonomy, agent count, budget, checks, and pending patches.
+4. `/plan <goal>` previews work. `/run <goal>` executes it through the existing orchestrator.
+5. `/check` tests the active files. `/diff` shows the proposed changes. `/receipt` shows the evidence collected for the run.
+6. `/apply` and `/discard` settle a live isolated chat and finish that session. The next session starts with `toris`.
 
-The product feels like a quiet edit bay: cinematic media focus, operational density around the edges, and restrained motion. The primary sequence is review queue → inspect → edit → render → verify → approve. Isolated coding diffs follow pick → annotate → agent turn → patch review → apply/discard. Public publishing is visually and behaviorally isolated from ordinary creation.
+Fresh solo setup uses L2, one agent, a $20 daily run budget, and automatic knowledge retrieval. Existing settings win over the preset. L3 remains an explicit automatic-apply option. Model authentication belongs to the selected CLI or API backend; initialization does not claim a successful login.
 
-## Tokens
+## Layout and type
 
-- Canvas: `#090b0f`; panel: `#11151b`; raised: `#171c23`; border: `#2a3039`.
-- Primary text: `#f4efe6`; secondary: `#a8b0bc`; quiet: `#8c95a2`.
-- Active coral: `#ff7657`; verified green: `#72d6a0`; review amber: `#f5bf68`; failure red: `#ff6f76`.
-- Accent ink: `#1b0e0a`; failure ink: `#19090b`. Filled actions always use their paired dark ink for AA contrast.
-- Media warm: `#282027`; media cool: `#0c0f14`; media black: `#050608`. Video surfaces use these tokens instead of ad hoc colors.
-- Spacing scale: 4, 8, 12, 16, 24, 32, 48 pixels.
-- Radius: 8 controls, 12 cards, 16 media frames. Avoid decorative pill containers; reserve full pills for compact status badges.
-- Typography: system sans for Korean UI; editorial headings use tighter tracking; metadata uses tabular numerals.
-- Shadow: one restrained elevation only, `0 16px 50px rgb(0 0 0 / .28)`.
+Use the existing system terminal font and ordinary Unicode; no patched font is required. The welcome box is capped at 64 columns. Below 40 columns, use a stacked header. Clip banner, palette, and status-strip rows to the reported width. A terminal with no negotiated width uses 80 columns.
 
-## Layout
+Keep the prompt visible after local operations. Present one labeled fact per row in `/status`, an aligned task table for a plan, and a PASS/FAIL row per check. Long evidence and diffs remain selectable terminal text and may wrap naturally. Do not replace them with decorative cards.
 
-- Desktop 1280+: 248px review rail, fluid center canvas, 340px inspector. Patch Review uses the same three columns with a monospace diff canvas.
-- Tablet 768–1279: 208px rail plus canvas; inspector becomes an in-flow panel.
-- Mobile 360–767: single column; queue becomes a horizontal filter strip; actions stay after evidence, never sticky over media.
-- The mobile review queue reserves 128px before async content arrives so the workspace never shifts when drafts load.
-- Every viewport must have zero horizontal overflow.
+## Color and keyboard
 
-## Content surfaces
+The accent is ANSI 256-color 209, used for the prompt and product mark. Success uses green, blocked or pending work uses yellow, and errors use red. Words and exit codes always carry the meaning; color alone does not. Respect `NO_COLOR`, `TERM=dumb`, and `--no-color`.
 
-- Video: 9:16 frame, controls, duration/codec/resolution evidence, storyboard/timeline rows.
-- Design: contained image canvas with dimensions, source, and review state.
-- Patch: monospace unified diff, file list, apply/discard, optional hunk selection for a review note.
-- Post: readable Korean typography preview with separate Threads and X drafts.
-- Cards show kind, title, updated time, and status. They do not expose absolute paths, secrets, or credential state.
+Typing `/` opens the command palette. Tab completes a command or agent. Readline supplies history and normal cursor editing. Ctrl-C interrupts a model turn; at an idle prompt it clears input or asks for a second press to exit. Ctrl-D and `/exit` leave the session. A local command error returns to the prompt.
 
-## States
+## Honest states
 
-- `awaiting_review`: amber, reviewable local output.
-- `queued` and `rendering`: coral progress with plain time/status text.
-- `pending` (patches): amber, isolated diff waiting for apply or discard.
-- `applied` / `discarded`: green or quiet receipt; `failed` is red with the git apply error.
-- `quality_failed` and `failed`: red evidence row naming the failed rule; no publish action.
-- `submitted`: neutral outbound receipt, explicitly not proof of a live URL.
-- `live verified`: green only when an external post ID, status, and verified URL are present.
-- Empty, loading, offline, and error states preserve the same layout to prevent jumps.
+- Offline means no model calls: prose and task execution are refused. A plan is deterministic and no coding task executes.
+- A dry-run receipt records a plan, not successful implementation or verification.
+- `/check` executes configured checks against the live chat worktree, or the latest pending run worktree after `/run`. A subsequent model message returns the focus to chat. Applied runs use the project checkout.
+- No detected checks means unverified. Never print PASS for an empty check list.
+- Independent `/check` results do not rewrite a run receipt. Receipts describe the checks actually performed in that run.
+- CLI chat uses a Git worktree when possible. Direct API chat tools operate in the checkout. The interface and documentation must state that distinction.
+- Daily and per-run budget limits belong to orchestrated runs. Do not imply the interactive chat token strip enforces a dollar ceiling.
 
-## Components
+## Evidence and documentation
 
-- Buttons: primary coral, secondary border, quiet text, destructive red. One primary action per region.
-- Inputs: persistent labels, 44px minimum target, visible help/error text.
-- Badges: compact status only; never use pills for navigation or paragraphs.
-- Dialog: title, consequence, evidence summary, explicit confirmation field, cancel-first keyboard order.
-- Quality row: rule, measured value, expected value, pass/fail mark.
-- Evidence receipt: timestamped local action list with copyable IDs, never credentials.
+README screenshots and the MP4 are rendered from a real pseudoterminal recording. Preserve the captured ANSI output and timing in the downloadable `.cast` artifact. Describe the offline walkthrough accurately; do not present a synthetic provider fixture as a successful AI coding run.
 
-## Interaction and accessibility
-
-- Visible `:focus-visible` ring on every control; logical DOM/tab order follows the visual sequence.
-- Escape closes dialogs; focus returns to the invoking control.
-- Status changes use an `aria-live="polite"` region and are not conveyed by color alone.
-- Respect `prefers-reduced-motion`; remove transforms and nonessential transitions.
-- Text contrast targets WCAG AA. Controls remain usable at 200% zoom.
-- Keyboard-only users can create a post, select a content item, inspect quality, and close a publish dialog.
-
-## Publication boundary
-
-External publish is a destructive production action. The dialog requires a checked public-publish acknowledgement and exact text `PUBLISH <contentId>`. The button stays disabled until content hash, review package, and quality evidence pass. Closing or refreshing never confirms publication.
-
-## Reference fidelity
-
-Concept C defines the storyboard/timeline/quality composition; concept B defines the queue/detail relationship. The implementation uses original tokens and components rather than embedding screenshots. The design-system route is implemented and reviewed before product screens.
+Validate terminal behavior with subprocess tests and a real PTY. Run the project checks, inspect screenshots for clipped text, decode the MP4, and check every README asset link before handoff.

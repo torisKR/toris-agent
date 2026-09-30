@@ -18,6 +18,7 @@ export async function cmdRun(ctx, positionals, flags) {
 
   const autonomy = resolveAutonomy(flags.autonomy ?? ctx.config.defaultAutonomy).level;
   const dryRun = Boolean(flags['dry-run']);
+  if (flags.offline && !dryRun) throw new UsageError('Offline runs require --dry-run; connect a provider to execute tasks.');
 
   if (!ctx.json) {
     line(c.bold(`Run ${SYM(dryRun)}`));
@@ -34,6 +35,7 @@ export async function cmdRun(ctx, positionals, flags) {
     store: ctx.store,
     config: ctx.config,
     cwd: ctx.cwd,
+    ...(flags.offline ? { detect: () => false } : {}),
     onEvent: ctx.verbose && !ctx.json ? (e) => line(c.dim(`  [${e.type}] ${e.title ?? e.taskId ?? ''}`)) : undefined,
   });
 
@@ -48,6 +50,7 @@ export async function cmdRun(ctx, positionals, flags) {
     review: flags['no-review'] ? false : true,
     checks: project?.checks ?? [],
   });
+  await ctx.onRunResult?.(run);
 
   if (ctx.json) {
     printJson({ ok: run.status !== 'failed', run });

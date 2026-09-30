@@ -1,10 +1,10 @@
 ---
 slug: toris-ops
 title: How to run Toris
-when: Autonomy, receipts, Design Mode, isolation, Studio
+when: Autonomy, receipts, isolation, terminal chat and runs
 anti: Treating a model claim as a receipt; silent knowledge writes
 skills: ship-small, reproduce-first, android-verify, release-check
-tags: toris, autonomy, receipts, studio
+tags: toris, autonomy, receipts, terminal
 ---
 
 # How to run Toris

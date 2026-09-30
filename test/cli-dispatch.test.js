@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { main, resolveInvocation, isInteractiveTerminal } from '../src/cli/index.js';
 import { EXIT } from '../src/core/errors.js';
@@ -121,24 +123,43 @@ test('bare `toris` in a pipe prints help and fails, so scripts do not hang', asy
   assert.match(out, /USAGE/);
 });
 
-test('help documents TUI and GUI doors onto the agent', async () => {
+test('help documents the terminal workflow and available developer tools', async () => {
   const { out } = await captureStdout(() => main(['--help'], { isInteractive: false }));
   assert.match(out, /toris\s+Open the interactive chat TUI/);
   assert.match(out, /toris --agent/);
-  assert.match(out, /agent room at \/agent/);
-  assert.match(out, /Design Mode at \/design/);
-  assert.match(out, /patches at \/patches/);
-  assert.match(out, /knowledge at \/knowledge/);
-  assert.match(out, /daemon at \/daemon/);
-  assert.match(out, /brief at \/brief/);
-  assert.match(out, /android at \/android/);
+  assert.match(out, /patches\s+Isolated diffs/);
+  assert.match(out, /knowledge\s+Local secretary knowledge/);
+  assert.match(out, /android status\|devices\|screenshot\|logcat\|install/);
   assert.match(out, /--no-knowledge/);
-  assert.match(out, /studio --open/);
+  assert.doesNotMatch(out, /studio|GUI|127\.0\.0\.1:5824|Design Mode/i);
   assert.match(out, /toris cost/);
   assert.match(out, /toris brief/);
   assert.match(out, /daemon start\|stop\|status/);
   assert.match(out, /daemon run/);
   assert.match(out, /daemon schedule/);
+});
+
+test('machine-readable help lists terminal commands without Studio', async () => {
+  const { status, stdout } = spawnSync(process.execPath, [
+    fileURLToPath(new URL('../bin/toris.js', import.meta.url)), '--help', '--json',
+  ], { encoding: 'utf8' });
+  assert.equal(status, EXIT.OK);
+  const help = JSON.parse(stdout);
+  assert.equal(help.commands.includes('studio'), false);
+  for (const name of ['chat', 'run', 'patches', 'knowledge', 'android', 'daemon']) {
+    assert.ok(help.commands.includes(name), `${name} remains available`);
+  }
+});
+
+test('removed Studio commands return the normal unknown-command usage error', async () => {
+  const { status, stdout } = spawnSync(process.execPath, [
+    fileURLToPath(new URL('../bin/toris.js', import.meta.url)), 'studio', 'legacy', '--json',
+  ], { encoding: 'utf8' });
+  assert.equal(status, EXIT.USAGE);
+  const error = JSON.parse(stdout).error;
+  assert.equal(error.code, 'E_USAGE');
+  assert.match(error.message, /Unknown command "studio"/);
+  assert.match(error.message, /toris --help/);
 });
 
 // --- first-run onboarding ---------------------------------------------------
