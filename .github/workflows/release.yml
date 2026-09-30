@@ -57,9 +57,28 @@ jobs:
 
       - name: Check syntax and run tests
         run: |
+          set -euo pipefail
           npm run lint
           node --check scripts/build-release.js
-          npm test
+          if npm test -- --test-reporter=spec 2>&1 | tee "$RUNNER_TEMP/toris-test.log"; then
+            :
+          else
+            TEST_STATUS="${PIPESTATUS[0]}"
+            if [ "$TEST_STATUS" -eq 0 ]; then TEST_STATUS=1; fi
+            node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const log = readFileSync(`${process.env.RUNNER_TEMP}/toris-test.log`, 'utf8')
+            .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '');
+          const start = log.lastIndexOf('failing tests:');
+          const details = start >= 0 ? log.slice(start)
+            : 'npm test failed before producing the failing-tests section. See the complete job log.';
+          const excerpt = details.split('\n').slice(0, 120).join('\n').slice(0, 16000)
+            .replaceAll('```', "'''");
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            `### npm test failed\n\nFailing-tests excerpt (at most 120 lines / 16,000 characters; complete output remains in the job log):\n\n\`\`\`text\n${excerpt}\n\`\`\`\n`);
+          NODE
+            exit "$TEST_STATUS"
+          fi
 
       - name: Build the archive and formula
         run: |
@@ -189,3 +208,24 @@ jobs:
             git -C "$TAP_DIR" push origin HEAD
           fi
           echo 'Public Homebrew tap published: https://github.com/torisKR/homebrew-tools' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install and verify the published Homebrew formula
+        run: |
+          set -euo pipefail
+          # Remove the disposable installation so this install resolves the
+          # public tap and its HTTPS release asset as a Homebrew user would.
+          brew uninstall toris-release/local/toris-agent
+          brew untap toris-release/local
+          unset GH_TOKEN GITHUB_TOKEN HOMEBREW_GITHUB_API_TOKEN
+          brew tap torisKR/tools
+          brew install torisKR/tools/toris-agent
+          brew test torisKR/tools/toris-agent
+          toris --version
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          const info = JSON.parse(execFileSync('toris', ['--version', '--json'], { encoding: 'utf8' }));
+          assert.equal(info.name, 'toris-agent');
+          assert.equal(info.version, process.env.RELEASE_VERSION);
+          NODE
+          echo "Verified public Homebrew installation and formula test: toris-agent $RELEASE_VERSION" >> "$GITHUB_STEP_SUMMARY"

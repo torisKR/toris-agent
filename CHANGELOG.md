@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-30
+
+### Fixed
+
+- Solo initialization recognizes equivalent directory aliases and retains the existing project and its checks.
+- Release and solo setup tests use canonical temporary directories, including macOS `/var` aliases.
+
 ## [0.5.0] - 2026-09-30
 
 ### Changed
@@ -86,7 +93,8 @@ Initial public release — the CLI foundation.
   `4` approval denied, `5` daemon unavailable — plus `--json` output on every command.
 - **Zero runtime dependencies**; requires Node.js >= 22.6.0.
 
-[Unreleased]: https://github.com/torisKR/toris-agent/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/torisKR/toris-agent/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/torisKR/toris-agent/releases/tag/v0.5.1
 [0.5.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.5.0
 [0.4.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.4.0
 [0.3.0]: https://github.com/torisKR/toris-agent/releases/tag/v0.3.0

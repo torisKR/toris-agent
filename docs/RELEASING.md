@@ -20,10 +20,10 @@ node scripts/build-release.js --out /tmp/toris-agent-release
 ```
 
 The last command prints JSON containing the archive, checksum file, formula,
-version, and exact release URL. With version `0.5.0`, the output contains:
+version, and exact release URL. With version `0.5.1`, the output contains:
 
 ```text
-/tmp/toris-agent-release/toris-agent-0.5.0.tgz
+/tmp/toris-agent-release/toris-agent-0.5.1.tgz
 /tmp/toris-agent-release/SHA256SUMS
 /tmp/toris-agent-release/Formula/toris-agent.rb
 ```
@@ -50,10 +50,10 @@ contract is revised.
 
 Commit the source changes and create the matching version tag. The release
 workflow publishes the archive and `SHA256SUMS` to a public release of
-`torisKR/toris-agent`. For `0.5.0`, the formula points to:
+`torisKR/toris-agent`. For `0.5.1`, the formula points to:
 
 ```text
-https://github.com/torisKR/toris-agent/releases/download/v0.5.0/toris-agent-0.5.0.tgz
+https://github.com/torisKR/toris-agent/releases/download/v0.5.1/toris-agent-0.5.1.tgz
 ```
 
 Verify the uploaded archive's SHA256 against the local `SHA256SUMS`. Preserve
@@ -115,6 +115,8 @@ dispatch it with the existing tag as its `tag` input. Before publication it:
 4. Rechecks the source tag, creates or completes the GitHub Release, and downloads
    the public assets to compare them with the tested bytes.
 5. Creates or updates the public tap when its separate token is available.
+6. Installs from that public tap and runs `brew test` again against the actual
+   GitHub Release URL.
 
 Existing draft releases are rejected because their assets are not public.
 Existing assets are never overwritten. A retry must produce exactly the same

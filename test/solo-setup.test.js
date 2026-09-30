@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, chmod, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, chmod, rm, realpath, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -9,7 +9,9 @@ import { applyDecision } from '../src/core/apply-gate.js';
 const cli = resolve('bin/toris.js');
 
 async function fixture(fn, providers = ['codex']) {
-  const dir = await mkdtemp(join(tmpdir(), 'toris-solo-'));
+  // Child processes and Git expose physical paths on macOS, where TMPDIR can
+  // contain the /var alias for /private/var.
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'toris-solo-')));
   const home = join(dir, 'state');
   const project = join(dir, 'project');
   const bin = join(dir, 'bin');
@@ -171,5 +173,34 @@ test('init --solo registers the Git root when invoked from a subdirectory withou
       { cwd: project, env, encoding: 'utf8' });
     assert.equal(worktrees.status, 0, worktrees.stderr);
     assert.equal(worktrees.stdout.split('\n').filter((line) => line.startsWith('worktree ')).length, 1);
+  });
+});
+
+test('init --solo recognizes an existing project through its stored symlink path', async () => {
+  await fixture(async ({ home, project, init }) => {
+    const alias = join(project, '..', 'project-alias');
+    await symlink(project, alias, 'dir');
+    await mkdir(home);
+    const existing = {
+      id: 'project_alias', name: 'user-name', path: alias,
+      checks: ['npm run custom-check'], addedAt: '2026-01-01T00:00:00.000Z',
+    };
+    await writeFile(join(home, 'projects.json'), JSON.stringify([existing]));
+    const first = init();
+    const second = init();
+    const normalized = { ...existing, path: project };
+    assert.equal(first.solo.projectCreated, false);
+    assert.equal(second.solo.projectCreated, false);
+    assert.deepEqual(first.solo.project, normalized, 'only the equivalent path is normalized');
+    assert.deepEqual(JSON.parse(await readFile(join(home, 'projects.json'), 'utf8')), [normalized]);
+    const { Store } = await import('../src/core/store.js');
+    const { createHarnessHandlers } = await import('../src/cli/tui/harness.js');
+    const output = [];
+    const config = JSON.parse(await readFile(join(home, 'config.json'), 'utf8'));
+    await createHarnessHandlers({ home, cwd: project, config, store: new Store(home) }, {
+      log: line => output.push(line),
+    }).status();
+    assert.ok(output.some(line => /project.*user-name/.test(line)), 'the TUI selects the preserved project');
+    assert.ok(output.some(line => /checks.*npm run custom-check/.test(line)), 'custom checks remain active');
   });
 });

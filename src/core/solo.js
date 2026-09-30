@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { DEFAULT_CONFIG, configPath, mergeConfig, validateConfig } from './config.js';
 import { ADAPTERS, detectBinary } from './providers.js';
@@ -58,12 +58,23 @@ export async function soloConfig(home) {
 
 /** Register the current project once, preserving any existing project checks. */
 export async function soloProject(store, projectPath) {
-  const target = resolve(projectPath);
+  const target = await realpath(resolve(projectPath));
   const isGitRepo = await isRepo(target);
   const root = isGitRepo ? (await repoRoot(target)) ?? target : target;
   const projects = await store.readCollection('projects');
   const existing = projects.find((project) => project.path === root);
   if (existing) return { project: existing, projectCreated: false };
+  const physicalPaths = await Promise.all(projects.map(project =>
+    typeof project.path === 'string' ? realpath(project.path).catch(() => null) : null));
+  const aliased = projects[physicalPaths.indexOf(root)];
+  if (aliased) {
+    // Node's cwd and Git report physical paths. Normalize only the equivalent
+    // stored path so CLI/TUI selection keeps the user's ID and check commands.
+    const project = { ...aliased, path: root };
+    await store.updateCollection('projects', items =>
+      items.map(item => item.id === project.id ? project : item));
+    return { project, projectCreated: false };
+  }
 
   let manifest = null;
   try {

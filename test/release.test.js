@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,9 @@ const builder = join(root, 'scripts/build-release.js');
 test('release archive and formula install a standalone CLI with a real offline plan', async (t) => {
   // Missing runtime files, a checksum mismatch, broken argument forwarding, or
   // an attempted npm dependency installation must make this test fail.
-  const dir = await mkdtemp(join(tmpdir(), 'toris-release-'));
+  // macOS exposes temporary directories through /var and /tmp symlinks,
+  // while a child process reports its physical working directory.
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'toris-release-')));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const out = join(dir, 'release files');
   const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
